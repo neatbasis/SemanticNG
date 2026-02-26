@@ -27,6 +27,18 @@ class AskStatus(str, Enum):
     ERROR = "error"
 
 
+class CaptureStatus(str, Enum):
+    NO_RESPONSE = "no_response"
+    ERROR = "error"
+
+
+class CaptureOutcome(BaseModel):
+    model_config = _CONTRACT_CONFIG
+    status: CaptureStatus
+    message: Optional[str] = None
+    details: Dict[str, Any] = Field(default_factory=dict)
+
+
 class AskMetrics(BaseModel):
     model_config = _CONTRACT_CONFIG
     elapsed_s: float = 0.0
@@ -39,7 +51,7 @@ class AskResult(BaseModel):
     status: AskStatus
     sentence: Optional[str] = None
     slots: Dict[str, Any] = Field(default_factory=dict)
-    error: Optional[str] = None
+    error: Optional[CaptureOutcome] = None
     metrics: AskMetrics = Field(default_factory=AskMetrics)
 
 # ------------------------------------------------------------------------------
@@ -308,4 +320,3 @@ class BeliefState:
     last_utterance_type: Optional[UtteranceType] = None
     last_status: Optional[AskStatus] = None
     consecutive_no_response: int = 0
-

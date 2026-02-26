@@ -11,6 +11,8 @@ from state_renormalization.contracts import (
     AmbiguityStatus,
     AmbiguityType,
     AskFormat,
+    CaptureOutcome,
+    CaptureStatus,
     Candidate,
     ClarifyingQuestion,
     ResolutionPolicy,
@@ -90,11 +92,11 @@ def sort_schema_hits(hits: list[SchemaHit]) -> list[SchemaHit]:
 #    notes="...",
 #)
 
-def naive_schema_selector(text: Optional[str], *, error: Optional[str]) -> SchemaSelection:
+def naive_schema_selector(text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
     # --------------------------------------------------------------------------
     # 0) Transport-level failure
     # --------------------------------------------------------------------------
-    if error == "no_response":
+    if error is not None and error.status == CaptureStatus.NO_RESPONSE:
         about = AmbiguityAbout(kind=AboutKind.SCHEMA, key="channel.capture")
         amb = Ambiguity(
             status=AmbiguityStatus.UNRESOLVED,

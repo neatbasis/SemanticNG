@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import inspect
 from state_renormalization.adapters.schema_selector import naive_schema_selector
+from state_renormalization.contracts import CaptureOutcome, CaptureStatus
 
 def test_no_response_yields_capture_clarification_ambiguity() -> None:
-    sel = naive_schema_selector(text=None, error="no_response")
+    sel = naive_schema_selector(text=None, error=CaptureOutcome(status=CaptureStatus.NO_RESPONSE))
 
     assert sel.schemas, "Expected schema hits"
     assert any(h.name.startswith("clarify.") for h in sel.schemas)

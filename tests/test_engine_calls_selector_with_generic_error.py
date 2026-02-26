@@ -5,13 +5,13 @@ from typing import Optional
 
 import pytest
 
-from state_renormalization.contracts import ObservationType, BeliefState
+from state_renormalization.contracts import CaptureOutcome, ObservationType, BeliefState, SchemaSelection
 from state_renormalization.engine import apply_schema_bubbling
 
 
 @dataclass
 class FakeAskSat:
-    error: Optional[str] = None
+    error: Optional[CaptureOutcome] = None
 
 
 @dataclass
@@ -27,23 +27,10 @@ class FakeEpisode:
     artifacts: list
 
 
-@dataclass
-class FakeSelection:
-    schemas: list = None
-    ambiguities: list = None
-    notes: Optional[str] = None
-
-    def __post_init__(self):
-        if self.schemas is None:
-            self.schemas = []
-        if self.ambiguities is None:
-            self.ambiguities = []
-
-
 def test_apply_schema_bubbling_calls_selector_with_error_kwarg(monkeypatch: pytest.MonkeyPatch) -> None:
     # Fake selector only accepts keyword-only `error`, not `ha_error`.
-    def fake_selector(user_text: Optional[str], *, error: Optional[str]) -> FakeSelection:
-        return FakeSelection()
+    def fake_selector(user_text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
+        return SchemaSelection()
 
     monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
 
@@ -54,4 +41,3 @@ def test_apply_schema_bubbling_calls_selector_with_error_kwarg(monkeypatch: pyte
     )
 
     apply_schema_bubbling(ep, BeliefState())
-

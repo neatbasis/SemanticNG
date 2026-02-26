@@ -10,11 +10,19 @@ from pydantic import BaseModel
 from enum import Enum
 
 from state_renormalization.contracts import (
+    Ambiguity,
+    AmbiguityAbout,
     AmbiguityStatus,
+    AmbiguityType,
+    AskFormat,
+    CaptureOutcome,
+    CaptureStatus,
+    ClarifyingQuestion,
     AskMetrics,
     AskResult,
     AskStatus,
     BeliefState,
+    AboutKind,
     HypothesisEvaluation,
     DecisionEffect,
     Episode,
@@ -22,6 +30,9 @@ from state_renormalization.contracts import (
     Observation,
     ObservationType,
     OutputRenderingArtifact,
+    ResolutionPolicy,
+    SchemaSelection,
+    SchemaHit,
     UtteranceType,
     project_ambiguity_state,
 )
@@ -70,8 +81,8 @@ def is_exit_intent(txt_lower: str) -> bool:
     return any(p in txt_lower for p in EXIT_PHRASES)
 
 
-def classify_utterance(sentence: Optional[str], error: Optional[str]) -> UtteranceType:
-    if error == "no_response":
+def classify_utterance(sentence: Optional[str], error: Optional[CaptureOutcome]) -> UtteranceType:
+    if error is not None and error.status == CaptureStatus.NO_RESPONSE:
         return UtteranceType.NONE
     txt = (sentence or "").strip().lower()
     if not txt:
@@ -119,9 +130,22 @@ def build_episode(
     outputs: EpisodeOutputs,
 ) -> Episode:
     err = payload.get("error")
-    if err == "no_response":
+    capture: Optional[CaptureOutcome]
+    if isinstance(err, CaptureOutcome):
+        capture = err
+    elif isinstance(err, str):
+        if err == CaptureStatus.NO_RESPONSE.value:
+            capture = CaptureOutcome(status=CaptureStatus.NO_RESPONSE)
+        else:
+            capture = CaptureOutcome(status=CaptureStatus.ERROR, message=err)
+    elif isinstance(err, dict):
+        capture = CaptureOutcome.model_validate(err)
+    else:
+        capture = None
+
+    if capture is not None and capture.status == CaptureStatus.NO_RESPONSE:
         status = AskStatus.NO_RESPONSE
-    elif err:
+    elif capture is not None:
         status = AskStatus.ERROR
     else:
         status = AskStatus.OK
@@ -137,7 +161,7 @@ def build_episode(
         status=status,
         sentence=payload.get("sentence"),
         slots=payload.get("slots") or {},
-        error=err,
+        error=capture,
         metrics=metrics,
     )
 
@@ -233,6 +257,31 @@ def attach_decision_effect(prev_ep: Optional[Episode], curr_ep: Episode) -> Epis
 
 
 
+def _invalid_selection_fallback() -> SchemaSelection:
+    about = AmbiguityAbout(kind=AboutKind.SCHEMA, key="engine.selection.invalid")
+    amb = Ambiguity(
+        status=AmbiguityStatus.UNRESOLVED,
+        about=about,
+        type=AmbiguityType.MISSING_CONTEXT,
+        resolution_policy=ResolutionPolicy.ASK_USER,
+        ask=[ClarifyingQuestion(q="I couldn't parse that response. Could you rephrase?", format=AskFormat.FREEFORM)],
+        evidence={"signals": ["malformed_selection"]},
+        notes="Schema selector returned malformed selection.",
+    )
+    return SchemaSelection(
+        schemas=[SchemaHit(name="clarify.selection_malformed", score=0.99, about=about)],
+        ambiguities=[amb],
+        notes="malformed_selection",
+    )
+
+
+def _validated_selection(raw_selection: Any) -> SchemaSelection:
+    try:
+        return SchemaSelection.model_validate(raw_selection)
+    except Exception:
+        return _invalid_selection_fallback()
+
+
 def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, BeliefState]:
     """
     Single-writer: updates belief state based on the latest observation.
@@ -243,7 +292,8 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
       - belief.pending_attempts (int)
     """
     user_text = extract_user_utterance(ep)
-    sel: SchemaSelectionLike = naive_schema_selector(user_text, error=ep.ask.error)
+    raw_selection = naive_schema_selector(user_text, error=ep.ask.error)
+    sel = _validated_selection(raw_selection)
 
     # --- Schemas
     belief.active_schemas = [h.name for h in sel.schemas]
@@ -261,14 +311,10 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
     else:
         # If we already have a pending obligation, keep it (do not reset attempts here)
         if belief.pending_about is None:
-            chosen = next(
-                (a for a in belief.ambiguities_active if getattr(a, "status", None) == AmbiguityStatus.UNRESOLVED),
-                None,
-            )
+            chosen = next((a for a in belief.ambiguities_active if a.status == AmbiguityStatus.UNRESOLVED), None)
 
             if chosen is not None:
-                about_obj = getattr(chosen, "about", None)
-                about_dict = _to_dict(about_obj if about_obj is not None else chosen)
+                about_dict = _to_dict(chosen.about)
                 if isinstance(about_dict, dict):
                     belief.pending_about = about_dict
                 else:
@@ -276,10 +322,10 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
 
                 # Prefer the first ClarifyingQuestion.q if present
                 q: Optional[str] = None
-                ask_list = getattr(chosen, "ask", None)
+                ask_list = chosen.ask
                 if isinstance(ask_list, list) and ask_list:
                     first = ask_list[0]
-                    q_val = getattr(first, "q", None)
+                    q_val = first.q
                     if isinstance(q_val, str) and q_val.strip():
                         q = q_val.strip()
 
@@ -307,10 +353,10 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
     ep.artifacts.append(
         {
             "kind": "schema_selection",
-            "schemas": [{"name": h.name, "score": h.score, "about": _to_dict(getattr(h, "about", None))} for h in sel.schemas],
+            "schemas": [{"name": h.name, "score": h.score, "about": _to_dict(h.about)} for h in sel.schemas],
             "ambiguities": [_to_dict(a) for a in belief.ambiguities_active],
             "ambiguity_state": belief.ambiguity_state.value,
-            "notes": getattr(sel, "notes", None),
+            "notes": sel.notes,
             "pending_about": _to_dict(belief.pending_about),
             "pending_question": belief.pending_question,
             "pending_attempts": belief.pending_attempts,
@@ -355,4 +401,3 @@ def to_jsonable_episode(ep: Episode) -> Dict[str, Any]:
     if not isinstance(out, dict):
         raise TypeError(f"to_jsonable_episode expected dict, got {type(out).__name__}")
     return out
-

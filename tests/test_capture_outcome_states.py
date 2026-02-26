@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.contracts import (
     AskMetrics,
@@ -65,16 +67,13 @@ def test_empty_text_is_distinct_from_capture_no_response() -> None:
     assert no_response_sel.ambiguities[0].about.key == "channel.capture"
 
 
-def test_malformed_selection_becomes_explicit_malformed_state(monkeypatch) -> None:
+def test_malformed_selector_output_raises_clear_error(monkeypatch) -> None:
     def fake_selector(_text, *, error):
         return {"schemas": ["not-a-schema-hit"], "ambiguities": "not-a-list"}
 
     monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
 
     episode = ingest_observation(_episode_with_capture(error=None, sentence="hello"))
-    ep2, belief = apply_schema_bubbling(episode, BeliefState())
 
-    assert belief.ambiguity_state.value == "unresolved"
-    schema_artifact = next(a for a in ep2.artifacts if a.get("kind") == "schema_selection")
-    assert schema_artifact["notes"] == "malformed_selection"
-    assert schema_artifact["schemas"][0]["name"] == "clarify.selection_malformed"
+    with pytest.raises(TypeError, match="must return SchemaSelection"):
+        apply_schema_bubbling(episode, BeliefState())

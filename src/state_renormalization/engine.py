@@ -3,36 +3,26 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from pydantic import BaseModel
 from enum import Enum
 
 from state_renormalization.contracts import (
-    Ambiguity,
-    AmbiguityAbout,
     AmbiguityStatus,
-    AmbiguityType,
-    AskFormat,
     CaptureOutcome,
     CaptureStatus,
-    ClarifyingQuestion,
     AskMetrics,
     AskResult,
     AskStatus,
     BeliefState,
-    AboutKind,
     HypothesisEvaluation,
     DecisionEffect,
     Episode,
     EpisodeOutputs,
     Observation,
     ObservationType,
-    OutputRenderingArtifact,
-    ResolutionPolicy,
     SchemaSelection,
-    SchemaHit,
     UtteranceType,
     project_ambiguity_state,
 )
@@ -255,31 +245,14 @@ def attach_decision_effect(prev_ep: Optional[Episode], curr_ep: Episode) -> Epis
     return curr_ep
 
 
-
-
-def _invalid_selection_fallback() -> SchemaSelection:
-    about = AmbiguityAbout(kind=AboutKind.SCHEMA, key="engine.selection.invalid")
-    amb = Ambiguity(
-        status=AmbiguityStatus.UNRESOLVED,
-        about=about,
-        type=AmbiguityType.MISSING_CONTEXT,
-        resolution_policy=ResolutionPolicy.ASK_USER,
-        ask=[ClarifyingQuestion(q="I couldn't parse that response. Could you rephrase?", format=AskFormat.FREEFORM)],
-        evidence={"signals": ["malformed_selection"]},
-        notes="Schema selector returned malformed selection.",
-    )
-    return SchemaSelection(
-        schemas=[SchemaHit(name="clarify.selection_malformed", score=0.99, about=about)],
-        ambiguities=[amb],
-        notes="malformed_selection",
-    )
-
-
 def _validated_selection(raw_selection: Any) -> SchemaSelection:
-    try:
-        return SchemaSelection.model_validate(raw_selection)
-    except Exception:
-        return _invalid_selection_fallback()
+    if isinstance(raw_selection, SchemaSelection):
+        return raw_selection
+
+    raise TypeError(
+        "naive_schema_selector must return SchemaSelection; "
+        f"got {type(raw_selection).__name__}"
+    )
 
 
 def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, BeliefState]:
@@ -292,7 +265,7 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
       - belief.pending_attempts (int)
     """
     user_text = extract_user_utterance(ep)
-    raw_selection = naive_schema_selector(user_text, error=ep.ask.error)
+    raw_selection: SchemaSelection = naive_schema_selector(user_text, error=ep.ask.error)
     sel = _validated_selection(raw_selection)
 
     # --- Schemas
@@ -314,29 +287,25 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
             chosen = next((a for a in belief.ambiguities_active if a.status == AmbiguityStatus.UNRESOLVED), None)
 
             if chosen is not None:
-                about_dict = _to_dict(chosen.about)
-                if isinstance(about_dict, dict):
-                    belief.pending_about = about_dict
-                else:
-                    belief.pending_about = {"value": about_dict}
+                belief.pending_about = {
+                    "kind": chosen.about.kind.value,
+                    "key": chosen.about.key,
+                }
+                if chosen.about.span is not None:
+                    belief.pending_about["span"] = {
+                        "text": chosen.about.span.text,
+                        "start": chosen.about.span.start,
+                        "end": chosen.about.span.end,
+                    }
 
                 # Prefer the first ClarifyingQuestion.q if present
                 q: Optional[str] = None
-                ask_list = chosen.ask
-                if isinstance(ask_list, list) and ask_list:
-                    first = ask_list[0]
-                    q_val = first.q
-                    if isinstance(q_val, str) and q_val.strip():
-                        q = q_val.strip()
+                if chosen.ask:
+                    q = chosen.ask[0].q.strip()
 
                 # Fallback: synthesize
                 if not q:
-                    span = None
-                    if isinstance(belief.pending_about, dict):
-                        span = belief.pending_about.get("span") or belief.pending_about.get("text")
-                        # support schema_selector.py which uses TextSpan {text: ...}
-                        if isinstance(span, dict):
-                            span = span.get("text")
+                    span = chosen.about.span.text if chosen.about.span is not None else None
                     if isinstance(span, str) and span.strip():
                         q = f"Be specific: what does “{span.strip()}” refer to?"
                     else:

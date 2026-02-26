@@ -168,6 +168,72 @@ class DenseInterpreterStub:
         }
 
 
+def _initialize_pipeline_context(context) -> None:
+    context._last_persisted_resource = None
+    context._last_ingested_resource = None
+    context._last_artifact_resource = None
+
+
+def _build_ingested_resource(dc: Dict[str, Any], payload_text: str) -> Resource:
+    meta = {"dc": dict(dc)}
+    payload = {"text": payload_text}
+    canonical = {
+        "meta": meta,
+        "payload": payload,
+    }
+    content_hash = _sha256_hex(_canonical_json(canonical))
+    identifier = f"res:{content_hash[:16]}"
+    return Resource(
+        identifier=identifier,
+        meta=meta,
+        payload=payload,
+        integrity={"content_hash": content_hash, "algo": "sha256"},
+        extensions={},
+    )
+
+
+def _validate_event_v1_proposal(proposal: Dict[str, Any], schema: Dict[str, Any]) -> Dict[str, Any]:
+    extraction = proposal.get("extraction", {})
+    evidence = proposal.get("evidence_spans", {})
+    required = schema.get("required", [])
+
+    missing = [f for f in required if f not in extraction]
+    if missing:
+        raise AssertionError(f"Missing required fields: {missing}")
+
+    for field in required:
+        span = evidence.get(field, {})
+        if span.get("start", -1) < 0 or span.get("end", -1) < 0:
+            raise AssertionError(f"Missing/invalid evidence span for required field: {field}")
+
+    return {
+        "ok": True,
+        "schema_id": "Event.v1",
+        "extraction": extraction,
+        "evidence_spans": evidence,
+        "confidence": proposal.get("confidence", 0.0),
+    }
+
+
+def _update_schema_usage_metrics(context, schema_id: str, confidence: float) -> None:
+    schema_usage = getattr(context, "schema_usage", None)
+    if schema_usage is None:
+        context.schema_usage = {}
+
+    rec = context.schema_usage.get(schema_id, {
+        "schema_id": schema_id,
+        "successful_validations": 0,
+        "avg_confidence": 0.0,
+        "last_used_at": None,
+    })
+    prev_n = rec["successful_validations"]
+    new_n = prev_n + 1
+    rec["avg_confidence"] = (rec["avg_confidence"] * prev_n + confidence) / new_n
+    rec["successful_validations"] = new_n
+    rec["last_used_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    context.schema_usage[schema_id] = rec
+
+
 # -------------------------
 # Given steps (infrastructure)
 # -------------------------
@@ -175,9 +241,7 @@ class DenseInterpreterStub:
 @given("an append-only Resource store")
 def step_given_append_only_store(context):
     context.resource_store = AppendOnlyResourceStore()
-    context._last_persisted_resource = None
-    context._last_ingested_resource = None
-    context._last_artifact_resource = None
+    _initialize_pipeline_context(context)
 
 
 @given("a sparse index")
@@ -250,26 +314,7 @@ def step_when_ingest_resource(context):
     if payload_text is None:
         raise AssertionError("No payload text provided for ingestion.")
 
-    # Build a Resource envelope similar to your existing Resource feature.
-    # Keep shape compatible with later real implementation:
-    meta = {"dc": dict(dc)}
-    payload = {"text": payload_text}
-    canonical = {
-        "meta": meta,
-        "payload": payload,
-    }
-    content_hash = _sha256_hex(_canonical_json(canonical))
-
-    # Deterministic identifier from hash (fine for tests)
-    identifier = f"res:{content_hash[:16]}"
-
-    resource = Resource(
-        identifier=identifier,
-        meta=meta,
-        payload=payload,
-        integrity={"content_hash": content_hash, "algo": "sha256"},
-        extensions={},
-    )
+    resource = _build_ingested_resource(dc=dc, payload_text=payload_text)
 
     context.resource_store.append(resource)
     context._last_persisted_resource = resource
@@ -302,28 +347,7 @@ def step_when_validate_proposal(context):
     if not schema:
         raise AssertionError('Schema "Event.v1" not found in registry.')
 
-    # Minimal validation: required fields present and evidence spans exist & are found
-    extraction = proposal.get("extraction", {})
-    evidence = proposal.get("evidence_spans", {})
-    required = schema.get("required", [])
-
-    missing = [f for f in required if f not in extraction]
-    if missing:
-        raise AssertionError(f"Missing required fields: {missing}")
-
-    # Evidence spans for required fields must have valid indices (>=0)
-    for f in required:
-        span = evidence.get(f, {})
-        if span.get("start", -1) < 0 or span.get("end", -1) < 0:
-            raise AssertionError(f"Missing/invalid evidence span for required field: {f}")
-
-    context._last_validation = {
-        "ok": True,
-        "schema_id": "Event.v1",
-        "extraction": extraction,
-        "evidence_spans": evidence,
-        "confidence": proposal.get("confidence", 0.0),
-    }
+    context._last_validation = _validate_event_v1_proposal(proposal=proposal, schema=schema)
 
 
 @when("I materialize a structured Artifact from the validated extraction")
@@ -373,25 +397,11 @@ def step_when_materialize_artifact(context):
     context._last_persisted_resource = artifact
     context._last_artifact_resource = artifact
 
-    # Update schema usage metrics here (so scenario 2 can assert it)
-    schema_usage = getattr(context, "schema_usage", None)
-    if schema_usage is None:
-        context.schema_usage = {}
-
-    rec = context.schema_usage.get(schema_id, {
-        "schema_id": schema_id,
-        "successful_validations": 0,
-        "avg_confidence": 0.0,
-        "last_used_at": None,
-    })
-    prev_n = rec["successful_validations"]
-    new_n = prev_n + 1
-    prev_avg = rec["avg_confidence"]
-    conf = float(validation.get("confidence", 0.0))
-    rec["avg_confidence"] = (prev_avg * prev_n + conf) / new_n
-    rec["successful_validations"] = new_n
-    rec["last_used_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
-    context.schema_usage[schema_id] = rec
+    _update_schema_usage_metrics(
+        context=context,
+        schema_id=schema_id,
+        confidence=float(validation.get("confidence", 0.0)),
+    )
 
 
 @when("I update the sparse index from the persisted Artifact")

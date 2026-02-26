@@ -114,6 +114,31 @@ def build_resource(
     return resource
 
 
+def _ensure_resource_draft(context) -> None:
+    context._meta = getattr(context, "_meta", {})
+    context._payload = getattr(context, "_payload", None)
+    context._extensions = getattr(context, "_extensions", None)
+
+
+def _set_meta_field(context, key: str, value: str) -> None:
+    _ensure_resource_draft(context)
+    context._meta[key] = value
+
+
+def _build_and_store_resource(context) -> None:
+    _ensure_resource_draft(context)
+    context.resource = build_resource(
+        meta=context._meta,
+        payload=context._payload,
+        extensions=context._extensions,
+    )
+    context.store.put(context.resource)
+
+
+def _resource_for_validation(context) -> Dict[str, Any]:
+    return json.loads(canonical_json(context.resource))
+
+
 # ----------------------------
 # Behave steps
 # ----------------------------
@@ -135,26 +160,22 @@ def step_given_store(context) -> None:
 
 @when('I create a Resource with dc:type "{dc_type}"')
 def step_when_create_resource_type(context, dc_type: str) -> None:
-    context._meta = getattr(context, "_meta", {})
-    context._meta["dc:type"] = dc_type
+    _set_meta_field(context, "dc:type", dc_type)
 
 
 @when('with dc:created "{created}"')
 def step_when_set_created(context, created: str) -> None:
-    context._meta = getattr(context, "_meta", {})
-    context._meta["dc:created"] = created
+    _set_meta_field(context, "dc:created", created)
 
 
 @when('with dc:source "{source}"')
 def step_when_set_source(context, source: str) -> None:
-    context._meta = getattr(context, "_meta", {})
-    context._meta["dc:source"] = source
+    _set_meta_field(context, "dc:source", source)
 
 
 @when('with dc:creator "{creator}"')
 def step_when_set_creator(context, creator: str) -> None:
-    context._meta = getattr(context, "_meta", {})
-    context._meta["dc:creator"] = creator
+    _set_meta_field(context, "dc:creator", creator)
 
 
 @when("I create a Resource with:")
@@ -207,14 +228,7 @@ def step_when_set_extensions(context) -> None:
 
 @when("I build the Resource")
 def step_when_build_resource(context) -> None:
-    meta = getattr(context, "_meta", {})
-    payload = getattr(context, "_payload", None)
-    extensions = getattr(context, "_extensions", None)
-
-    context.resource = build_resource(meta=meta, payload=payload, extensions=extensions)
-
-    # store it (many features expect storing implies immutability constraints)
-    context.store.put(context.resource)
+    _build_and_store_resource(context)
 
 
 @then("the Resource MUST contain meta, payload, integrity")
@@ -270,7 +284,7 @@ def step_then_extension_key_pattern(context, pattern: str) -> None:
 
 @then("the kernel validator MUST pass even if \"extensions\" is removed")
 def step_then_kernel_validator_pass_without_extensions(context) -> None:
-    r = json.loads(canonical_json(context.resource))
+    r = _resource_for_validation(context)
     r.pop("extensions", None)
     res = kernel_validate(r)
     assert res.ok, f"Kernel validation failed without extensions: {res.code}"
@@ -294,7 +308,7 @@ def step_when_extension_attempts_override_dc_type(context, new_type: str) -> Non
 
 @then('validation MUST fail with code "{code}"')
 def step_then_validation_fails_with_code(context, code: str) -> None:
-    r = json.loads(canonical_json(context.resource))
+    r = _resource_for_validation(context)
     # Apply the bad extension for this validation attempt
     if hasattr(context, "_bad_extension"):
         r["extensions"] = context._bad_extension

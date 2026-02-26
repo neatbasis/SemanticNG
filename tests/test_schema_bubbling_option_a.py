@@ -2,42 +2,61 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
-from typing import Optional
 
 import pytest
 
 from state_renormalization.contracts import (
     Ambiguity,
     AmbiguityAbout,
+    AboutKind,
     AmbiguityStatus,
     AmbiguityType,
     AskFormat,
+    AskMetrics,
+    AskResult,
+    AskStatus,
     BeliefState,
+    Channel,
     CaptureOutcome,
     ClarifyingQuestion,
+    Episode,
     ResolutionPolicy,
     SchemaHit,
     SchemaSelection,
+    VerbosityDecision,
+    VerbosityLevel,
 )
 from state_renormalization.engine import apply_schema_bubbling
 
 
-@dataclass
-class FakeAskSat:
-    error: Optional[CaptureOutcome] = None
-
-
-@dataclass
-class FakeEpisode:
-    # only what apply_schema_bubbling uses directly
-    ask: FakeAskSat
-    observations: list
-    artifacts: list
+def _episode(error: CaptureOutcome | None = None) -> Episode:
+    return Episode(
+        episode_id="ep:test",
+        conversation_id="conv:test",
+        turn_index=1,
+        t_asked_iso="2026-02-11T00:00:00Z",
+        assistant_prompt_asked="prompt",
+        policy_decision=VerbosityDecision(
+            decision_id="dec:test",
+            t_decided_iso="2026-02-11T00:00:00Z",
+            action_type="prompt_user",
+            verbosity_level=VerbosityLevel.V3_CONCISE,
+            channel=Channel.SATELLITE,
+            reason_codes=[],
+            signals={},
+            policy_version="test",
+            source="test",
+        ),
+        ask=AskResult(status=AskStatus.OK, sentence=None, slots={}, error=error, metrics=AskMetrics()),
+        observations=[],
+        outputs=None,
+        artifacts=[],
+        effects=[],
+    )
 
 
 def test_option_a_sets_pending_about_and_question_when_unresolved(monkeypatch: pytest.MonkeyPatch) -> None:
-    about = AmbiguityAbout(kind="entity", key="ref:they")
+    about = AmbiguityAbout(kind=AboutKind.ENTITY, key="ref:they")
     sel = SchemaSelection(
         schemas=[SchemaHit(name="actionable_intent", score=0.7)],
         ambiguities=[
@@ -51,12 +70,12 @@ def test_option_a_sets_pending_about_and_question_when_unresolved(monkeypatch: p
         ],
     )
 
-    def fake_selector(user_text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
+    def fake_selector(user_text: str | None, *, error: CaptureOutcome | None) -> SchemaSelection:
         return sel
 
     monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
 
-    ep = FakeEpisode(ask=FakeAskSat(error=None), observations=[], artifacts=[])
+    ep = _episode()
     belief = BeliefState()
 
     ep2, b2 = apply_schema_bubbling(ep, belief)
@@ -72,12 +91,12 @@ def test_option_a_sets_pending_about_and_question_when_unresolved(monkeypatch: p
 def test_option_a_clears_pending_when_no_unresolved(monkeypatch: pytest.MonkeyPatch) -> None:
     sel = SchemaSelection(schemas=[], ambiguities=[], notes=None)
 
-    def fake_selector(user_text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
+    def fake_selector(user_text: str | None, *, error: CaptureOutcome | None) -> SchemaSelection:
         return sel
 
     monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
 
-    ep = FakeEpisode(ask=FakeAskSat(error=None), observations=[], artifacts=[])
+    ep = _episode()
     belief = BeliefState(
         ambiguity_state=AmbiguityStatus.UNRESOLVED,
         pending_about={"key": "ref:they"},
@@ -96,12 +115,12 @@ def test_option_a_clears_pending_when_no_unresolved(monkeypatch: pytest.MonkeyPa
 def test_schema_selection_artifact_does_not_leak_channel_specific_terms(monkeypatch: pytest.MonkeyPatch) -> None:
     sel = SchemaSelection(schemas=[SchemaHit(name="actionable_intent", score=0.7)], ambiguities=[], notes="ok")
 
-    def fake_selector(user_text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
+    def fake_selector(user_text: str | None, *, error: CaptureOutcome | None) -> SchemaSelection:
         return sel
 
     monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
 
-    ep = FakeEpisode(ask=FakeAskSat(error=None), observations=[], artifacts=[])
+    ep = _episode()
     belief = BeliefState()
 
     ep2, _ = apply_schema_bubbling(ep, belief)

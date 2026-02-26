@@ -1,0 +1,23 @@
+# state_renormalization/typing_contracts.py
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Protocol
+from state_renormalization.contracts import AmbiguityStatus
+
+
+class AmbiguityLike(Protocol):
+    status: AmbiguityStatus
+    about: Any  # can be dict or rich object
+    ask: Any    # can be str/list/etc. keep loose for now
+
+
+class SchemaHitLike(Protocol):
+    name: str
+    score: float
+    about: Any
+
+
+class SchemaSelectionLike(Protocol):
+    schemas: List[SchemaHitLike]
+    ambiguities: List[AmbiguityLike]
+    notes: Optional[str]

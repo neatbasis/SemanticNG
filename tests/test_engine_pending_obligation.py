@@ -5,6 +5,8 @@ from state_renormalization.contracts import (
     AskMetrics,
     AskResult,
     AskStatus,
+    CaptureOutcome,
+    CaptureStatus,
     BeliefState,
     Channel,
     Episode,
@@ -32,7 +34,7 @@ def _mk_episode_no_response() -> Episode:
         status=AskStatus.NO_RESPONSE,
         sentence=None,
         slots={},
-        error="no_response",
+        error=CaptureOutcome(status=CaptureStatus.NO_RESPONSE),
         metrics=AskMetrics(elapsed_s=30.0, question_chars=0, question_words=0),
     )
 
@@ -63,8 +65,8 @@ def test_apply_schema_bubbling_sets_pending_and_emits_schema_selection_artifact(
 
     # If unresolved, pending must exist
     if belief1.ambiguity_state.value == "unresolved":
-        pending_about = getattr(belief1, "pending_about", None)
-        pending_question = getattr(belief1, "pending_question", None)
+        pending_about = belief1.pending_about
+        pending_question = belief1.pending_question
 
         assert pending_about is not None, "pending_about should not evaporate"
         assert isinstance(pending_about, dict), "pending_about should be a dict (Option A)"

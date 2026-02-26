@@ -3,40 +3,29 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing import Optional
 
 import pytest
 
-from state_renormalization.contracts import AmbiguityStatus, BeliefState
+from state_renormalization.contracts import (
+    Ambiguity,
+    AmbiguityAbout,
+    AmbiguityStatus,
+    AmbiguityType,
+    AskFormat,
+    BeliefState,
+    CaptureOutcome,
+    ClarifyingQuestion,
+    ResolutionPolicy,
+    SchemaHit,
+    SchemaSelection,
+)
 from state_renormalization.engine import apply_schema_bubbling
-
-
-# ---- Minimal fakes matching what engine reads
-
-@dataclass
-class FakeSchemaHit:
-    name: str
-    score: float
-    about: Any = None
-
-
-@dataclass
-class FakeAmbiguity:
-    status: AmbiguityStatus
-    about: Any
-    ask: Any = None  # engine may look at ask/question/q
-
-
-@dataclass
-class FakeSelection:
-    schemas: List[FakeSchemaHit]
-    ambiguities: List[FakeAmbiguity]
-    notes: Optional[str] = None
 
 
 @dataclass
 class FakeAskSat:
-    error: Optional[str] = None
+    error: Optional[CaptureOutcome] = None
 
 
 @dataclass
@@ -48,36 +37,30 @@ class FakeEpisode:
 
 
 def test_option_a_sets_pending_about_and_question_when_unresolved(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Arrange: selector returns one unresolved ambiguity about "they"
-    sel = FakeSelection(
-        schemas=[FakeSchemaHit(name="actionable_intent", score=0.7, about=None)],
+    about = AmbiguityAbout(kind="entity", key="ref:they")
+    sel = SchemaSelection(
+        schemas=[SchemaHit(name="actionable_intent", score=0.7)],
         ambiguities=[
-            FakeAmbiguity(
+            Ambiguity(
                 status=AmbiguityStatus.UNRESOLVED,
-                about={"kind": "reference", "key": "ref:they", "span": "They"},
-                ask=None,
+                about=about,
+                type=AmbiguityType.UNDERSPECIFIED,
+                ask=[ClarifyingQuestion(q="Who is 'they'?", format=AskFormat.FREEFORM)],
+                resolution_policy=ResolutionPolicy.ASK_USER,
             )
         ],
-        notes=None,
     )
 
-    # IMPORTANT: keyword-only `error` enforces engine callsite: naive_schema_selector(..., error=...)
-    def fake_selector(user_text: Optional[str], *, error: Optional[str]) -> FakeSelection:
+    def fake_selector(user_text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
         return sel
 
     monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
 
-    ep = FakeEpisode(
-        ask=FakeAskSat(error=None),
-        observations=[],   # extract_user_utterance won't find any; that's OK for this unit
-        artifacts=[],
-    )
+    ep = FakeEpisode(ask=FakeAskSat(error=None), observations=[], artifacts=[])
     belief = BeliefState()
 
-    # Act
     ep2, b2 = apply_schema_bubbling(ep, belief)
 
-    # Assert
     assert b2.ambiguity_state == AmbiguityStatus.UNRESOLVED
     assert b2.pending_about is not None
     assert b2.pending_about.get("key") == "ref:they"
@@ -87,9 +70,9 @@ def test_option_a_sets_pending_about_and_question_when_unresolved(monkeypatch: p
 
 
 def test_option_a_clears_pending_when_no_unresolved(monkeypatch: pytest.MonkeyPatch) -> None:
-    sel = FakeSelection(schemas=[], ambiguities=[], notes=None)
+    sel = SchemaSelection(schemas=[], ambiguities=[], notes=None)
 
-    def fake_selector(user_text: Optional[str], *, error: Optional[str]) -> FakeSelection:
+    def fake_selector(user_text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
         return sel
 
     monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
@@ -111,13 +94,9 @@ def test_option_a_clears_pending_when_no_unresolved(monkeypatch: pytest.MonkeyPa
 
 
 def test_schema_selection_artifact_does_not_leak_channel_specific_terms(monkeypatch: pytest.MonkeyPatch) -> None:
-    sel = FakeSelection(
-        schemas=[FakeSchemaHit(name="actionable_intent", score=0.7, about=None)],
-        ambiguities=[],
-        notes="ok",
-    )
+    sel = SchemaSelection(schemas=[SchemaHit(name="actionable_intent", score=0.7)], ambiguities=[], notes="ok")
 
-    def fake_selector(user_text: Optional[str], *, error: Optional[str]) -> FakeSelection:
+    def fake_selector(user_text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
         return sel
 
     monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
@@ -132,4 +111,3 @@ def test_schema_selection_artifact_does_not_leak_channel_specific_terms(monkeypa
 
     assert "ha_" not in s
     assert "satellite_" not in s
-

@@ -1,91 +1,96 @@
 # ROADMAP
 
-This roadmap tracks the state-renormalization work as executable behavior. Every item is tied to concrete modules and explicit test-based done conditions so progress is measurable.
+This roadmap translates the architecture in `ARCHITECTURE.md` into an execution plan organized by horizon and validated by tests. It is intentionally future-leaning while preserving the fail-closed principles already implemented: prediction-first gating, explainable halts, and deterministic projection/replay.
 
-## 1. Shipped (verified by tests)
+## Now (already implemented + verified tests)
 
-### 1.1 Schema selection and ambiguity bubbling baseline
-- **Modules/files:** `src/state_renormalization/engine.py`, `src/state_renormalization/adapters/schema_selector.py`, `src/state_renormalization/contracts.py`.
-- **Primary tests:** `tests/test_schema_selector.py`, `tests/test_schema_bubbling_option_a.py`, `tests/test_capture_outcome_states.py`, `tests/test_engine_calls_selector_with_generic_error.py`.
-- **Done condition (test terms):**
-  - `pytest tests/test_schema_selector.py tests/test_schema_bubbling_option_a.py tests/test_capture_outcome_states.py tests/test_engine_calls_selector_with_generic_error.py` passes, proving selector interface stability (`error` kwarg), unresolved ambiguity handling, and artifact emission.
+### 1) Prediction-first contracts and deterministic persistence baseline
+- **Owner area/module:** Contracts + Engine + Persistence (`src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/stable_ids.py`)
+- **Success criteria (test outcomes):**
+  - `pytest tests/test_stable_ids.py tests/test_persistence_jsonl.py tests/test_predictions_contracts_and_gates.py` passes.
+  - Outcomes verify deterministic IDs, append/read JSONL stability, and prediction write/projection behavior.
+- **Related files/tests:**
+  - Files: `src/state_renormalization/stable_ids.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/engine.py`
+  - Tests: `tests/test_stable_ids.py`, `tests/test_persistence_jsonl.py`, `tests/test_predictions_contracts_and_gates.py`
 
-### 1.2 Core contract normalization (channel-agnostic naming)
-- **Modules/files:** `src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`.
-- **Primary tests:** `tests/test_contracts_belief_state.py`, `tests/test_contracts_decision_effect_shape.py`, `tests/test_engine_pending_obligation.py`, `tests/test_engine_pending_obligation_minimal.py`.
-- **Done condition (test terms):**
-  - `pytest tests/test_contracts_belief_state.py tests/test_contracts_decision_effect_shape.py tests/test_engine_pending_obligation.py tests/test_engine_pending_obligation_minimal.py` passes, confirming generic field names and pending-obligation behavior remain stable.
+### 2) Channel-agnostic contract normalization and pending-obligation behavior
+- **Owner area/module:** Contracts + Engine (`src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`)
+- **Success criteria (test outcomes):**
+  - `pytest tests/test_contracts_belief_state.py tests/test_contracts_decision_effect_shape.py tests/test_engine_pending_obligation.py tests/test_engine_pending_obligation_minimal.py` passes.
+  - Outcomes verify generic artifact shapes and stable pending-obligation semantics.
+- **Related files/tests:**
+  - Files: `src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`
+  - Tests: `tests/test_contracts_belief_state.py`, `tests/test_contracts_decision_effect_shape.py`, `tests/test_engine_pending_obligation.py`, `tests/test_engine_pending_obligation_minimal.py`
 
-### 1.3 Deterministic identity and persistence foundation
-- **Modules/files:** `src/state_renormalization/stable_ids.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/engine.py`.
-- **Primary tests:** `tests/test_stable_ids.py`, `tests/test_persistence_jsonl.py`, `tests/test_predictions_contracts_and_gates.py`.
-- **Done condition (test terms):**
-  - `pytest tests/test_stable_ids.py tests/test_persistence_jsonl.py tests/test_predictions_contracts_and_gates.py` passes, verifying deterministic IDs, JSONL append/read semantics, and prediction write/projection contract behavior.
+### 3) Schema selection + ambiguity bubbling contract baseline
+- **Owner area/module:** Selector Adapter + Engine (`src/state_renormalization/adapters/schema_selector.py`, `src/state_renormalization/engine.py`)
+- **Success criteria (test outcomes):**
+  - `pytest tests/test_schema_selector.py tests/test_schema_bubbling_option_a.py tests/test_capture_outcome_states.py tests/test_engine_calls_selector_with_generic_error.py` passes.
+  - Outcomes verify selector interface compatibility (`error` kwarg), unresolved ambiguity capture, and consistent artifact emission.
+- **Related files/tests:**
+  - Files: `src/state_renormalization/adapters/schema_selector.py`, `src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`
+  - Tests: `tests/test_schema_selector.py`, `tests/test_schema_bubbling_option_a.py`, `tests/test_capture_outcome_states.py`, `tests/test_engine_calls_selector_with_generic_error.py`
 
-## 2. In progress
+## Next (active refactors: gate/halt unification + halt persistence)
 
-### 2.1 Engine gates refactor hardening
-- **Refactor target files:** `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`.
-- **Scope:** Continue isolating gate evaluation flow and stop semantics so pre-consume/post-write checks are easier to evolve without changing episode behavior.
-- **Done condition (test terms):**
-  - `pytest tests/test_predictions_contracts_and_gates.py` passes with explicit coverage of both pass and halt branches (`prediction_write_materialized`, `prediction_append_unverified`).
-  - New/updated tests (same file or adjacent gate-focused test file) must assert explainable STOP behavior linked to `InvariantId.H0_EXPLAINABLE_HALT`.
+### 1) Unified gate pipeline (pre-consume + post-write invariants)
+- **Owner area/module:** Engine + Invariants (`src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`)
+- **Success criteria (test outcomes):**
+  - `pytest tests/test_predictions_contracts_and_gates.py` passes with explicit assertions for both `Flow.CONTINUE` and `Flow.STOP` branches.
+  - Tests validate parity of behavior before/after refactor for core gate scenarios (`prediction_write_materialized`, `prediction_append_unverified`).
+- **Related files/tests:**
+  - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`
+  - Tests: `tests/test_predictions_contracts_and_gates.py`
 
-### 2.2 Invariant flow tightening
-- **Refactor target files:** `src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py`.
-- **Scope:** Make invariant outcomes consistently evidence-rich and action-oriented so degraded/invalid flows are debuggable and composable.
-- **Done condition (test terms):**
-  - Gate/invariant tests assert STOP outcomes include both `details` and `evidence`, and that missing explainability is surfaced by `halt_not_explainable`.
-  - Existing invariant-related assertions in `tests/test_predictions_contracts_and_gates.py` remain green after refactor.
+### 2) Explainable halt contract unification and durable halt records
+- **Owner area/module:** Invariants + Contracts + Persistence (`src/state_renormalization/invariants.py`, `src/state_renormalization/contracts.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/engine.py`)
+- **Success criteria (test outcomes):**
+  - `pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py` passes with assertions that every STOP includes machine-readable `details`, `evidence`, and invariant identity.
+  - New/updated tests assert halt artifacts are persisted and replayable without loss of explainability fields.
+- **Related files/tests:**
+  - Files: `src/state_renormalization/invariants.py`, `src/state_renormalization/contracts.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/engine.py`
+  - Tests: `tests/test_predictions_contracts_and_gates.py`, `tests/test_persistence_jsonl.py`
 
-### 2.3 Persistence artifact guarantees
-- **Refactor target files:** `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/engine.py`.
-- **Scope:** Harden append metadata and retrievability conventions for prediction evidence references used by gates.
-- **Done condition (test terms):**
-  - `pytest tests/test_persistence_jsonl.py tests/test_predictions_contracts_and_gates.py` passes with assertions that evidence refs are emitted in stable `file@offset` form and remain consumable through JSONL readers.
+### 3) Invariant matrix completion (all registered invariants exhaustively tested)
+- **Owner area/module:** Invariants + Test harness (`src/state_renormalization/invariants.py`, `tests/test_predictions_contracts_and_gates.py`)
+- **Success criteria (test outcomes):**
+  - `pytest tests/test_predictions_contracts_and_gates.py` passes with parameterized coverage across all `InvariantId` branches.
+  - Test suite proves each invariant can deterministically emit either admissible continuation or explainable stop.
+- **Related files/tests:**
+  - Files: `src/state_renormalization/invariants.py`
+  - Tests: `tests/test_predictions_contracts_and_gates.py`
 
-## 3. Planned
+## Later (larger architecture goals)
 
-### P0 — Formal invariant test matrix
-- **Priority:** Highest.
-- **Files to extend:** `tests/test_predictions_contracts_and_gates.py`, `tests/test_persistence_jsonl.py`, `src/state_renormalization/invariants.py`.
-- **Acceptance criteria (test terms):**
-  - Add parameterized tests for every invariant code path in `InvariantId` registry.
-  - A single command `pytest tests/test_predictions_contracts_and_gates.py` must cover all `Flow.STOP` and `Flow.CONTINUE` outcomes with explicit code assertions.
+### 1) Replay-grade projection engine and longitudinal correction analytics
+- **Owner area/module:** Engine + Persistence + Correction artifacts (`src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`)
+- **Success criteria (test outcomes):**
+  - New replay tests pass, proving `ProjectionState` reconstructed from append-only logs is deterministic across repeated runs and independent process restarts.
+  - Multi-episode tests pass, demonstrating correction/cost attribution can be computed from persisted lineage without side channels.
+- **Related files/tests:**
+  - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`
+  - Tests: extend `tests/test_predictions_contracts_and_gates.py`; add replay/correction-focused tests under `tests/`.
 
-### P1 — Projection/persistence integration scenarios
-- **Priority:** High.
-- **Files to extend:** `src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `tests/test_predictions_contracts_and_gates.py`.
-- **Acceptance criteria (test terms):**
-  - Add multi-write integration tests asserting monotonic offsets and consistent `ProjectionState.current_predictions` updates over successive predictions.
-  - `pytest tests/test_predictions_contracts_and_gates.py` must pass with at least one multi-turn append/projection case.
+### 2) Capability-invocation governance (policy-aware external actions)
+- **Owner area/module:** Engine + Contracts + Capability adapters (`src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, adapter modules under `src/state_renormalization/adapters/`)
+- **Success criteria (test outcomes):**
+  - New capability-gating tests pass, showing no externally consequential action executes without a current valid prediction and explicit gate pass.
+  - Failure-path tests pass, proving policy violations produce persisted explainable halts and zero side-effect invocation.
+- **Related files/tests:**
+  - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, capability adapter files (as added)
+  - Tests: add capability governance suites under `tests/` (prediction + halt + side-effect guards).
 
-### P2 — Schema-selection contract robustness
-- **Priority:** Medium.
-- **Files to extend:** `src/state_renormalization/adapters/schema_selector.py`, `src/state_renormalization/engine.py`, `tests/test_capture_outcome_states.py`, `tests/test_schema_selector.py`.
-- **Acceptance criteria (test terms):**
-  - Add negative tests for malformed selector responses and broaden ambiguity shape assertions.
-  - `pytest tests/test_capture_outcome_states.py tests/test_schema_selector.py` passes while preserving the current channel-agnostic selector signature.
+### 3) Evolution path toward repair-aware projection (without silent mutation)
+- **Owner area/module:** Invariants + Engine (`src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py`)
+- **Success criteria (test outcomes):**
+  - Prototype repair-mode tests pass where repair proposals are emitted as explicit auditable events (never implicit state mutation).
+  - Regression tests continue to pass in strict halt-only mode, proving backward compatibility of fail-closed execution.
+- **Related files/tests:**
+  - Files: `src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py`
+  - Tests: existing `tests/test_predictions_contracts_and_gates.py` plus new repair-mode tests.
 
-### P3 — End-to-end executable documentation alignment
-- **Priority:** Medium.
-- **Files to align:** `README.md`, `tests/README.md`, selected tests under `tests/`.
-- **Acceptance criteria (test terms):**
-  - Document canonical smoke-test command groups used in this roadmap.
-  - CI/readme smoke set (`pytest tests/test_contracts_belief_state.py tests/test_schema_selector.py tests/test_predictions_contracts_and_gates.py`) passes and is documented in both README files.
+## Guardrails (unchanged until Next milestones are complete)
 
-## 4. Out of scope for now
-
-These boundaries prevent accidental scope creep while refactors above are active.
-
-- Replacing JSONL persistence with external databases or streaming infrastructure (`src/state_renormalization/adapters/persistence.py`).
-  - **Re-entry done condition:** only reconsider when current JSONL contract tests (`tests/test_persistence_jsonl.py`, `tests/test_predictions_contracts_and_gates.py`) are fully green and invariant matrix milestone P0 is complete.
-
-- Building a production-grade schema-ranking ML pipeline beyond current naive selector (`src/state_renormalization/adapters/schema_selector.py`).
-  - **Re-entry done condition:** only after schema contract suites (`tests/test_schema_selector.py`, `tests/test_capture_outcome_states.py`, `tests/test_schema_bubbling_option_a.py`) are stable and expanded.
-
-- Broad CLI/app UX expansion unrelated to state-renormalization invariants (`src/features/**`, `src/features/steps/**`).
-  - **Re-entry done condition:** only after engine/invariant/persistence milestones above are accepted by passing targeted pytest sets.
-
-- Non-essential ontology/modeling experiments outside the tested runtime path (`ideas/`, exploratory `.feature` additions without tests).
-  - **Re-entry done condition:** new experiments must first propose test coverage under `tests/` that captures runtime impact.
+- Keep JSONL append-only persistence as the reference storage contract until gate/halt unification and invariant matrix completion are green in CI.
+- Defer production ML ranking complexity for schema selection until selector contract tests are expanded and stable.
+- Avoid broad UX/CLI expansion outside invariant-critical paths until the Next section is complete.

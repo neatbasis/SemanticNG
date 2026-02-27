@@ -55,7 +55,7 @@ def test_post_write_gate_passes_when_evidence_and_projection_current() -> None:
     assert gate.post_write[0].code == "prediction_write_materialized"
 
 
-def test_post_write_gate_halts_when_append_evidence_missing() -> None:
+def test_post_write_gate_halts_when_append_evidence_missing(tmp_path: Path) -> None:
     pred = PredictionRecord.model_validate(FIXED_PREDICTION)
 
     gate = evaluate_invariant_gates(
@@ -65,6 +65,7 @@ def test_post_write_gate_halts_when_append_evidence_missing() -> None:
         current_predictions={pred.scope_key: pred.prediction_id},
         prediction_log_available=True,
         just_written_prediction={"key": pred.scope_key, "evidence_refs": []},
+        halt_log_path=tmp_path / "halts.jsonl",
     )
 
     assert gate.kind == "halt"
@@ -76,6 +77,37 @@ def test_post_write_gate_halts_when_append_evidence_missing() -> None:
     assert gate.halt.reason == "Prediction append did not produce retrievable evidence."
     assert gate.halt.evidence_refs == [{"kind": "scope", "value": pred.scope_key}]
     assert gate.halt.retryable is True
+
+
+def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path: Path) -> None:
+    class DummyEpisode:
+        def __init__(self) -> None:
+            self.artifacts = []
+
+    pred = PredictionRecord.model_validate(FIXED_PREDICTION)
+    ep = DummyEpisode()
+
+    gate = evaluate_invariant_gates(
+        ep=ep,
+        scope=pred.scope_key,
+        prediction_key=pred.scope_key,
+        current_predictions={pred.scope_key: pred.prediction_id},
+        prediction_log_available=True,
+        just_written_prediction={"key": pred.scope_key, "evidence_refs": []},
+        halt_log_path=tmp_path / "halts.jsonl",
+    )
+
+    assert gate.kind == "halt"
+    assert len(ep.artifacts) == 1
+    artifact = ep.artifacts[0]
+    assert artifact["artifact_kind"] == "invariant_outcomes"
+    assert artifact["kind"] == "halt"
+    assert artifact["halt_evidence_ref"] == {"kind": "jsonl", "ref": "halts.jsonl@1"}
+    assert artifact["invariant_context"]["prediction_log_available"] is True
+    assert artifact["invariant_context"]["just_written_prediction"] == {
+        "key": pred.scope_key,
+        "evidence_refs": [],
+    }
 
 
 def test_append_prediction_and_projection_support_post_write_gate(tmp_path: Path) -> None:

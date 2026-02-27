@@ -79,3 +79,13 @@ def append_prediction(path: PathLike, record: Any) -> JsonObj:
 
     append_jsonl(p, record)
     return {"kind": "jsonl", "ref": f"{p.name}@{next_offset}"}
+
+
+def append_halt(path: PathLike, record: Any) -> JsonObj:
+    p = Path(path)
+    next_offset = 1
+    if p.exists():
+        next_offset = len(p.read_text(encoding="utf-8").splitlines()) + 1
+
+    append_jsonl(p, record)
+    return {"kind": "jsonl", "ref": f"{p.name}@{next_offset}"}

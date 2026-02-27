@@ -4,11 +4,16 @@ from __future__ import annotations
 import json
 import re
 import hashlib
+from pathlib import Path
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Tuple, Optional
 
 from behave import given, when, then
+from gherkin.parser import Parser
+from gherkin.token_scanner import TokenScanner
+
+from state_renormalization.stable_ids import derive_stable_ids
 
 
 # -------------------------
@@ -168,14 +173,59 @@ class DenseInterpreterStub:
         }
 
 
+
+
+def _derive_context_stable_ids(context) -> Dict[str, str]:
+    feature_path = getattr(getattr(context, "feature", None), "filename", None)
+    scenario = getattr(context, "scenario", None)
+    step = getattr(context, "step", None)
+
+    if not isinstance(feature_path, str) or not feature_path:
+        return {}
+
+    try:
+        doc = Parser().parse(TokenScanner(Path(feature_path).read_text(encoding="utf-8")))
+    except Exception:
+        return {}
+
+    doc["uri"] = feature_path
+    stable = derive_stable_ids(doc, uri=feature_path)
+    out: Dict[str, str] = {"feature_id": stable.feature_id}
+
+    scenario_name = getattr(scenario, "name", None)
+    scenario_id = None
+    if isinstance(scenario_name, str) and scenario_name.strip():
+        for key, sid in stable.scenario_ids.items():
+            if key.split(":", 1)[-1].split("@", 1)[0] == scenario_name:
+                scenario_id = sid
+                break
+    if scenario_id is not None:
+        out["scenario_id"] = scenario_id
+
+    step_name = getattr(step, "name", None)
+    if scenario_id is not None and isinstance(step_name, str) and step_name.strip():
+        scenario_key = next((k for k, v in stable.scenario_ids.items() if v == scenario_id), None)
+        if scenario_key is not None:
+            for key, sid in stable.step_ids.items():
+                key_scenario, step_part = key.split("::", 1)
+                key_step_text = step_part.split(":", 1)[-1].split("@", 1)[0]
+                if key_scenario == scenario_key and key_step_text == step_name:
+                    out["step_id"] = sid
+                    break
+
+    return out
+
 def _initialize_pipeline_context(context) -> None:
     context._last_persisted_resource = None
     context._last_ingested_resource = None
     context._last_artifact_resource = None
 
 
-def _build_ingested_resource(dc: Dict[str, Any], payload_text: str) -> Resource:
+def _build_ingested_resource(context, dc: Dict[str, Any], payload_text: str) -> Resource:
+    stable_ids = _derive_context_stable_ids(context)
     meta = {"dc": dict(dc)}
+    if stable_ids:
+        meta["stable_ids"] = dict(stable_ids)
     payload = {"text": payload_text}
     canonical = {
         "meta": meta,
@@ -314,7 +364,7 @@ def step_when_ingest_resource(context):
     if payload_text is None:
         raise AssertionError("No payload text provided for ingestion.")
 
-    resource = _build_ingested_resource(dc=dc, payload_text=payload_text)
+    resource = _build_ingested_resource(context, dc=dc, payload_text=payload_text)
 
     context.resource_store.append(resource)
     context._last_persisted_resource = resource
@@ -374,6 +424,7 @@ def step_when_materialize_artifact(context):
             "source_identifier": source_res.identifier,
         },
     }
+    stable_ids = _derive_context_stable_ids(context)
     payload = {
         "extraction": extraction,
         "evidence_spans": evidence,
@@ -381,6 +432,9 @@ def step_when_materialize_artifact(context):
         "schema_id": schema_id,
         "confidence": validation.get("confidence", 0.0),
     }
+    if stable_ids:
+        payload.update(stable_ids)
+        meta.setdefault("semanticng", {}).update(stable_ids)
     canonical = {"meta": meta, "payload": payload}
     content_hash = _sha256_hex(_canonical_json(canonical))
     identifier = f"art:{content_hash[:16]}"

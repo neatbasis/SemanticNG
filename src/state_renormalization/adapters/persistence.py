@@ -12,6 +12,8 @@ from pydantic import BaseModel
 JsonObj = Dict[str, Any]
 PathLike = Union[str, Path]
 
+PREDICTIONS_LOG_PATH = Path("artifacts/predictions.jsonl")
+
 
 def _to_jsonable(x: Any) -> Any:
     if x is None:
@@ -110,7 +112,9 @@ def read_jsonl(path: PathLike) -> Iterator[Tuple[JsonObj, JsonObj]]:
 #    continue
 
 
-def append_prediction(path: PathLike, record: Any) -> JsonObj:
+def append_prediction(path: PathLike = PREDICTIONS_LOG_PATH, record: Any = None) -> JsonObj:
+    if record is None:
+        raise ValueError("append_prediction requires a prediction record")
     p = Path(path)
     next_offset = 1
     if p.exists():

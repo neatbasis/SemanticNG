@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 # ------------------------------------------------------------------------------
 # Shared BaseModel config helpers
@@ -331,27 +331,55 @@ class PredictionRecord(BaseModel):
     model_config = _CONTRACT_CONFIG
 
     prediction_id: str
-    prediction_key: str
     scope_key: str
-    filtration_ref: str
-    variable: str
-    horizon_iso: str
+    prediction_key: Optional[str] = None
+    filtration_id: str = Field(validation_alias=AliasChoices("filtration_id", "filtration_ref"))
+    target_variable: str = Field(validation_alias=AliasChoices("target_variable", "variable"))
+    target_horizon_iso: str = Field(validation_alias=AliasChoices("target_horizon_iso", "horizon_iso"))
 
-    distribution_kind: str
+    # Backward-compatible optional distribution metadata.
+    distribution_kind: Optional[str] = None
     distribution_params: Dict[str, Any] = Field(default_factory=dict)
-    confidence: float
-    uncertainty: float
+    confidence: Optional[float] = None
+    uncertainty: Optional[float] = None
+
+    expectation: Optional[float] = Field(default=None, validation_alias=AliasChoices("expectation", "conditional_expectation"))
+    variance: Optional[float] = Field(default=None, validation_alias=AliasChoices("variance", "conditional_variance"))
 
     issued_at_iso: str
     valid_from_iso: Optional[str] = None
     valid_until_iso: Optional[str] = None
     stopping_time_iso: Optional[str] = None
-    invariants_assumed: List[str] = Field(default_factory=list)
-    evidence_links: List[EvidenceRef] = Field(default_factory=list)
+    assumptions: List[str] = Field(default_factory=list, validation_alias=AliasChoices("assumptions", "invariants_assumed"))
+    evidence_refs: List[EvidenceRef] = Field(default_factory=list, validation_alias=AliasChoices("evidence_refs", "evidence_links"))
 
-    # Optional numeric moments for numeric distributions.
-    conditional_expectation: Optional[float] = None
-    conditional_variance: Optional[float] = None
+    @property
+    def variable(self) -> str:
+        return self.target_variable
+
+    @property
+    def horizon_iso(self) -> str:
+        return self.target_horizon_iso
+
+    @property
+    def filtration_ref(self) -> str:
+        return self.filtration_id
+
+    @property
+    def invariants_assumed(self) -> List[str]:
+        return self.assumptions
+
+    @property
+    def evidence_links(self) -> List[EvidenceRef]:
+        return self.evidence_refs
+
+    @property
+    def conditional_expectation(self) -> Optional[float]:
+        return self.expectation
+
+    @property
+    def conditional_variance(self) -> Optional[float]:
+        return self.variance
 
 
 class ProjectionState(BaseModel):

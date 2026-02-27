@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Any, Dict, Mapping, Optional, Sequence
+from typing import Any, Dict, Literal, Mapping, Optional, Sequence
 from pydantic import BaseModel
 from enum import Enum
 
@@ -26,6 +26,7 @@ from state_renormalization.contracts import (
     ObservationType,
     ProjectionState,
     PredictionRecord,
+    HaltRecord,
     SchemaSelection,
     UtteranceType,
     project_ambiguity_state,
@@ -65,9 +66,11 @@ EXIT_PHRASES = [
 
 
 @dataclass(frozen=True)
-class InvariantGateResult:
+class GateResult:
+    kind: Literal["prediction", "halt"]
     pre_consume: Sequence[InvariantOutcome] = field(default_factory=tuple)
     post_write: Sequence[InvariantOutcome] = field(default_factory=tuple)
+    halt: Optional[HaltRecord] = None
 
     @property
     def combined(self) -> Sequence[InvariantOutcome]:
@@ -76,6 +79,19 @@ class InvariantGateResult:
     @property
     def should_stop(self) -> bool:
         return any(outcome.flow == InvariantFlow.STOP for outcome in self.combined)
+
+
+def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltRecord:
+    reason = str(outcome.details.get("message") or outcome.code)
+    return HaltRecord(
+        halt_id=_new_id("halt:"),
+        stage=stage,
+        invariant_id=outcome.invariant_id.value,
+        reason=reason,
+        evidence_refs=[_to_dict(item) for item in outcome.evidence],
+        timestamp_iso=_now_iso(),
+        retryable=bool(outcome.action_hints),
+    )
 
 
 def _now_iso() -> str:
@@ -164,7 +180,7 @@ def evaluate_invariant_gates(
     current_predictions: Mapping[str, Any],
     prediction_log_available: bool,
     just_written_prediction: Optional[Mapping[str, Any]] = None,
-) -> InvariantGateResult:
+) -> GateResult:
     pre_ctx = default_check_context(
         scope=scope,
         prediction_key=prediction_key,
@@ -185,7 +201,25 @@ def evaluate_invariant_gates(
         )
         post_write = (_run_invariant(InvariantId.P1_WRITE_BEFORE_USE, ctx=post_ctx),)
 
-    result = InvariantGateResult(pre_consume=pre_consume, post_write=post_write)
+    halt_outcome: Optional[InvariantOutcome] = None
+    halt_stage: Optional[str] = None
+    if pre_outcome.flow == InvariantFlow.STOP:
+        halt_outcome = pre_outcome
+        halt_stage = "pre_consume"
+    elif post_write and post_write[0].flow == InvariantFlow.STOP:
+        halt_outcome = post_write[0]
+        halt_stage = "post_write"
+
+    halt_record = None
+    if halt_outcome is not None and halt_stage is not None:
+        halt_record = _halt_record_from_outcome(stage=halt_stage, outcome=halt_outcome)
+
+    result = GateResult(
+        kind="halt" if halt_record is not None else "prediction",
+        pre_consume=pre_consume,
+        post_write=post_write,
+        halt=halt_record,
+    )
 
     if ep is not None:
         ep.artifacts.append(
@@ -194,7 +228,8 @@ def evaluate_invariant_gates(
                 "scope": scope,
                 "pre_consume": [_to_dict(outcome) for outcome in result.pre_consume],
                 "post_write": [_to_dict(outcome) for outcome in result.post_write],
-                "should_stop": result.should_stop,
+                "kind": result.kind,
+                "halt": _to_dict(result.halt),
             }
         )
 

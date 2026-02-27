@@ -69,6 +69,17 @@ def _ok(invariant_id: InvariantId, code: str, details: Optional[Mapping[str, Any
 
 
 def check_p0_no_current_prediction(ctx: CheckContext) -> InvariantOutcome:
+    if not ctx.current_predictions:
+        return InvariantOutcome(
+            invariant_id=InvariantId.P0_NO_CURRENT_PREDICTION,
+            flow=Flow.STOP,
+            validity=Validity.INVALID,
+            code="no_predictions_projected",
+            evidence=({"kind": "scope", "value": ctx.scope},),
+            details={"message": "Action selection requires at least one projected current prediction."},
+            action_hints=({"kind": "rebuild_view", "scope": ctx.scope},),
+        )
+
     key = ctx.prediction_key
     if not key:
         return _ok(InvariantId.P0_NO_CURRENT_PREDICTION, "p0_not_applicable")

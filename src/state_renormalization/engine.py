@@ -282,11 +282,16 @@ def evaluate_invariant_gates(
     ep: Optional[Episode],
     scope: str,
     prediction_key: Optional[str],
-    current_predictions: Mapping[str, Any],
+    projection_state: ProjectionState,
     prediction_log_available: bool,
     just_written_prediction: Optional[Mapping[str, Any]] = None,
     halt_log_path: str | Path = "halts.jsonl",
 ) -> GateResult:
+    current_predictions = {
+        key: pred.prediction_id
+        for key, pred in projection_state.current_predictions.items()
+    }
+
     pre_ctx = default_check_context(
         scope=scope,
         prediction_key=prediction_key,
@@ -341,6 +346,7 @@ def evaluate_invariant_gates(
                 "scope": scope,
                 "prediction_key": prediction_key,
                 "invariant_context": {
+                    "has_current_predictions": projection_state.has_current_predictions,
                     "current_predictions": dict(current_predictions),
                     "prediction_log_available": prediction_log_available,
                     "just_written_prediction": _to_dict(just_written_prediction),
@@ -362,7 +368,7 @@ def evaluate_invariant_gates(
 def append_prediction_record(
     pred: PredictionRecord,
     *,
-    prediction_log_path: str | Path = "predictions.jsonl",
+    prediction_log_path: str | Path = "artifacts/predictions.jsonl",
 ) -> dict[str, str]:
     return append_prediction(prediction_log_path, pred)
 
@@ -377,7 +383,7 @@ def append_halt_record(
 
 def project_current(pred: PredictionRecord, projection_state: ProjectionState) -> ProjectionState:
     current = dict(projection_state.current_predictions)
-    current[pred.scope_key] = pred.prediction_id
+    current[pred.scope_key] = pred
     return ProjectionState(current_predictions=current, updated_at_iso=_now_iso())
 
 def build_episode(

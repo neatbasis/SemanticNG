@@ -27,10 +27,49 @@ def _to_jsonable(x: Any) -> Any:
     return x
 
 
+def _stable_ids_from_record(record: JsonObj) -> JsonObj:
+    stable = record.get("stable_ids")
+    out: JsonObj = {}
+    if isinstance(stable, dict):
+        for key in ("feature_id", "scenario_id", "step_id"):
+            if isinstance(stable.get(key), str):
+                out[key] = stable[key]
+
+    for key in ("feature_id", "scenario_id", "step_id"):
+        val = record.get(key)
+        if isinstance(val, str):
+            out[key] = val
+    return out
+
+
+def _inject_stable_ids(record: JsonObj) -> JsonObj:
+    stable = _stable_ids_from_record(record)
+    if not stable:
+        return record
+
+    out = {**stable, **record}
+
+    for list_key in ("events", "artifacts", "steps", "decisions"):
+        items = out.get(list_key)
+        if not isinstance(items, list):
+            continue
+        enriched = []
+        for item in items:
+            if isinstance(item, dict):
+                enriched.append({**stable, **item})
+            else:
+                enriched.append(item)
+        out[list_key] = enriched
+
+    return out
+
+
 def append_jsonl(path: PathLike, record: Any) -> None:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     obj = _to_jsonable(record)
+    if isinstance(obj, dict):
+        obj = _inject_stable_ids(obj)
 
     # enforce "one JSON object per line"
     line = json.dumps(obj, ensure_ascii=False)

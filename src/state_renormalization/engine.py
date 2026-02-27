@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Literal, Mapping, Optional, Sequence
 from pydantic import BaseModel
 from enum import Enum
+from gherkin.parser import Parser
+from gherkin.token_scanner import TokenScanner
 
 from state_renormalization.contracts import (
     AmbiguityStatus,
@@ -43,6 +45,7 @@ from state_renormalization.invariants import (
     REGISTRY,
     default_check_context,
 )
+from state_renormalization.stable_ids import derive_stable_ids
 
 
 PHATIC_PATTERNS = [
@@ -170,6 +173,90 @@ def _to_dict(obj: Any) -> Any:
     return obj
 
 
+def _find_stable_ids_from_payload(payload: Mapping[str, Any]) -> Dict[str, str]:
+    explicit = {
+        "feature_id": payload.get("feature_id"),
+        "scenario_id": payload.get("scenario_id"),
+        "step_id": payload.get("step_id"),
+    }
+    if explicit["feature_id"] and explicit["scenario_id"] and explicit["step_id"]:
+        return {k: str(v) for k, v in explicit.items() if v is not None}
+
+    feature_uri = payload.get("feature_uri") or payload.get("feature_path")
+    if not isinstance(feature_uri, str) or not feature_uri.strip():
+        return {}
+
+    feature_path = Path(feature_uri)
+    if not feature_path.exists():
+        return {}
+
+    try:
+        doc = Parser().parse(TokenScanner(feature_path.read_text(encoding="utf-8")))
+    except Exception:
+        return {}
+
+    doc["uri"] = feature_uri
+    stable = derive_stable_ids(doc, uri=feature_uri)
+
+    scenario_name = payload.get("scenario_name")
+    step_text = payload.get("step_text")
+
+    scenario_id: Optional[str] = None
+    if isinstance(scenario_name, str) and scenario_name.strip():
+        for key, sid in stable.scenario_ids.items():
+            if key.split(":", 1)[-1].split("@", 1)[0] == scenario_name:
+                scenario_id = sid
+                break
+    elif len(stable.scenario_ids) == 1:
+        scenario_id = next(iter(stable.scenario_ids.values()))
+
+    step_id: Optional[str] = None
+    if isinstance(step_text, str) and step_text.strip():
+        for key, sid in stable.step_ids.items():
+            key_scenario, step_part = key.split("::", 1)
+            key_step_text = step_part.split(":", 1)[-1].split("@", 1)[0]
+            if key_step_text != step_text:
+                continue
+            if scenario_id is None:
+                step_id = sid
+                break
+            scenario_key = next((k for k, v in stable.scenario_ids.items() if v == scenario_id), None)
+            if scenario_key is not None and key_scenario == scenario_key:
+                step_id = sid
+                break
+    elif len(stable.step_ids) == 1:
+        step_id = next(iter(stable.step_ids.values()))
+
+    out = {"feature_id": stable.feature_id}
+    if scenario_id is not None:
+        out["scenario_id"] = scenario_id
+    if step_id is not None:
+        out["step_id"] = step_id
+    return out
+
+
+def _episode_stable_ids(ep: Episode) -> Dict[str, str]:
+    for artifact in ep.artifacts:
+        if not isinstance(artifact, dict):
+            continue
+        fid = artifact.get("feature_id")
+        sid = artifact.get("scenario_id")
+        stid = artifact.get("step_id")
+        if isinstance(fid, str):
+            out = {"feature_id": fid}
+            if isinstance(sid, str):
+                out["scenario_id"] = sid
+            if isinstance(stid, str):
+                out["step_id"] = stid
+            return out
+    return {}
+
+
+def _append_episode_artifact(ep: Episode, artifact: Dict[str, Any], *, stable_ids: Optional[Mapping[str, str]] = None) -> None:
+    sid = dict(stable_ids or _episode_stable_ids(ep))
+    ep.artifacts.append({**sid, **artifact} if sid else artifact)
+
+
 def _run_invariant(invariant_id: InvariantId, *, ctx) -> InvariantOutcome:
     checker = REGISTRY[invariant_id]
     outcome = checker(ctx)
@@ -246,7 +333,8 @@ def evaluate_invariant_gates(
         halt_evidence_ref = append_halt(halt_log_path, halt_record)
 
     if ep is not None:
-        ep.artifacts.append(
+        _append_episode_artifact(
+            ep,
             {
                 "artifact_kind": "invariant_outcomes",
                 "observer": _to_dict(getattr(ep, "observer", None)),
@@ -263,7 +351,7 @@ def evaluate_invariant_gates(
                 "prediction": _to_dict(result.prediction),
                 "halt": _to_dict(result.halt),
                 "halt_evidence_ref": halt_evidence_ref,
-            }
+            },
         )
 
     return result
@@ -352,12 +440,19 @@ def build_episode(
         artifacts=[],
         effects=[],
     )
-    ep.artifacts.append({
-        "kind": "policy_hypothesis",
-        "decision_id": policy_decision.decision_id,
-        "hypothesis": policy_decision.hypothesis,
-        "reason_codes": policy_decision.reason_codes,
-    })
+    stable_ids = _find_stable_ids_from_payload(payload)
+    _append_episode_artifact(
+        ep,
+        {
+            "kind": "policy_hypothesis",
+            "decision_id": policy_decision.decision_id,
+            "hypothesis": policy_decision.hypothesis,
+            "reason_codes": policy_decision.reason_codes,
+        },
+        stable_ids=stable_ids,
+    )
+    if stable_ids:
+        _append_episode_artifact(ep, {"kind": "stable_ids", **stable_ids}, stable_ids=stable_ids)
     return ep
 
 
@@ -504,7 +599,8 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
     belief.belief_version += 1
     belief.updated_at_iso = _now_iso()
 
-    ep.artifacts.append(
+    _append_episode_artifact(
+        ep,
         {
             "kind": "schema_selection",
             "schemas": [{"name": h.name, "score": h.score, "about": _to_dict(h.about)} for h in sel.schemas],
@@ -514,7 +610,7 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
             "pending_about": _to_dict(belief.pending_about),
             "pending_question": belief.pending_question,
             "pending_attempts": belief.pending_attempts,
-        }
+        },
     )
 
     return ep, belief
@@ -536,13 +632,14 @@ def apply_utterance_interpretation(ep: Episode, belief: BeliefState) -> tuple[Ep
     else:
         belief.consecutive_no_response = 0
 
-    ep.artifacts.append(
+    _append_episode_artifact(
+        ep,
         {
             "kind": "utterance_interpretation",
             "utterance_type": utype.value,
             "text_preview": (user_text[:80] if isinstance(user_text, str) else None),
             "consecutive_no_response": belief.consecutive_no_response,
-        }
+        },
     )
     return ep, belief
 

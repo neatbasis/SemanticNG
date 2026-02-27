@@ -84,7 +84,17 @@ class PredictionOutcome:
         return tuple(self.pre_consume) + tuple(self.post_write)
 
 
-GateDecision = PredictionOutcome | HaltRecord
+@dataclass(frozen=True)
+class GateSuccessOutcome:
+    artifact: PredictionOutcome
+
+
+@dataclass(frozen=True)
+class GateHaltOutcome:
+    artifact: HaltRecord
+
+
+GateDecision = GateSuccessOutcome | GateHaltOutcome
 
 
 @dataclass(frozen=True)
@@ -140,13 +150,13 @@ def _stable_halt_id(*, stage: str, outcome: InvariantOutcome) -> str:
 def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltRecord:
     reason = outcome.reason
     return HaltRecord(
-        stable_halt_id=_stable_halt_id(stage=stage, outcome=outcome),
+        halt_id=_stable_halt_id(stage=stage, outcome=outcome),
         stage=stage,
         violated_invariant_id=outcome.invariant_id.value,
         reason=reason,
         evidence_refs=[_as_evidence_ref(_to_dict(item)) for item in outcome.evidence],
-        timestamp=_now_iso(),
-        retryability=bool(outcome.action_hints),
+        timestamp_iso=_now_iso(),
+        retryable=bool(outcome.action_hints),
     )
 
 
@@ -389,20 +399,19 @@ def evaluate_invariant_gates(
             )
         )
 
-    result: GateDecision
     result_kind: str
     if halt_record is None:
-        result = PredictionOutcome(pre_consume=pre_consume, post_write=post_write)
+        result = GateSuccessOutcome(artifact=PredictionOutcome(pre_consume=pre_consume, post_write=post_write))
         result_kind = "prediction"
     else:
-        result = halt_record
+        result = GateHaltOutcome(artifact=halt_record)
         result_kind = "halt"
 
     halt_evidence_ref: Optional[Dict[str, str]] = None
     stable_ids = _episode_stable_ids(ep) if ep is not None else {}
-    if isinstance(result, HaltRecord):
+    if isinstance(result, GateHaltOutcome):
         halt_evidence_ref = append_halt_record(
-            result,
+            result.artifact,
             halt_log_path=halt_log_path,
             stable_ids=stable_ids,
         )
@@ -439,19 +448,20 @@ def evaluate_invariant_gates(
                     for check in gate_checks
                 ],
                 "kind": result_kind,
-                "prediction": _to_dict(result) if isinstance(result, PredictionOutcome) else None,
-                "halt": _to_dict(result) if isinstance(result, HaltRecord) else None,
+                "prediction": _to_dict(result.artifact) if isinstance(result, GateSuccessOutcome) else None,
+                "halt": _to_dict(result.artifact) if isinstance(result, GateHaltOutcome) else None,
                 "halt_evidence_ref": halt_evidence_ref,
             },
         )
 
-        if isinstance(result, HaltRecord):
+        if isinstance(result, GateHaltOutcome):
+            halt = result.artifact
             halt_observation = Observation(
                 observation_id=_new_id("obs:"),
                 t_observed_iso=_now_iso(),
                 type=ObservationType.HALT,
-                text=result.reason,
-                source=f"invariant:{result.violated_invariant_id}",
+                text=halt.reason,
+                source=f"invariant:{halt.violated_invariant_id}",
             )
             if not hasattr(ep, "observations") or getattr(ep, "observations") is None:
                 setattr(ep, "observations", [])
@@ -462,12 +472,12 @@ def evaluate_invariant_gates(
                     "artifact_kind": "halt_observation",
                     "observation_type": "halt",
                     "observation_id": halt_observation.observation_id,
-                    "stable_halt_id": result.stable_halt_id,
-                    "stage": result.stage,
-                    "violated_invariant_id": result.violated_invariant_id,
-                    "reason": result.reason,
-                    "retryability": result.retryability,
-                    "evidence_refs": [_to_dict(e) for e in result.evidence_refs],
+                    "halt_id": halt.halt_id,
+                    "stage": halt.stage,
+                    "violated_invariant_id": halt.violated_invariant_id,
+                    "reason": halt.reason,
+                    "retryable": halt.retryable,
+                    "evidence_refs": [_to_dict(e) for e in halt.evidence_refs],
                     "halt_evidence_ref": halt_evidence_ref,
                 },
             )
@@ -502,7 +512,7 @@ def append_halt_record(
     halt_log_path: str | Path = "halts.jsonl",
     stable_ids: Optional[Mapping[str, str]] = None,
 ) -> dict[str, str]:
-    payload: Any = halt
+    payload: Any = halt.model_dump(mode="json")
     if stable_ids:
         payload = {**dict(stable_ids), **halt.model_dump(mode="json")}
     return append_halt(halt_log_path, payload)
@@ -557,7 +567,7 @@ def run_mission_loop(
             prediction_log_available=True,
             just_written_prediction={"key": pred.scope_key, "evidence_refs": [evidence_ref]},
         )
-        if isinstance(gate, HaltRecord):
+        if isinstance(gate, GateHaltOutcome):
             return ep, belief, updated_projection
 
 
@@ -569,7 +579,7 @@ def run_mission_loop(
         projection_state=updated_projection,
         prediction_log_available=True,
     )
-    if isinstance(pre_decision_gate, HaltRecord):
+    if isinstance(pre_decision_gate, GateHaltOutcome):
         return ep, belief, updated_projection
 
     ep = ingest_observation(ep)

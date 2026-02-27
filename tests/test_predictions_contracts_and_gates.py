@@ -2,9 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from state_renormalization.contracts import HaltRecord, PredictionRecord, ProjectionState
+from state_renormalization.contracts import PredictionRecord, ProjectionState
 from state_renormalization.adapters.persistence import read_jsonl
-from state_renormalization.engine import PredictionOutcome, append_prediction_record, evaluate_invariant_gates, project_current
+from state_renormalization.engine import (
+    GateHaltOutcome,
+    GateSuccessOutcome,
+    append_prediction_record,
+    evaluate_invariant_gates,
+    project_current,
+)
 
 
 FIXED_PREDICTION = {
@@ -56,9 +62,9 @@ def test_post_write_gate_passes_when_evidence_and_projection_current() -> None:
         },
     )
 
-    assert isinstance(gate, PredictionOutcome)
-    assert gate.post_write
-    assert gate.post_write[0].code == "prediction_write_materialized"
+    assert isinstance(gate, GateSuccessOutcome)
+    assert gate.artifact.post_write
+    assert gate.artifact.post_write[0].code == "prediction_write_materialized"
 
 
 def test_post_write_gate_halts_when_append_evidence_missing(tmp_path: Path) -> None:
@@ -78,12 +84,13 @@ def test_post_write_gate_halts_when_append_evidence_missing(tmp_path: Path) -> N
         halt_log_path=tmp_path / "halts.jsonl",
     )
 
-    assert isinstance(gate, HaltRecord)
-    assert gate.stage == "post_write"
-    assert gate.violated_invariant_id == "prediction_retrievability.v1"
-    assert gate.reason == "Prediction append did not produce retrievable evidence."
-    assert [e.model_dump(mode="json") for e in gate.evidence_refs] == [{"kind": "scope", "ref": pred.scope_key}]
-    assert gate.retryability is True
+    assert isinstance(gate, GateHaltOutcome)
+    halt = gate.artifact
+    assert halt.stage == "post_write"
+    assert halt.violated_invariant_id == "prediction_retrievability.v1"
+    assert halt.reason == "Prediction append did not produce retrievable evidence."
+    assert [e.model_dump(mode="json") for e in halt.evidence_refs] == [{"kind": "scope", "ref": pred.scope_key}]
+    assert halt.retryable is True
 
 
 def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path: Path) -> None:
@@ -108,12 +115,12 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
         halt_log_path=tmp_path / "halts.jsonl",
     )
 
-    assert isinstance(gate, HaltRecord)
+    assert isinstance(gate, GateHaltOutcome)
     assert len(ep.artifacts) == 2
     artifact = ep.artifacts[0]
     assert artifact["artifact_kind"] == "invariant_outcomes"
     assert artifact["kind"] == "halt"
-    assert artifact["halt"]["stable_halt_id"].startswith("halt:")
+    assert artifact["halt"]["halt_id"].startswith("halt:")
     assert artifact["halt_evidence_ref"] == {"kind": "jsonl", "ref": "halts.jsonl@1"}
     assert artifact["invariant_context"]["prediction_log_available"] is True
     assert artifact["invariant_context"]["has_current_predictions"] is True
@@ -148,7 +155,7 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
     halt_observation = ep.artifacts[1]
     assert halt_observation["artifact_kind"] == "halt_observation"
     assert halt_observation["observation_type"] == "halt"
-    assert halt_observation["stable_halt_id"].startswith("halt:")
+    assert halt_observation["halt_id"].startswith("halt:")
     assert halt_observation["violated_invariant_id"] == "prediction_retrievability.v1"
 
 
@@ -172,8 +179,8 @@ def test_append_prediction_and_projection_support_post_write_gate(tmp_path: Path
 
     assert evidence["ref"].startswith("predictions.jsonl@")
     assert projected.current_predictions[pred.scope_key] == pred
-    assert isinstance(gate, PredictionOutcome)
-    assert gate.post_write[0].code == "prediction_write_materialized"
+    assert isinstance(gate, GateSuccessOutcome)
+    assert gate.artifact.post_write[0].code == "prediction_write_materialized"
 
 
 def test_pre_consume_gate_halts_without_any_projected_predictions(tmp_path: Path) -> None:
@@ -186,9 +193,10 @@ def test_pre_consume_gate_halts_without_any_projected_predictions(tmp_path: Path
         halt_log_path=tmp_path / "halts.jsonl",
     )
 
-    assert isinstance(gate, HaltRecord)
-    assert gate.violated_invariant_id == "prediction_availability.v1"
-    assert gate.reason == "Action selection requires at least one projected current prediction."
+    assert isinstance(gate, GateHaltOutcome)
+    halt = gate.artifact
+    assert halt.violated_invariant_id == "prediction_availability.v1"
+    assert halt.reason == "Action selection requires at least one projected current prediction."
 
 
 def test_append_prediction_record_persists_supplied_stable_ids(tmp_path: Path) -> None:

@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Callable, Optional, Protocol
 
 from state_renormalization.contracts import (
     AboutKind,
@@ -81,202 +82,291 @@ def sort_schema_hits(hits: list[SchemaHit]) -> list[SchemaHit]:
             h.name,
         ),
     )
-    
-# TODO: When we have implemented the feature for delivering multiple schemas
-#return SchemaSelection(
-#    schemas=sort_schema_hits([
-#        SchemaHit(...),
-#        SchemaHit(...),
-#    ]),
-#    ambiguities=[...],
-#    notes="...",
-#)
 
-def naive_schema_selector(text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
-    # --------------------------------------------------------------------------
-    # 0) Transport-level failure
-    # --------------------------------------------------------------------------
-    if error is not None and error.status == CaptureStatus.NO_RESPONSE:
-        about = AmbiguityAbout(kind=AboutKind.SCHEMA, key="channel.capture")
-        amb = Ambiguity(
-            status=AmbiguityStatus.UNRESOLVED,
-            about=about,
-            type=AmbiguityType.MISSING_CONTEXT,
-            candidates=[],
-            resolution_policy=ResolutionPolicy.ASK_USER,
-            ask=[
-                ClarifyingQuestion(
-                    q="I didn’t catch that. Please repeat?",
-                    format=AskFormat.FREEFORM,
-                )
-            ],
-            evidence={"signals": ["no_response"]},
-            notes="No response captured (transport/ASR timeout).",
-        )
-        return SchemaSelection(
-            schemas=[SchemaHit(name="clarify.capture", score=0.95, about=about)],
-            ambiguities=[amb],
-            notes="no_response",
-        )
 
-    # --------------------------------------------------------------------------
-    # 1) Normalize + guard empty
-    # --------------------------------------------------------------------------
-    raw = text or ""
-    t = normalize_text(raw)
+@dataclass(frozen=True)
+class SelectorContext:
+    raw: str
+    normalized: str
+    tokens: set[str]
+    error: Optional[CaptureOutcome]
+    metadata: dict[str, object] = field(default_factory=dict)
 
-    if not t.strip():
-        about = AmbiguityAbout(kind=AboutKind.SCHEMA, key="cli.input.empty")
-        amb = Ambiguity(
-            status=AmbiguityStatus.UNRESOLVED,
-            about=about,
-            type=AmbiguityType.MISSING_CONTEXT,
-            resolution_policy=ResolutionPolicy.ASK_USER,
-            ask=[ClarifyingQuestion(q="I didn't catch anything. What do you want to do?", format=AskFormat.FREEFORM)],
-            evidence={"signals": ["empty_text"]},
-        )
-        return SchemaSelection(
-            schemas=[SchemaHit(name="clarify.empty_input", score=0.95, about=about)],
-            ambiguities=[amb],
-        )
 
-    # --------------------------------------------------------------------------
-    # 2) Exit intent early
-    # --------------------------------------------------------------------------
-    if is_exit_intent(t):
-        about = AmbiguityAbout(kind=AboutKind.INTENT, key="user.intent.exit", span=TextSpan(text=raw))
-        return SchemaSelection(
-            schemas=[SchemaHit(name="exit_intent", score=0.99, about=about)],
-            ambiguities=[],
-        )
+class Rule(Protocol):
+    name: str
 
-    tokens = set(norm_tokens(t))
+    def applies(self, ctx: SelectorContext) -> bool: ...
 
-    # --------------------------------------------------------------------------
-    # 3) Specific ambiguity: vague actor ("they ... coming")
-    #    IMPORTANT: this must run before "uncertainty" so "I don't know" doesn't steal it.
-    # --------------------------------------------------------------------------
-    if (tokens & VAGUE_PRONOUNS) and any(w in tokens for w in ARRIVAL_WORDS):
-        about = AmbiguityAbout(kind=AboutKind.ENTITY, key="event.actor", span=TextSpan(text=raw))
-        amb = Ambiguity(
-            status=AmbiguityStatus.UNRESOLVED,
-            about=about,
-            type=AmbiguityType.UNDERSPECIFIED,
-            resolution_policy=ResolutionPolicy.ASK_USER,
-            ask=[
-                ClarifyingQuestion(
-                    q="Who is 'they'?",
-                    format=AskFormat.FREEFORM,
-                )
-            ],
-            evidence={"signals": ["vague_pronoun", "arrival_event"], "tokens": sorted(tokens)},
-            notes="Vague actor in arrival statement.",
-        )
-        return SchemaSelection(
-            schemas=[
-                SchemaHit(name="clarify.actor", score=0.92, about=about),
-                SchemaHit(name="clarification_needed", score=0.75, about=about),
-            ],
-            ambiguities=[amb],
-        )
+    def emit(self, ctx: SelectorContext) -> SchemaSelection: ...
 
-    # --------------------------------------------------------------------------
-    # 4) URL task intent
-    # --------------------------------------------------------------------------
-    if has_url(t):
-        about = AmbiguityAbout(kind=AboutKind.INTENT, key="task.intent.link", span=TextSpan(text=raw))
-        amb = Ambiguity(
-            status=AmbiguityStatus.UNRESOLVED,
-            about=about,
-            type=AmbiguityType.UNDERSPECIFIED,
-            resolution_policy=ResolutionPolicy.ASK_USER,
-            ask=[
-                ClarifyingQuestion(
-                    q="What should I do with that link?",
-                    format=AskFormat.MULTICHOICE,
-                    options=["summarize", "extract key claims", "relate to our system", "just open it"],
-                )
-            ],
-            evidence={"signals": ["url_present"]},
-        )
-        return SchemaSelection(
-            schemas=[
-                SchemaHit(name="clarify.link_intent", score=0.9, about=about),
-                SchemaHit(name="clarification_needed", score=0.7, about=about),
-            ],
-            ambiguities=[amb],
-        )
 
-    # --------------------------------------------------------------------------
-    # 5) Timer duration unit underspecification
-    # --------------------------------------------------------------------------
-    has_numberish = any(tok.isdigit() for tok in tokens) or any(tok in {"ten", "five"} for tok in tokens)
-    has_unit = any(u in tokens for u in {"s", "sec", "second", "seconds", "m", "min", "minute", "minutes", "h", "hour", "hours"})
-    mentions_timerish = any(w in t for w in ["timer", "remind", "reminder", "in "])
+@dataclass(frozen=True)
+class FunctionRule:
+    name: str
+    _applies: Callable[[SelectorContext], bool]
+    _emit: Callable[[SelectorContext], SchemaSelection]
 
-    if mentions_timerish and has_numberish and not has_unit:
-        about = AmbiguityAbout(kind=AboutKind.PARAMETER, key="timer.duration", span=TextSpan(text=raw))
-        amb = Ambiguity(
-            status=AmbiguityStatus.UNRESOLVED,
-            about=about,
-            type=AmbiguityType.UNDERSPECIFIED,
-            candidates=[
-                Candidate("minutes", 0.65),
-                Candidate("seconds", 0.25),
-                Candidate("hours", 0.10),
-            ],
-            resolution_policy=ResolutionPolicy.ASK_USER,
-            ask=[
-                ClarifyingQuestion(
-                    q="Ten what — minutes or seconds?",
-                    format=AskFormat.MULTICHOICE,
-                    options=["minutes", "seconds"],
-                )
-            ],
-            evidence={"signals": ["timerish", "number_without_unit"], "tokens": sorted(tokens)},
-            notes="Duration unit missing.",
-        )
-        return SchemaSelection(
-            schemas=[
-                SchemaHit(name="clarify.duration_unit", score=0.9, about=about),
-                SchemaHit(name="clarification_needed", score=0.7, about=about),
-            ],
-            ambiguities=[amb],
-        )
+    def applies(self, ctx: SelectorContext) -> bool:
+        return self._applies(ctx)
 
-    # --------------------------------------------------------------------------
-    # 6) Broad uncertainty (goal/intent) — LAST among ambiguity rules
-    # --------------------------------------------------------------------------
-    if has_any_phrase(t, UNCERTAIN_PHRASES):
-        about = AmbiguityAbout(kind=AboutKind.GOAL, key="user.goal", span=TextSpan(text=raw))
-        amb = Ambiguity(
-            status=AmbiguityStatus.UNRESOLVED,
-            about=about,
-            type=AmbiguityType.UNDERSPECIFIED,
-            resolution_policy=ResolutionPolicy.ASK_USER,
-            ask=[
-                ClarifyingQuestion(
-                    q="What are you trying to achieve right now?",
-                    format=AskFormat.MULTICHOICE,
-                    options=["find something", "understand something", "plan next step", "something else"],
-                )
-            ],
-            evidence={"signals": ["uncertainty_phrase"]},
-        )
-        return SchemaSelection(
-            schemas=[
-                SchemaHit(name="clarify.goal", score=0.86, about=about),
-                SchemaHit(name="clarification_needed", score=0.7, about=about),
-            ],
-            ambiguities=[amb],
-        )
+    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+        return self._emit(ctx)
 
-    # --------------------------------------------------------------------------
-    # 7) Default
-    # --------------------------------------------------------------------------
-    about = AmbiguityAbout(kind=AboutKind.INTENT, key="user.intent", span=TextSpan(text=raw))
+
+def _no_response_emit(ctx: SelectorContext) -> SchemaSelection:
+    about = AmbiguityAbout(kind=AboutKind.SCHEMA, key="channel.capture")
+    amb = Ambiguity(
+        status=AmbiguityStatus.UNRESOLVED,
+        about=about,
+        type=AmbiguityType.MISSING_CONTEXT,
+        candidates=[],
+        resolution_policy=ResolutionPolicy.ASK_USER,
+        ask=[
+            ClarifyingQuestion(
+                q="I didn’t catch that. Please repeat?",
+                format=AskFormat.FREEFORM,
+            )
+        ],
+        evidence={"signals": ["no_response"]},
+        notes="No response captured (transport/ASR timeout).",
+    )
+    return SchemaSelection(
+        schemas=[SchemaHit(name="clarify.capture", score=0.95, about=about)],
+        ambiguities=[amb],
+        notes="no_response",
+    )
+
+
+def _empty_input_emit(ctx: SelectorContext) -> SchemaSelection:
+    about = AmbiguityAbout(kind=AboutKind.SCHEMA, key="cli.input.empty")
+    amb = Ambiguity(
+        status=AmbiguityStatus.UNRESOLVED,
+        about=about,
+        type=AmbiguityType.MISSING_CONTEXT,
+        resolution_policy=ResolutionPolicy.ASK_USER,
+        ask=[ClarifyingQuestion(q="I didn't catch anything. What do you want to do?", format=AskFormat.FREEFORM)],
+        evidence={"signals": ["empty_text"]},
+    )
+    return SchemaSelection(
+        schemas=[SchemaHit(name="clarify.empty_input", score=0.95, about=about)],
+        ambiguities=[amb],
+    )
+
+
+def _exit_emit(ctx: SelectorContext) -> SchemaSelection:
+    about = AmbiguityAbout(kind=AboutKind.INTENT, key="user.intent.exit", span=TextSpan(text=ctx.raw))
+    return SchemaSelection(
+        schemas=[SchemaHit(name="exit_intent", score=0.99, about=about)],
+        ambiguities=[],
+    )
+
+
+def _vague_actor_emit(ctx: SelectorContext) -> SchemaSelection:
+    about = AmbiguityAbout(kind=AboutKind.ENTITY, key="event.actor", span=TextSpan(text=ctx.raw))
+    amb = Ambiguity(
+        status=AmbiguityStatus.UNRESOLVED,
+        about=about,
+        type=AmbiguityType.UNDERSPECIFIED,
+        resolution_policy=ResolutionPolicy.ASK_USER,
+        ask=[
+            ClarifyingQuestion(
+                q="Who is 'they'?",
+                format=AskFormat.FREEFORM,
+            )
+        ],
+        evidence={"signals": ["vague_pronoun", "arrival_event"], "tokens": sorted(ctx.tokens)},
+        notes="Vague actor in arrival statement.",
+    )
+    return SchemaSelection(
+        schemas=[
+            SchemaHit(name="clarify.actor", score=0.92, about=about),
+            SchemaHit(name="clarification_needed", score=0.75, about=about),
+        ],
+        ambiguities=[amb],
+    )
+
+
+def _url_emit(ctx: SelectorContext) -> SchemaSelection:
+    about = AmbiguityAbout(kind=AboutKind.INTENT, key="task.intent.link", span=TextSpan(text=ctx.raw))
+    amb = Ambiguity(
+        status=AmbiguityStatus.UNRESOLVED,
+        about=about,
+        type=AmbiguityType.UNDERSPECIFIED,
+        resolution_policy=ResolutionPolicy.ASK_USER,
+        ask=[
+            ClarifyingQuestion(
+                q="What should I do with that link?",
+                format=AskFormat.MULTICHOICE,
+                options=["summarize", "extract key claims", "relate to our system", "just open it"],
+            )
+        ],
+        evidence={"signals": ["url_present"]},
+    )
+    return SchemaSelection(
+        schemas=[
+            SchemaHit(name="clarify.link_intent", score=0.9, about=about),
+            SchemaHit(name="clarification_needed", score=0.7, about=about),
+        ],
+        ambiguities=[amb],
+    )
+
+
+def _timer_unit_emit(ctx: SelectorContext) -> SchemaSelection:
+    about = AmbiguityAbout(kind=AboutKind.PARAMETER, key="timer.duration", span=TextSpan(text=ctx.raw))
+    amb = Ambiguity(
+        status=AmbiguityStatus.UNRESOLVED,
+        about=about,
+        type=AmbiguityType.UNDERSPECIFIED,
+        candidates=[
+            Candidate(value="minutes", score=0.65),
+            Candidate(value="seconds", score=0.25),
+            Candidate(value="hours", score=0.10),
+        ],
+        resolution_policy=ResolutionPolicy.ASK_USER,
+        ask=[
+            ClarifyingQuestion(
+                q="Ten what — minutes or seconds?",
+                format=AskFormat.MULTICHOICE,
+                options=["minutes", "seconds"],
+            )
+        ],
+        evidence={"signals": ["timerish", "number_without_unit"], "tokens": sorted(ctx.tokens)},
+        notes="Duration unit missing.",
+    )
+    return SchemaSelection(
+        schemas=[
+            SchemaHit(name="clarify.duration_unit", score=0.9, about=about),
+            SchemaHit(name="clarification_needed", score=0.7, about=about),
+        ],
+        ambiguities=[amb],
+    )
+
+
+def _uncertainty_emit(ctx: SelectorContext) -> SchemaSelection:
+    about = AmbiguityAbout(kind=AboutKind.GOAL, key="user.goal", span=TextSpan(text=ctx.raw))
+    amb = Ambiguity(
+        status=AmbiguityStatus.UNRESOLVED,
+        about=about,
+        type=AmbiguityType.UNDERSPECIFIED,
+        resolution_policy=ResolutionPolicy.ASK_USER,
+        ask=[
+            ClarifyingQuestion(
+                q="What are you trying to achieve right now?",
+                format=AskFormat.MULTICHOICE,
+                options=["find something", "understand something", "plan next step", "something else"],
+            )
+        ],
+        evidence={"signals": ["uncertainty_phrase"]},
+    )
+    return SchemaSelection(
+        schemas=[
+            SchemaHit(name="clarify.goal", score=0.86, about=about),
+            SchemaHit(name="clarification_needed", score=0.7, about=about),
+        ],
+        ambiguities=[amb],
+    )
+
+
+def _actionable_emit(ctx: SelectorContext) -> SchemaSelection:
+    about = AmbiguityAbout(kind=AboutKind.INTENT, key="user.intent", span=TextSpan(text=ctx.raw))
     return SchemaSelection(
         schemas=[SchemaHit(name="actionable_intent", score=0.7, about=about)],
         ambiguities=[],
     )
 
+
+RULE_PHASES: tuple[str, ...] = ("hard-stop", "disambiguation", "fallback")
+RULES_BY_PHASE: dict[str, list[Rule]] = {
+    "hard-stop": [
+        FunctionRule(
+            name="no_response",
+            _applies=lambda ctx: ctx.error is not None and ctx.error.status == CaptureStatus.NO_RESPONSE,
+            _emit=_no_response_emit,
+        ),
+        FunctionRule(
+            name="empty_input",
+            _applies=lambda ctx: not ctx.normalized.strip(),
+            _emit=_empty_input_emit,
+        ),
+        FunctionRule(
+            name="exit_intent",
+            _applies=lambda ctx: is_exit_intent(ctx.normalized),
+            _emit=_exit_emit,
+        ),
+    ],
+    "disambiguation": [
+        FunctionRule(
+            name="vague_actor",
+            _applies=lambda ctx: (ctx.tokens & VAGUE_PRONOUNS) and any(w in ctx.tokens for w in ARRIVAL_WORDS),
+            _emit=_vague_actor_emit,
+        ),
+        FunctionRule(
+            name="url_intent",
+            _applies=lambda ctx: bool(ctx.metadata.get("has_url")),
+            _emit=_url_emit,
+        ),
+        FunctionRule(
+            name="timer_unit",
+            _applies=lambda ctx: bool(ctx.metadata.get("mentions_timerish"))
+            and bool(ctx.metadata.get("has_numberish"))
+            and not bool(ctx.metadata.get("has_unit")),
+            _emit=_timer_unit_emit,
+        ),
+        FunctionRule(
+            name="uncertainty",
+            _applies=lambda ctx: has_any_phrase(ctx.normalized, UNCERTAIN_PHRASES),
+            _emit=_uncertainty_emit,
+        ),
+    ],
+    "fallback": [
+        FunctionRule(
+            name="actionable_intent",
+            _applies=lambda _ctx: True,
+            _emit=_actionable_emit,
+        )
+    ],
+}
+
+
+def _merge_schema_selections(selections: list[SchemaSelection]) -> SchemaSelection:
+    schemas: list[SchemaHit] = []
+    ambiguities: list[Ambiguity] = []
+    notes: list[str] = []
+    for selection in selections:
+        schemas.extend(selection.schemas)
+        ambiguities.extend(selection.ambiguities)
+        if selection.notes:
+            notes.append(selection.notes)
+    return SchemaSelection(
+        schemas=sort_schema_hits(schemas),
+        ambiguities=ambiguities,
+        notes="; ".join(notes) if notes else None,
+    )
+
+def naive_schema_selector(text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
+    raw = text or ""
+    t = normalize_text(raw)
+    tokens = set(norm_tokens(t))
+    ctx = SelectorContext(
+        raw=raw,
+        normalized=t,
+        tokens=tokens,
+        error=error,
+        metadata={
+            "has_url": has_url(t),
+            "has_numberish": any(tok.isdigit() for tok in tokens) or any(tok in {"ten", "five"} for tok in tokens),
+            "has_unit": any(
+                u in tokens
+                for u in {"s", "sec", "second", "seconds", "m", "min", "minute", "minutes", "h", "hour", "hours"}
+            ),
+            "mentions_timerish": any(w in t for w in ["timer", "remind", "reminder", "in "]),
+        },
+    )
+
+    for phase in RULE_PHASES:
+        matching = [rule.emit(ctx) for rule in RULES_BY_PHASE[phase] if rule.applies(ctx)]
+        if matching:
+            return _merge_schema_selections(matching)
+
+    return SchemaSelection(schemas=[], ambiguities=[])

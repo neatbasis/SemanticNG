@@ -70,6 +70,7 @@ def test_observer_preserved_in_persisted_episode_json(tmp_path: Path, make_episo
     (_, rec), = list(read_jsonl(out))
     assert rec["observer"]["role"] == "assistant"
     assert rec["observer"]["capabilities"] == ["baseline.dialog"]
+    assert rec["observer"]["authorization_level"] == "baseline"
     assert rec["observer"]["evaluation_invariants"] == ["prediction_availability.v1"]
 
 
@@ -79,6 +80,7 @@ def test_observer_passed_through_decision_and_evaluation_artifacts(make_episode,
 
     curr_ep = attach_decision_effect(prev_ep, curr_ep)
     assert curr_ep.effects[0].notes["observer"]["role"] == "assistant"
+    assert curr_ep.effects[0].notes["authorization_level"] == "baseline"
 
     evaluate_invariant_gates(
         ep=curr_ep,
@@ -124,6 +126,7 @@ def test_observer_enforcement_hooks_limit_invariant_evaluation(make_episode, mak
 
     invariant_artifact = next(a for a in ep.artifacts if a.get("artifact_kind") == "invariant_outcomes")
     assert invariant_artifact["observer_enforcement"]["enforced"] is True
+    assert invariant_artifact["observer_enforcement"]["authorization_level"] == "baseline"
     assert invariant_artifact["observer_enforcement"]["requested_evaluation_invariants"] == [
         "prediction_retrievability.v1"
     ]
@@ -172,3 +175,4 @@ def test_observer_included_in_schema_and_utterance_artifacts(make_episode, make_
     utterance_artifact = next(a for a in ep.artifacts if a.get("kind") == "utterance_interpretation")
     assert schema_artifact["observer"]["role"] == "assistant"
     assert utterance_artifact["observer"]["role"] == "assistant"
+    assert utterance_artifact["interpretation_frame"]["authorization_level"] == "baseline"

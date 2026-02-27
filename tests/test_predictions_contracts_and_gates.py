@@ -21,7 +21,7 @@ FIXED_PREDICTION = {
     "valid_from_iso": "2026-02-13T00:00:00+00:00",
     "valid_until_iso": "2026-02-13T00:10:00+00:00",
     "stopping_time_iso": None,
-    "invariants_assumed": ["P0_NO_CURRENT_PREDICTION"],
+    "invariants_assumed": ["prediction_availability.v1"],
     "evidence_links": [{"kind": "jsonl", "ref": "predictions.jsonl@1"}],
     "conditional_expectation": None,
     "conditional_variance": None,
@@ -79,7 +79,7 @@ def test_post_write_gate_halts_when_append_evidence_missing(tmp_path: Path) -> N
 
     assert isinstance(gate, HaltRecord)
     assert gate.stage == "post_write"
-    assert gate.invariant_id == "P1_WRITE_BEFORE_USE"
+    assert gate.invariant_id == "prediction_retrievability.v1"
     assert gate.reason == "Prediction append did not produce retrievable evidence."
     assert [e.model_dump(mode="json") for e in gate.evidence_refs] == [{"kind": "scope", "ref": pred.scope_key}]
     assert gate.retryable is True
@@ -160,5 +160,5 @@ def test_pre_consume_gate_halts_without_any_projected_predictions(tmp_path: Path
     )
 
     assert isinstance(gate, HaltRecord)
-    assert gate.invariant_id == "P0_NO_CURRENT_PREDICTION"
+    assert gate.invariant_id == "prediction_availability.v1"
     assert gate.reason == "Action selection requires at least one projected current prediction."

@@ -41,7 +41,7 @@ def test_run_mission_loop_updates_projection_before_decision_stages(
                 "issued_at_iso": "2026-02-13T00:00:00+00:00",
                 "valid_from_iso": "2026-02-13T00:00:00+00:00",
                 "valid_until_iso": "2026-02-13T00:10:00+00:00",
-                "assumptions": ["P0_NO_CURRENT_PREDICTION"],
+                "assumptions": ["prediction_availability.v1"],
                 "evidence_refs": [],
             }
         ],

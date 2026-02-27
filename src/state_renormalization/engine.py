@@ -94,7 +94,7 @@ def _as_evidence_ref(item: Mapping[str, Any]) -> EvidenceRef:
 
 
 def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltRecord:
-    reason = str(outcome.details.get("message") or outcome.code)
+    reason = outcome.reason
     return HaltRecord(
         halt_id=_new_id("halt:"),
         stage=stage,
@@ -262,7 +262,7 @@ def _run_invariant(invariant_id: InvariantId, *, ctx) -> InvariantOutcome:
         just_written_prediction=ctx.just_written_prediction,
         halt_candidate=outcome,
     )
-    explainable_halt = REGISTRY[InvariantId.H0_EXPLAINABLE_HALT](h0_ctx)
+    explainable_halt = REGISTRY[InvariantId.EXPLAINABLE_HALT_COMPLETENESS](h0_ctx)
     if explainable_halt.flow == InvariantFlow.STOP:
         return explainable_halt
     return outcome
@@ -289,7 +289,7 @@ def evaluate_invariant_gates(
         current_predictions=current_predictions,
         prediction_log_available=prediction_log_available,
     )
-    pre_outcome = _run_invariant(InvariantId.P0_NO_CURRENT_PREDICTION, ctx=pre_ctx)
+    pre_outcome = _run_invariant(InvariantId.PREDICTION_AVAILABILITY, ctx=pre_ctx)
     pre_consume = (pre_outcome,)
 
     post_write: Sequence[InvariantOutcome] = tuple()
@@ -301,7 +301,7 @@ def evaluate_invariant_gates(
             prediction_log_available=prediction_log_available,
             just_written_prediction=just_written_prediction,
         )
-        post_write = (_run_invariant(InvariantId.P1_WRITE_BEFORE_USE, ctx=post_ctx),)
+        post_write = (_run_invariant(InvariantId.PREDICTION_RETRIEVABILITY, ctx=post_ctx),)
 
     halt_outcome: Optional[InvariantOutcome] = None
     halt_stage: Optional[str] = None
@@ -345,6 +345,7 @@ def evaluate_invariant_gates(
                 },
                 "pre_consume": [_to_dict(outcome) for outcome in pre_consume],
                 "post_write": [_to_dict(outcome) for outcome in post_write],
+                "invariant_results": [_to_dict(outcome) for outcome in tuple(pre_consume) + tuple(post_write)],
                 "kind": result_kind,
                 "prediction": _to_dict(result) if isinstance(result, Prediction) else None,
                 "halt": _to_dict(result) if isinstance(result, HaltRecord) else None,
@@ -424,6 +425,17 @@ def run_mission_loop(
                 "projection_updated_at_iso": updated_projection.updated_at_iso,
             },
         )
+
+        gate = evaluate_invariant_gates(
+            ep=ep,
+            scope=pred.scope_key,
+            prediction_key=pred.scope_key,
+            projection_state=updated_projection,
+            prediction_log_available=True,
+            just_written_prediction={"key": pred.scope_key, "evidence_refs": [evidence_ref]},
+        )
+        if isinstance(gate, HaltRecord):
+            return ep, belief, updated_projection
 
     ep = ingest_observation(ep)
     ep, belief = apply_utterance_interpretation(ep, belief)

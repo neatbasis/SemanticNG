@@ -219,10 +219,12 @@ def _to_dict(obj: Any) -> Any:
 
 
 def _find_stable_ids_from_payload(payload: Mapping[str, Any]) -> Dict[str, str]:
+    nested = payload.get("stable_ids")
+    nested_stable = nested if isinstance(nested, Mapping) else {}
     explicit = {
-        "feature_id": payload.get("feature_id"),
-        "scenario_id": payload.get("scenario_id"),
-        "step_id": payload.get("step_id"),
+        "feature_id": payload.get("feature_id") or nested_stable.get("feature_id"),
+        "scenario_id": payload.get("scenario_id") or nested_stable.get("scenario_id"),
+        "step_id": payload.get("step_id") or nested_stable.get("step_id"),
     }
     if explicit["feature_id"] and explicit["scenario_id"] and explicit["step_id"]:
         return {k: str(v) for k, v in explicit.items() if v is not None}
@@ -243,8 +245,8 @@ def _find_stable_ids_from_payload(payload: Mapping[str, Any]) -> Dict[str, str]:
     doc["uri"] = feature_uri
     stable = derive_stable_ids(doc, uri=feature_uri)
 
-    scenario_name = payload.get("scenario_name")
-    step_text = payload.get("step_text")
+    scenario_name = payload.get("scenario_name") or payload.get("scenario")
+    step_text = payload.get("step_text") or payload.get("step_name")
 
     scenario_id: Optional[str] = None
     if isinstance(scenario_name, str) and scenario_name.strip():

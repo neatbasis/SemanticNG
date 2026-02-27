@@ -51,7 +51,21 @@ def _inject_stable_ids(record: JsonObj) -> JsonObj:
 
     out = {**stable, **record}
 
-    for list_key in ("events", "artifacts", "steps", "decisions"):
+    for dict_key in ("embedding", "ontology_alignment", "elasticsearch_document", "index_document"):
+        item = out.get(dict_key)
+        if isinstance(item, dict):
+            out[dict_key] = {**stable, **item}
+
+    for list_key in (
+        "events",
+        "artifacts",
+        "steps",
+        "decisions",
+        "embeddings",
+        "ontology_alignments",
+        "elasticsearch_documents",
+        "index_documents",
+    ):
         items = out.get(list_key)
         if not isinstance(items, list):
             continue

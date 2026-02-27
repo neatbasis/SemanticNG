@@ -93,6 +93,39 @@ def test_observer_passed_through_decision_and_evaluation_artifacts(make_episode,
     assert halt_observation["observation_type"] == "halt"
 
 
+def test_episode_serialization_supports_null_observer(tmp_path: Path, make_episode) -> None:
+    ep = make_episode(with_default_observer=False)
+    serialized = to_jsonable_episode(ep)
+
+    assert serialized["observer"] is None
+
+    out = tmp_path / "episodes.jsonl"
+    append_jsonl(out, serialized)
+    (_, rec), = list(read_jsonl(out))
+    assert rec["observer"] is None
+
+
+def test_observer_enforcement_hooks_limit_invariant_evaluation(make_episode, make_observer) -> None:
+    ep = make_episode(
+        observer=make_observer(evaluation_invariants=["prediction_retrievability.v1"]),
+    )
+
+    gate = evaluate_invariant_gates(
+        ep=ep,
+        scope="scope:test",
+        prediction_key="scope:test",
+        projection_state=ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+        prediction_log_available=True,
+    )
+
+    assert gate.pre_consume == ()
+
+    invariant_artifact = next(a for a in ep.artifacts if a.get("artifact_kind") == "invariant_outcomes")
+    assert invariant_artifact["observer_enforcement"]["enforced"] is True
+    assert invariant_artifact["observer_enforcement"]["requested_evaluation_invariants"] == [
+        "prediction_retrievability.v1"
+    ]
+
 def test_build_episode_attaches_stable_ids_from_feature_doc(tmp_path: Path, make_policy_decision) -> None:
     feature = tmp_path / "sample.feature"
     feature.write_text(

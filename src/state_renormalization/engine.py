@@ -85,6 +85,30 @@ class PredictionOutcome:
 GateDecision = PredictionOutcome | HaltRecord
 
 
+def _observer_allowed_invariants(observer: Optional[ObserverFrame]) -> Optional[set[InvariantId]]:
+    if observer is None:
+        return None
+
+    configured = getattr(observer, "evaluation_invariants", None) or []
+    if not configured:
+        return None
+
+    allowed: set[InvariantId] = set()
+    for invariant_name in configured:
+        try:
+            allowed.add(InvariantId(invariant_name))
+        except ValueError:
+            continue
+    return allowed
+
+
+def _observer_allows_invariant(*, observer: Optional[ObserverFrame], invariant_id: InvariantId) -> bool:
+    allowed = _observer_allowed_invariants(observer)
+    if allowed is None:
+        return True
+    return invariant_id in allowed
+
+
 def _as_evidence_ref(item: Mapping[str, Any]) -> EvidenceRef:
     kind = str(item.get("kind") or "unknown")
     ref = item.get("ref")
@@ -290,22 +314,29 @@ def evaluate_invariant_gates(
     just_written_prediction: Optional[Mapping[str, Any]] = None,
     halt_log_path: str | Path = "halts.jsonl",
 ) -> GateDecision:
+    observer = getattr(ep, "observer", None) if ep is not None else None
     current_predictions = {
         key: pred.prediction_id
         for key, pred in projection_state.current_predictions.items()
     }
 
-    pre_ctx = default_check_context(
-        scope=scope,
-        prediction_key=prediction_key,
-        current_predictions=current_predictions,
-        prediction_log_available=prediction_log_available,
-    )
-    pre_outcome = _run_invariant(InvariantId.PREDICTION_AVAILABILITY, ctx=pre_ctx)
-    pre_consume = (pre_outcome,)
+    pre_consume: Sequence[InvariantOutcome] = tuple()
+    pre_outcome: Optional[InvariantOutcome] = None
+    if _observer_allows_invariant(observer=observer, invariant_id=InvariantId.PREDICTION_AVAILABILITY):
+        pre_ctx = default_check_context(
+            scope=scope,
+            prediction_key=prediction_key,
+            current_predictions=current_predictions,
+            prediction_log_available=prediction_log_available,
+        )
+        pre_outcome = _run_invariant(InvariantId.PREDICTION_AVAILABILITY, ctx=pre_ctx)
+        pre_consume = (pre_outcome,)
 
     post_write: Sequence[InvariantOutcome] = tuple()
-    if just_written_prediction is not None:
+    if just_written_prediction is not None and _observer_allows_invariant(
+        observer=observer,
+        invariant_id=InvariantId.PREDICTION_RETRIEVABILITY,
+    ):
         post_ctx = default_check_context(
             scope=scope,
             prediction_key=prediction_key,
@@ -317,7 +348,7 @@ def evaluate_invariant_gates(
 
     halt_outcome: Optional[InvariantOutcome] = None
     halt_stage: Optional[str] = None
-    if pre_outcome.flow == InvariantFlow.STOP:
+    if pre_outcome is not None and pre_outcome.flow == InvariantFlow.STOP:
         halt_outcome = pre_outcome
         halt_stage = "pre_consume"
     elif post_write and post_write[0].flow == InvariantFlow.STOP:
@@ -347,6 +378,10 @@ def evaluate_invariant_gates(
             {
                 "artifact_kind": "invariant_outcomes",
                 "observer": _to_dict(getattr(ep, "observer", None)),
+                "observer_enforcement": {
+                    "requested_evaluation_invariants": list(getattr(observer, "evaluation_invariants", []) or []),
+                    "enforced": bool(getattr(observer, "evaluation_invariants", []) or []),
+                },
                 "scope": scope,
                 "prediction_key": prediction_key,
                 "invariant_context": {

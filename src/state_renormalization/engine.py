@@ -36,7 +36,7 @@ from state_renormalization.contracts import (
     default_observer_frame,
     project_ambiguity_state,
 )
-from state_renormalization.adapters.persistence import append_halt, append_prediction
+from state_renormalization.adapters.persistence import append_halt, append_prediction_event
 from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.invariants import (
     Flow as InvariantFlow,
@@ -442,11 +442,18 @@ def append_prediction_record(
     *,
     prediction_log_path: str | Path = "artifacts/predictions.jsonl",
     stable_ids: Optional[Mapping[str, str]] = None,
+    episode: Optional[Episode] = None,
 ) -> dict[str, str]:
-    payload: Any = pred
+    payload: Any = pred.model_dump(mode="json")
     if stable_ids:
-        payload = {**dict(stable_ids), **pred.model_dump(mode="json")}
-    return append_prediction(prediction_log_path, payload)
+        payload = {**dict(stable_ids), **payload}
+    return append_prediction_event(
+        payload,
+        path=prediction_log_path,
+        episode_id=getattr(episode, "episode_id", None),
+        conversation_id=getattr(episode, "conversation_id", None),
+        turn_index=getattr(episode, "turn_index", None),
+    )
 
 
 def append_halt_record(
@@ -485,6 +492,7 @@ def run_mission_loop(
             pred,
             prediction_log_path=prediction_log_path,
             stable_ids=_episode_stable_ids(ep),
+            episode=ep,
         )
         updated_projection = project_current(pred, updated_projection)
         _append_episode_artifact(
@@ -511,6 +519,18 @@ def run_mission_loop(
         )
         if isinstance(gate, HaltRecord):
             return ep, belief, updated_projection
+
+
+    active_scope = next(iter(updated_projection.current_predictions), "decision_stage")
+    pre_decision_gate = evaluate_invariant_gates(
+        ep=ep,
+        scope=active_scope,
+        prediction_key=None,
+        projection_state=updated_projection,
+        prediction_log_available=True,
+    )
+    if isinstance(pre_decision_gate, HaltRecord):
+        return ep, belief, updated_projection
 
     ep = ingest_observation(ep)
     ep, belief = apply_utterance_interpretation(ep, belief)

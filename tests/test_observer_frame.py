@@ -14,6 +14,7 @@ from state_renormalization.contracts import (
     VerbosityLevel,
 )
 from state_renormalization.engine import (
+    GateSuccessOutcome,
     apply_schema_bubbling,
     apply_utterance_interpretation,
     attach_decision_effect,
@@ -118,7 +119,8 @@ def test_observer_enforcement_hooks_limit_invariant_evaluation(make_episode, mak
         prediction_log_available=True,
     )
 
-    assert gate.pre_consume == ()
+    assert isinstance(gate, GateSuccessOutcome)
+    assert gate.artifact.pre_consume == ()
 
     invariant_artifact = next(a for a in ep.artifacts if a.get("artifact_kind") == "invariant_outcomes")
     assert invariant_artifact["observer_enforcement"]["enforced"] is True

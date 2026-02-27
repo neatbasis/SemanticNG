@@ -319,25 +319,29 @@ class EvidenceRef(BaseModel):
 class HaltRecord(BaseModel):
     model_config = _CONTRACT_CONFIG
 
-    stable_halt_id: str = Field(validation_alias=AliasChoices("stable_halt_id", "halt_id"))
+    halt_id: str = Field(validation_alias=AliasChoices("halt_id", "stable_halt_id"))
     stage: str
     violated_invariant_id: str = Field(validation_alias=AliasChoices("violated_invariant_id", "invariant_id"))
     reason: str
     evidence_refs: List[EvidenceRef] = Field(default_factory=list)
-    timestamp: str
-    retryability: bool = Field(validation_alias=AliasChoices("retryability", "retryable"))
+    timestamp_iso: str = Field(validation_alias=AliasChoices("timestamp_iso", "timestamp"))
+    retryable: bool = Field(validation_alias=AliasChoices("retryable", "retryability"))
 
     @property
-    def halt_id(self) -> str:
-        return self.stable_halt_id
+    def stable_halt_id(self) -> str:
+        return self.halt_id
 
     @property
     def invariant_id(self) -> str:
         return self.violated_invariant_id
 
     @property
-    def retryable(self) -> bool:
-        return self.retryability
+    def timestamp(self) -> str:
+        return self.timestamp_iso
+
+    @property
+    def retryability(self) -> bool:
+        return self.retryable
 
 
 class PredictionRecord(BaseModel):

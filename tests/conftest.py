@@ -91,14 +91,19 @@ def make_episode(
         ask: AskResult | None = None,
         observations: list[Observation] | None = None,
         observer: ObserverFrame | None = None,
+        with_default_observer: bool = True,
     ) -> Episode:
+        episode_observer = observer
+        if episode_observer is None and with_default_observer:
+            episode_observer = default_observer_frame()
+
         return Episode(
             episode_id=episode_id,
             conversation_id=conversation_id,
             turn_index=turn_index,
             t_asked_iso=t_asked_iso,
             assistant_prompt_asked=assistant_prompt_asked,
-            observer=observer or default_observer_frame(),
+            observer=episode_observer,
             policy_decision=decision or make_policy_decision(),
             ask=ask or make_ask_result(),
             observations=observations or [],

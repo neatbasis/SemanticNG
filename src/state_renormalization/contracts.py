@@ -331,8 +331,9 @@ class PredictionRecord(BaseModel):
     model_config = _CONTRACT_CONFIG
 
     prediction_id: str
+    prediction_key: str
     scope_key: str
-    filtration_id: str
+    filtration_ref: str
     variable: str
     horizon_iso: str
 
@@ -342,10 +343,11 @@ class PredictionRecord(BaseModel):
     uncertainty: float
 
     issued_at_iso: str
+    valid_from_iso: Optional[str] = None
     valid_until_iso: Optional[str] = None
     stopping_time_iso: Optional[str] = None
     invariants_assumed: List[str] = Field(default_factory=list)
-    evidence_refs: List[EvidenceRef] = Field(default_factory=list)
+    evidence_links: List[EvidenceRef] = Field(default_factory=list)
 
     # Optional numeric moments for numeric distributions.
     conditional_expectation: Optional[float] = None
@@ -355,8 +357,12 @@ class PredictionRecord(BaseModel):
 class ProjectionState(BaseModel):
     model_config = _CONTRACT_CONFIG
 
-    current_predictions: Dict[str, str] = Field(default_factory=dict)
+    current_predictions: Dict[str, PredictionRecord] = Field(default_factory=dict)
     updated_at_iso: str
+
+    @property
+    def has_current_predictions(self) -> bool:
+        return bool(self.current_predictions)
 
 # ------------------------------------------------------------------------------
 # Demo-only statuses + BeliefState (Option A)

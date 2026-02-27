@@ -9,6 +9,7 @@ from state_renormalization.contracts import (
     EpisodeOutputs,
     ObserverFrame,
     OutputRenderingArtifact,
+    ProjectionState,
     VerbosityLevel,
 )
 from state_renormalization.engine import (
@@ -78,7 +79,7 @@ def test_observer_passed_through_decision_and_evaluation_artifacts(make_episode,
         ep=curr_ep,
         scope="scope:test",
         prediction_key=None,
-        current_predictions={},
+        projection_state=ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
         prediction_log_available=False,
     )
     invariant_artifact = curr_ep.artifacts[-1]

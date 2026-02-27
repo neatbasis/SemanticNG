@@ -112,6 +112,44 @@ class BaseRule:
         raise NotImplementedError
 
 
+def _about(kind: AboutKind, key: str, *, span_text: Optional[str] = None) -> AmbiguityAbout:
+    if span_text is None:
+        return AmbiguityAbout(kind=kind, key=key)
+    return AmbiguityAbout(kind=kind, key=key, span=TextSpan(text=span_text))
+
+
+def _amb(
+    *,
+    about: AmbiguityAbout,
+    type_: AmbiguityType,
+    ask: list[ClarifyingQuestion],
+    evidence: dict[str, object],
+    resolution_policy: ResolutionPolicy = ResolutionPolicy.ASK_USER,
+    candidates: Optional[list[Candidate]] = None,
+    notes: Optional[str] = None,
+) -> Ambiguity:
+    return Ambiguity(
+        status=AmbiguityStatus.UNRESOLVED,
+        about=about,
+        type=type_,
+        candidates=candidates or [],
+        resolution_policy=resolution_policy,
+        ask=ask,
+        evidence=evidence,
+        notes=notes,
+    )
+
+
+def _selection(*, schemas: list[SchemaHit], ambiguities: list[Ambiguity], notes: Optional[str] = None) -> SchemaSelection:
+    payload: dict[str, object] = {
+        "schemas": sort_schema_hits(schemas),
+        "ambiguities": ambiguities,
+    }
+    if notes is not None:
+        payload["notes"] = notes
+    return SchemaSelection(**payload)
+
+
 @dataclass(frozen=True)
 class NoResponseRule(BaseRule):
     name: str = "no_response"
@@ -205,13 +243,10 @@ class ActionableIntentRule(BaseRule):
 
 
 def _no_response_emit(ctx: SelectorContext) -> SchemaSelection:
-    about = AmbiguityAbout(kind=AboutKind.SCHEMA, key="channel.capture")
-    amb = Ambiguity(
-        status=AmbiguityStatus.UNRESOLVED,
+    about = _about(AboutKind.SCHEMA, "channel.capture")
+    amb = _amb(
         about=about,
-        type=AmbiguityType.MISSING_CONTEXT,
-        candidates=[],
-        resolution_policy=ResolutionPolicy.ASK_USER,
+        type_=AmbiguityType.MISSING_CONTEXT,
         ask=[
             ClarifyingQuestion(
                 q="I didn’t catch that. Please repeat?",
@@ -221,7 +256,7 @@ def _no_response_emit(ctx: SelectorContext) -> SchemaSelection:
         evidence={"signals": ["no_response"]},
         notes="No response captured (transport/ASR timeout).",
     )
-    return SchemaSelection(
+    return _selection(
         schemas=[SchemaHit(name="clarify.capture", score=0.95, about=about)],
         ambiguities=[amb],
         notes="no_response",
@@ -229,36 +264,32 @@ def _no_response_emit(ctx: SelectorContext) -> SchemaSelection:
 
 
 def _empty_input_emit(ctx: SelectorContext) -> SchemaSelection:
-    about = AmbiguityAbout(kind=AboutKind.SCHEMA, key="cli.input.empty")
-    amb = Ambiguity(
-        status=AmbiguityStatus.UNRESOLVED,
+    about = _about(AboutKind.SCHEMA, "cli.input.empty")
+    amb = _amb(
         about=about,
-        type=AmbiguityType.MISSING_CONTEXT,
-        resolution_policy=ResolutionPolicy.ASK_USER,
+        type_=AmbiguityType.MISSING_CONTEXT,
         ask=[ClarifyingQuestion(q="I didn't catch anything. What do you want to do?", format=AskFormat.FREEFORM)],
         evidence={"signals": ["empty_text"]},
     )
-    return SchemaSelection(
+    return _selection(
         schemas=[SchemaHit(name="clarify.empty_input", score=0.95, about=about)],
         ambiguities=[amb],
     )
 
 
 def _exit_emit(ctx: SelectorContext) -> SchemaSelection:
-    about = AmbiguityAbout(kind=AboutKind.INTENT, key="user.intent.exit", span=TextSpan(text=ctx.raw))
-    return SchemaSelection(
+    about = _about(AboutKind.INTENT, "user.intent.exit", span_text=ctx.raw)
+    return _selection(
         schemas=[SchemaHit(name="exit_intent", score=0.99, about=about)],
         ambiguities=[],
     )
 
 
 def _vague_actor_emit(ctx: SelectorContext) -> SchemaSelection:
-    about = AmbiguityAbout(kind=AboutKind.ENTITY, key="event.actor", span=TextSpan(text=ctx.raw))
-    amb = Ambiguity(
-        status=AmbiguityStatus.UNRESOLVED,
+    about = _about(AboutKind.ENTITY, "event.actor", span_text=ctx.raw)
+    amb = _amb(
         about=about,
-        type=AmbiguityType.UNDERSPECIFIED,
-        resolution_policy=ResolutionPolicy.ASK_USER,
+        type_=AmbiguityType.UNDERSPECIFIED,
         ask=[
             ClarifyingQuestion(
                 q="Who is 'they'?",
@@ -268,7 +299,7 @@ def _vague_actor_emit(ctx: SelectorContext) -> SchemaSelection:
         evidence={"signals": ["vague_pronoun", "arrival_event"], "tokens": sorted(ctx.tokens)},
         notes="Vague actor in arrival statement.",
     )
-    return SchemaSelection(
+    return _selection(
         schemas=[
             SchemaHit(name="clarify.actor", score=0.92, about=about),
             SchemaHit(name="clarification_needed", score=0.75, about=about),
@@ -278,12 +309,10 @@ def _vague_actor_emit(ctx: SelectorContext) -> SchemaSelection:
 
 
 def _url_emit(ctx: SelectorContext) -> SchemaSelection:
-    about = AmbiguityAbout(kind=AboutKind.INTENT, key="task.intent.link", span=TextSpan(text=ctx.raw))
-    amb = Ambiguity(
-        status=AmbiguityStatus.UNRESOLVED,
+    about = _about(AboutKind.INTENT, "task.intent.link", span_text=ctx.raw)
+    amb = _amb(
         about=about,
-        type=AmbiguityType.UNDERSPECIFIED,
-        resolution_policy=ResolutionPolicy.ASK_USER,
+        type_=AmbiguityType.UNDERSPECIFIED,
         ask=[
             ClarifyingQuestion(
                 q="What should I do with that link?",
@@ -293,7 +322,7 @@ def _url_emit(ctx: SelectorContext) -> SchemaSelection:
         ],
         evidence={"signals": ["url_present"]},
     )
-    return SchemaSelection(
+    return _selection(
         schemas=[
             SchemaHit(name="clarify.link_intent", score=0.9, about=about),
             SchemaHit(name="clarification_needed", score=0.7, about=about),
@@ -303,17 +332,15 @@ def _url_emit(ctx: SelectorContext) -> SchemaSelection:
 
 
 def _timer_unit_emit(ctx: SelectorContext) -> SchemaSelection:
-    about = AmbiguityAbout(kind=AboutKind.PARAMETER, key="timer.duration", span=TextSpan(text=ctx.raw))
-    amb = Ambiguity(
-        status=AmbiguityStatus.UNRESOLVED,
+    about = _about(AboutKind.PARAMETER, "timer.duration", span_text=ctx.raw)
+    amb = _amb(
         about=about,
-        type=AmbiguityType.UNDERSPECIFIED,
+        type_=AmbiguityType.UNDERSPECIFIED,
         candidates=[
             Candidate(value="minutes", score=0.65),
             Candidate(value="seconds", score=0.25),
             Candidate(value="hours", score=0.10),
         ],
-        resolution_policy=ResolutionPolicy.ASK_USER,
         ask=[
             ClarifyingQuestion(
                 q="Ten what — minutes or seconds?",
@@ -324,7 +351,7 @@ def _timer_unit_emit(ctx: SelectorContext) -> SchemaSelection:
         evidence={"signals": ["timerish", "number_without_unit"], "tokens": sorted(ctx.tokens)},
         notes="Duration unit missing.",
     )
-    return SchemaSelection(
+    return _selection(
         schemas=[
             SchemaHit(name="clarify.duration_unit", score=0.9, about=about),
             SchemaHit(name="clarification_needed", score=0.7, about=about),
@@ -334,12 +361,10 @@ def _timer_unit_emit(ctx: SelectorContext) -> SchemaSelection:
 
 
 def _uncertainty_emit(ctx: SelectorContext) -> SchemaSelection:
-    about = AmbiguityAbout(kind=AboutKind.GOAL, key="user.goal", span=TextSpan(text=ctx.raw))
-    amb = Ambiguity(
-        status=AmbiguityStatus.UNRESOLVED,
+    about = _about(AboutKind.GOAL, "user.goal", span_text=ctx.raw)
+    amb = _amb(
         about=about,
-        type=AmbiguityType.UNDERSPECIFIED,
-        resolution_policy=ResolutionPolicy.ASK_USER,
+        type_=AmbiguityType.UNDERSPECIFIED,
         ask=[
             ClarifyingQuestion(
                 q="What are you trying to achieve right now?",
@@ -349,7 +374,7 @@ def _uncertainty_emit(ctx: SelectorContext) -> SchemaSelection:
         ],
         evidence={"signals": ["uncertainty_phrase"]},
     )
-    return SchemaSelection(
+    return _selection(
         schemas=[
             SchemaHit(name="clarify.goal", score=0.86, about=about),
             SchemaHit(name="clarification_needed", score=0.7, about=about),
@@ -359,8 +384,8 @@ def _uncertainty_emit(ctx: SelectorContext) -> SchemaSelection:
 
 
 def _actionable_emit(ctx: SelectorContext) -> SchemaSelection:
-    about = AmbiguityAbout(kind=AboutKind.INTENT, key="user.intent", span=TextSpan(text=ctx.raw))
-    return SchemaSelection(
+    about = _about(AboutKind.INTENT, "user.intent", span_text=ctx.raw)
+    return _selection(
         schemas=[SchemaHit(name="actionable_intent", score=0.7, about=about)],
         ambiguities=[],
     )

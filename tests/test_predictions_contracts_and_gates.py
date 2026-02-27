@@ -166,3 +166,29 @@ def test_pre_consume_gate_halts_without_any_projected_predictions(tmp_path: Path
     assert gate.halt is not None
     assert gate.halt.invariant_id == "P0_NO_CURRENT_PREDICTION"
     assert gate.halt.reason == "Action selection requires at least one projected current prediction."
+
+
+def test_halt_artifact_contains_normalized_invariant_results(tmp_path: Path) -> None:
+    class DummyEpisode:
+        def __init__(self) -> None:
+            self.artifacts = []
+
+    ep = DummyEpisode()
+
+    evaluate_invariant_gates(
+        ep=ep,
+        scope="scope:test",
+        prediction_key="scope:test",
+        projection_state=ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+        prediction_log_available=True,
+        halt_log_path=tmp_path / "halts.jsonl",
+    )
+
+    artifact = ep.artifacts[0]
+    normalized = artifact["normalized_invariant_results"]
+    assert normalized[0]["invariant_id"] == "P0_NO_CURRENT_PREDICTION"
+    assert normalized[0]["passed"] is False
+    assert normalized[0]["gate_point"] == "pre_consume_prediction_availability"
+    assert normalized[1]["invariant_id"] == "H0_EXPLAINABLE_HALT"
+    assert normalized[1]["passed"] is True
+    assert normalized[1]["gate_point"] == "halt_payload_completeness"

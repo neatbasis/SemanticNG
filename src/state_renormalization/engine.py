@@ -5,7 +5,7 @@ import hashlib
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any, Dict, Literal, Mapping, Optional, Sequence
 from pydantic import BaseModel
 from enum import Enum
@@ -42,8 +42,10 @@ from state_renormalization.invariants import (
     Flow as InvariantFlow,
     InvariantId,
     InvariantOutcome,
+    NormalizedInvariantResult,
     REGISTRY,
     default_check_context,
+    normalize_invariant_result,
 )
 from state_renormalization.stable_ids import derive_stable_ids
 
@@ -163,6 +165,10 @@ def _to_dict(obj: Any) -> Any:
     if isinstance(obj, Enum):
         return obj.value
 
+    # Dataclasses
+    if is_dataclass(obj):
+        return _to_dict(asdict(obj))
+
     # Containers
     if isinstance(obj, dict):
         return {str(k): _to_dict(v) for k, v in obj.items()}
@@ -257,11 +263,19 @@ def _append_episode_artifact(ep: Episode, artifact: Dict[str, Any], *, stable_id
     ep.artifacts.append({**sid, **artifact} if sid else artifact)
 
 
-def _run_invariant(invariant_id: InvariantId, *, ctx) -> InvariantOutcome:
+def _run_invariant(
+    invariant_id: InvariantId,
+    *,
+    ctx,
+    gate_point: str,
+) -> tuple[InvariantOutcome, Sequence[NormalizedInvariantResult]]:
     checker = REGISTRY[invariant_id]
     outcome = checker(ctx)
+    normalized_results: list[NormalizedInvariantResult] = [
+        normalize_invariant_result(outcome, gate_point=gate_point)
+    ]
     if outcome.flow != InvariantFlow.STOP:
-        return outcome
+        return outcome, tuple(normalized_results)
 
     h0_ctx = default_check_context(
         scope=ctx.scope,
@@ -272,9 +286,12 @@ def _run_invariant(invariant_id: InvariantId, *, ctx) -> InvariantOutcome:
         halt_candidate=outcome,
     )
     explainable_halt = REGISTRY[InvariantId.H0_EXPLAINABLE_HALT](h0_ctx)
+    normalized_results.append(
+        normalize_invariant_result(explainable_halt, gate_point="halt_payload_completeness")
+    )
     if explainable_halt.flow == InvariantFlow.STOP:
-        return explainable_halt
-    return outcome
+        return explainable_halt, tuple(normalized_results)
+    return outcome, tuple(normalized_results)
 
 
 def evaluate_invariant_gates(
@@ -287,6 +304,7 @@ def evaluate_invariant_gates(
     just_written_prediction: Optional[Mapping[str, Any]] = None,
     halt_log_path: str | Path = "halts.jsonl",
 ) -> GateResult:
+    normalized_results: list[NormalizedInvariantResult] = []
     current_predictions = {
         key: pred.prediction_id
         for key, pred in projection_state.current_predictions.items()
@@ -298,7 +316,12 @@ def evaluate_invariant_gates(
         current_predictions=current_predictions,
         prediction_log_available=prediction_log_available,
     )
-    pre_outcome = _run_invariant(InvariantId.P0_NO_CURRENT_PREDICTION, ctx=pre_ctx)
+    pre_outcome, pre_normalized = _run_invariant(
+        InvariantId.P0_NO_CURRENT_PREDICTION,
+        ctx=pre_ctx,
+        gate_point="pre_consume_prediction_availability",
+    )
+    normalized_results.extend(pre_normalized)
     pre_consume = (pre_outcome,)
 
     post_write: Sequence[InvariantOutcome] = tuple()
@@ -310,7 +333,13 @@ def evaluate_invariant_gates(
             prediction_log_available=prediction_log_available,
             just_written_prediction=just_written_prediction,
         )
-        post_write = (_run_invariant(InvariantId.P1_WRITE_BEFORE_USE, ctx=post_ctx),)
+        post_outcome, post_normalized = _run_invariant(
+            InvariantId.P1_WRITE_BEFORE_USE,
+            ctx=post_ctx,
+            gate_point="post_write_retrievability",
+        )
+        normalized_results.extend(post_normalized)
+        post_write = (post_outcome,)
 
     halt_outcome: Optional[InvariantOutcome] = None
     halt_stage: Optional[str] = None
@@ -353,6 +382,7 @@ def evaluate_invariant_gates(
                 },
                 "pre_consume": [_to_dict(outcome) for outcome in pre_consume],
                 "post_write": [_to_dict(outcome) for outcome in post_write],
+                "normalized_invariant_results": [_to_dict(result_item) for result_item in normalized_results],
                 "kind": result.kind,
                 "prediction": _to_dict(result.prediction),
                 "halt": _to_dict(result.halt),

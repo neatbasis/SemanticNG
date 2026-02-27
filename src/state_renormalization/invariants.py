@@ -34,6 +34,18 @@ class InvariantOutcome:
     action_hints: Optional[Sequence[Mapping[str, Any]]] = None
 
 
+@dataclass(frozen=True)
+class NormalizedInvariantResult:
+    """Invariant check result format attached to episode artifacts for auditing."""
+
+    invariant_id: str
+    passed: bool
+    evidence: Sequence[Mapping[str, Any]] = field(default_factory=tuple)
+    remediation_hint: Optional[str] = None
+    gate_point: Optional[str] = None
+    code: Optional[str] = None
+
+
 class CheckContext(Protocol):
     now_iso: str
     scope: str
@@ -173,6 +185,27 @@ REGISTRY: dict[InvariantId, Checker] = {
     InvariantId.P1_WRITE_BEFORE_USE: check_p1_write_before_use,
     InvariantId.H0_EXPLAINABLE_HALT: check_h0_explainable_halt,
 }
+
+
+def normalize_invariant_result(
+    outcome: InvariantOutcome,
+    *,
+    gate_point: Optional[str] = None,
+) -> NormalizedInvariantResult:
+    remediation_hint = None
+    if outcome.action_hints:
+        first_hint = outcome.action_hints[0]
+        hint_kind = first_hint.get("kind")
+        remediation_hint = str(hint_kind) if hint_kind is not None else str(first_hint)
+
+    return NormalizedInvariantResult(
+        invariant_id=outcome.invariant_id.value,
+        passed=outcome.flow != Flow.STOP,
+        evidence=tuple(outcome.evidence),
+        remediation_hint=remediation_hint,
+        gate_point=gate_point,
+        code=outcome.code,
+    )
 
 
 def default_check_context(*, scope: str, prediction_key: Optional[str], current_predictions: Mapping[str, Any], prediction_log_available: bool, just_written_prediction: Optional[Mapping[str, Any]] = None, halt_candidate: Optional[InvariantOutcome] = None) -> InvariantCheckContext:

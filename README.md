@@ -1,6 +1,8 @@
 # SemanticNG
 
-SemanticNG is a Python project focused on state renormalization, schema selection, and behavior-driven test scenarios.
+## Mission
+
+SemanticNG is a Python project focused on state renormalization, schema selection, and behavior-driven test scenarios. See `MISSION.md` for mission, north-star principles, and phase non-goals.
 
 ## Requirements
 

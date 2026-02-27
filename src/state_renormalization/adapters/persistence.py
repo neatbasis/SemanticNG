@@ -124,6 +124,29 @@ def append_prediction(path: PathLike = PREDICTIONS_LOG_PATH, record: Any = None)
     return {"kind": "jsonl", "ref": f"{p.name}@{next_offset}"}
 
 
+def append_prediction_event(
+    record: Any,
+    *,
+    path: PathLike = PREDICTIONS_LOG_PATH,
+    episode_id: str | None = None,
+    conversation_id: str | None = None,
+    turn_index: int | None = None,
+) -> JsonObj:
+    payload = _to_jsonable(record)
+    if not isinstance(payload, dict):
+        raise ValueError("append_prediction_event expects a dict-like prediction payload")
+
+    event: JsonObj = {"event_kind": "prediction", **payload}
+    if episode_id:
+        event["episode_id"] = episode_id
+    if conversation_id:
+        event["conversation_id"] = conversation_id
+    if turn_index is not None:
+        event["turn_index"] = int(turn_index)
+
+    return append_prediction(path=path, record=event)
+
+
 def append_halt(path: PathLike, record: Any) -> JsonObj:
     p = Path(path)
     next_offset = 1

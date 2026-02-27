@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from state_renormalization.adapters.persistence import read_jsonl
 from state_renormalization.contracts import (
     AskResult,
     BeliefState,
@@ -51,3 +52,28 @@ def test_run_mission_loop_updates_projection_before_decision_stages(
     assert "room:kitchen:light" in projection_out.current_predictions
     assert any(a.get("artifact_kind") == "prediction_update" for a in ep_out.artifacts)
     assert ep_out.observations
+
+    (_, prediction_event), = list(read_jsonl(tmp_path / "predictions.jsonl"))
+    assert prediction_event["episode_id"] == ep.episode_id
+    assert prediction_event["conversation_id"] == ep.conversation_id
+    assert prediction_event["turn_index"] == ep.turn_index
+
+
+def test_run_mission_loop_halts_before_downstream_decision_without_predictions(
+    belief: BeliefState,
+    make_episode: Callable[..., Episode],
+    make_policy_decision: Callable[..., VerbosityDecision],
+    make_ask_result: Callable[..., AskResult],
+) -> None:
+    ep = make_episode(
+        decision=make_policy_decision(),
+        ask=make_ask_result(sentence="turn on the kitchen light"),
+    )
+    projection = ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00")
+
+    ep_out, _, projection_out = run_mission_loop(ep, belief, projection)
+
+    assert projection_out.current_predictions == {}
+    assert len(ep_out.observations) == 1
+    assert ep_out.observations[0].type.value == "halt"
+    assert any(a.get("artifact_kind") == "invariant_outcomes" and a.get("kind") == "halt" for a in ep_out.artifacts)

@@ -346,9 +346,9 @@ class PredictionRecord(BaseModel):
     prediction_id: str
     scope_key: str
     prediction_key: Optional[str] = None
-    filtration_id: str = Field(validation_alias=AliasChoices("filtration_id", "filtration_ref"))
+    filtration_id: str = Field(validation_alias=AliasChoices("filtration_id", "filtration_ref", "filtration_reference"))
     target_variable: str = Field(validation_alias=AliasChoices("target_variable", "variable"))
-    target_horizon_iso: str = Field(validation_alias=AliasChoices("target_horizon_iso", "horizon_iso"))
+    target_horizon_iso: str = Field(validation_alias=AliasChoices("target_horizon_iso", "horizon_iso", "horizon"))
 
     # Backward-compatible optional distribution metadata.
     distribution_kind: Optional[str] = None

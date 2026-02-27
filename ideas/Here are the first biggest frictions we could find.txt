@@ -1,3 +1,5 @@
+NOTE: This file is exploratory. It is not normative and should be treated as draft material unless and until it is promoted into roadmap or architecture documentation.
+
 Here are the biggest frictions I see in the current plan (where you’ll get complexity, ambiguity, or future rewrites), and a tightened plan that keeps your “north star” invariant while reducing churn.
 Frictions and failure modes
 1) Invariants layer is under-specified for composition

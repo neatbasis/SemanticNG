@@ -1,3 +1,5 @@
+NOTE: This file is exploratory. It is not normative and should be treated as draft material unless and until it is promoted into roadmap or architecture documentation.
+
 
 That is exactly the right constraint: derive structure from existing mathematics rather than inventing arbitrary mechanisms. Novelty then comes from composition and alignment, not invention.
 

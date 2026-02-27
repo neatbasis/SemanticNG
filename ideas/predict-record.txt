@@ -1,3 +1,5 @@
+NOTE: This file is exploratory. It is not normative and should be treated as draft material unless and until it is promoted into roadmap or architecture documentation.
+
 Sinä sanoit:
 What's this narcissist trap?
 

@@ -286,12 +286,12 @@ RULES_BY_PHASE: dict[str, list[Rule]] = {
         ),
         FunctionRule(
             name="empty_input",
-            _applies=lambda ctx: not ctx.normalized.strip(),
+            _applies=lambda ctx: ctx.error is None and not ctx.normalized.strip(),
             _emit=_empty_input_emit,
         ),
         FunctionRule(
             name="exit_intent",
-            _applies=lambda ctx: is_exit_intent(ctx.normalized),
+            _applies=lambda ctx: ctx.error is None and is_exit_intent(ctx.normalized),
             _emit=_exit_emit,
         ),
     ],
@@ -342,6 +342,59 @@ def _merge_schema_selections(selections: list[SchemaSelection]) -> SchemaSelecti
         schemas=sort_schema_hits(schemas),
         ambiguities=ambiguities,
         notes="; ".join(notes) if notes else None,
+    )
+
+
+def _legacy_naive_schema_selector(text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
+    """
+    Frozen baseline implementation used by tests to verify refactors preserve behavior.
+    """
+    raw = text or ""
+    t = normalize_text(raw)
+    tokens = set(norm_tokens(t))
+
+    if error is not None and error.status == CaptureStatus.NO_RESPONSE:
+        return _no_response_emit(
+            SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
+        )
+
+    if not t.strip():
+        return _empty_input_emit(
+            SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
+        )
+
+    if is_exit_intent(t):
+        return _exit_emit(
+            SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
+        )
+
+    if (tokens & VAGUE_PRONOUNS) and any(w in tokens for w in ARRIVAL_WORDS):
+        return _vague_actor_emit(
+            SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
+        )
+
+    if has_url(t):
+        return _url_emit(
+            SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
+        )
+
+    numberish = any(tok.isdigit() for tok in tokens) or any(tok in {"ten", "five"} for tok in tokens)
+    has_unit_token = any(
+        u in tokens for u in {"s", "sec", "second", "seconds", "m", "min", "minute", "minutes", "h", "hour", "hours"}
+    )
+    mentions_timerish = any(w in t for w in ["timer", "remind", "reminder", "in "])
+    if mentions_timerish and numberish and not has_unit_token:
+        return _timer_unit_emit(
+            SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
+        )
+
+    if has_any_phrase(t, UNCERTAIN_PHRASES):
+        return _uncertainty_emit(
+            SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
+        )
+
+    return _actionable_emit(
+        SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
     )
 
 def naive_schema_selector(text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:

@@ -5,8 +5,20 @@ import inspect
 
 import pytest
 
-from state_renormalization.adapters.schema_selector import naive_schema_selector
+from state_renormalization.adapters.schema_selector import _legacy_naive_schema_selector, naive_schema_selector
 from state_renormalization.contracts import CaptureOutcome, CaptureStatus
+
+
+SELECTOR_FIXTURES: list[tuple[str | None, CaptureOutcome | None]] = [
+    (None, CaptureOutcome(status=CaptureStatus.NO_RESPONSE)),
+    ("", None),
+    ("quit", None),
+    ("they are coming", None),
+    ("https://example.com", None),
+    ("set timer for ten", None),
+    ("maybe", None),
+    ("turn on the lights", None),
+]
 
 
 def test_no_response_yields_capture_clarification_ambiguity() -> None:
@@ -52,3 +64,11 @@ def test_schema_selector_regression_snapshots(
     assert all(hit.about is not None for hit in sel.schemas)
     assert sel.schemas[0].about is not None
     assert sel.schemas[0].about.key == expected_about_key
+
+
+@pytest.mark.parametrize(("text", "error"), SELECTOR_FIXTURES)
+def test_refactored_selector_matches_legacy_snapshots(text: str | None, error: CaptureOutcome | None) -> None:
+    legacy = _legacy_naive_schema_selector(text=text, error=error)
+    refactored = naive_schema_selector(text=text, error=error)
+
+    assert refactored.model_dump(mode="json") == legacy.model_dump(mode="json")

@@ -48,6 +48,16 @@ If you also want the BDD / Gherkin tooling used by the `features/` step definiti
 python -m pip install -e ".[test,bdd]"
 ```
 
+## Definition-of-done manifest
+
+A machine-readable status inventory lives at `docs/dod_manifest.json` with capability IDs, status (`done`/`in_progress`/`planned`), code paths, and test commands.
+
+Validate this inventory in tests:
+
+```bash
+pytest tests/test_dod_manifest.py
+```
+
 ## Running tests
 
 Run the pytest suite:

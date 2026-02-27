@@ -4,7 +4,8 @@ from __future__ import annotations
 import hashlib
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, Mapping, Optional, Sequence
 from pydantic import BaseModel
 from enum import Enum
 
@@ -27,6 +28,13 @@ from state_renormalization.contracts import (
     project_ambiguity_state,
 )
 from state_renormalization.adapters.schema_selector import naive_schema_selector
+from state_renormalization.invariants import (
+    Flow as InvariantFlow,
+    InvariantId,
+    InvariantOutcome,
+    REGISTRY,
+    default_check_context,
+)
 
 
 PHATIC_PATTERNS = [
@@ -50,6 +58,20 @@ EXIT_PHRASES = [
     "later",
     "leave me alone",
 ]
+
+
+@dataclass(frozen=True)
+class InvariantGateResult:
+    pre_consume: Sequence[InvariantOutcome] = field(default_factory=tuple)
+    post_write: Sequence[InvariantOutcome] = field(default_factory=tuple)
+
+    @property
+    def combined(self) -> Sequence[InvariantOutcome]:
+        return tuple(self.pre_consume) + tuple(self.post_write)
+
+    @property
+    def should_stop(self) -> bool:
+        return any(outcome.flow == InvariantFlow.STOP for outcome in self.combined)
 
 
 def _now_iso() -> str:
@@ -108,6 +130,71 @@ def _to_dict(obj: Any) -> Any:
 
     # Primitives / unknowns
     return obj
+
+
+def _run_invariant(invariant_id: InvariantId, *, ctx) -> InvariantOutcome:
+    checker = REGISTRY[invariant_id]
+    outcome = checker(ctx)
+    if outcome.flow != InvariantFlow.STOP:
+        return outcome
+
+    h0_ctx = default_check_context(
+        scope=ctx.scope,
+        prediction_key=ctx.prediction_key,
+        current_predictions=ctx.current_predictions,
+        prediction_log_available=ctx.prediction_log_available,
+        just_written_prediction=ctx.just_written_prediction,
+        halt_candidate=outcome,
+    )
+    explainable_halt = REGISTRY[InvariantId.H0_EXPLAINABLE_HALT](h0_ctx)
+    if explainable_halt.flow == InvariantFlow.STOP:
+        return explainable_halt
+    return outcome
+
+
+def evaluate_invariant_gates(
+    *,
+    ep: Optional[Episode],
+    scope: str,
+    prediction_key: Optional[str],
+    current_predictions: Mapping[str, Any],
+    prediction_log_available: bool,
+    just_written_prediction: Optional[Mapping[str, Any]] = None,
+) -> InvariantGateResult:
+    pre_ctx = default_check_context(
+        scope=scope,
+        prediction_key=prediction_key,
+        current_predictions=current_predictions,
+        prediction_log_available=prediction_log_available,
+    )
+    pre_outcome = _run_invariant(InvariantId.P0_NO_CURRENT_PREDICTION, ctx=pre_ctx)
+    pre_consume = (pre_outcome,)
+
+    post_write: Sequence[InvariantOutcome] = tuple()
+    if just_written_prediction is not None:
+        post_ctx = default_check_context(
+            scope=scope,
+            prediction_key=prediction_key,
+            current_predictions=current_predictions,
+            prediction_log_available=prediction_log_available,
+            just_written_prediction=just_written_prediction,
+        )
+        post_write = (_run_invariant(InvariantId.P1_WRITE_BEFORE_USE, ctx=post_ctx),)
+
+    result = InvariantGateResult(pre_consume=pre_consume, post_write=post_write)
+
+    if ep is not None:
+        ep.artifacts.append(
+            {
+                "kind": "invariant_outcomes",
+                "scope": scope,
+                "pre_consume": [_to_dict(outcome) for outcome in result.pre_consume],
+                "post_write": [_to_dict(outcome) for outcome in result.post_write],
+                "should_stop": result.should_stop,
+            }
+        )
+
+    return result
 
 
 def build_episode(

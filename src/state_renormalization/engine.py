@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Any, Dict, Literal, Mapping, Optional, Sequence
+from typing import Any, Dict, Mapping, Optional, Sequence
 from pydantic import BaseModel
 from enum import Enum
 from gherkin.parser import Parser
@@ -72,26 +72,17 @@ EXIT_PHRASES = [
 
 
 @dataclass(frozen=True)
-class GatePrediction:
+class Prediction:
     pre_consume: Sequence[InvariantOutcome] = field(default_factory=tuple)
     post_write: Sequence[InvariantOutcome] = field(default_factory=tuple)
 
 
-@dataclass(frozen=True)
-class GateResult:
-    kind: Literal["prediction", "halt"]
-    prediction: Optional[GatePrediction] = None
-    halt: Optional[HaltRecord] = None
-
     @property
     def combined(self) -> Sequence[InvariantOutcome]:
-        if self.prediction is None:
-            return tuple()
-        return tuple(self.prediction.pre_consume) + tuple(self.prediction.post_write)
+        return tuple(self.pre_consume) + tuple(self.post_write)
 
-    @property
-    def should_stop(self) -> bool:
-        return any(outcome.flow == InvariantFlow.STOP for outcome in self.combined)
+
+GateDecision = Prediction | HaltRecord
 
 
 def _as_evidence_ref(item: Mapping[str, Any]) -> EvidenceRef:
@@ -110,7 +101,7 @@ def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltR
         invariant_id=outcome.invariant_id.value,
         reason=reason,
         evidence_refs=[_as_evidence_ref(_to_dict(item)) for item in outcome.evidence],
-        timestamp_iso=_now_iso(),
+        timestamp=_now_iso(),
         retryable=bool(outcome.action_hints),
     )
 
@@ -286,7 +277,7 @@ def evaluate_invariant_gates(
     prediction_log_available: bool,
     just_written_prediction: Optional[Mapping[str, Any]] = None,
     halt_log_path: str | Path = "halts.jsonl",
-) -> GateResult:
+) -> GateDecision:
     current_predictions = {
         key: pred.prediction_id
         for key, pred in projection_state.current_predictions.items()
@@ -321,21 +312,22 @@ def evaluate_invariant_gates(
         halt_outcome = post_write[0]
         halt_stage = "post_write"
 
-    halt_record = None
+    halt_record: Optional[HaltRecord] = None
     if halt_outcome is not None and halt_stage is not None:
         halt_record = _halt_record_from_outcome(stage=halt_stage, outcome=halt_outcome)
 
+    result: GateDecision
+    result_kind: str
     if halt_record is None:
-        result = GateResult(
-            kind="prediction",
-            prediction=GatePrediction(pre_consume=pre_consume, post_write=post_write),
-        )
+        result = Prediction(pre_consume=pre_consume, post_write=post_write)
+        result_kind = "prediction"
     else:
-        result = GateResult(kind="halt", halt=halt_record)
+        result = halt_record
+        result_kind = "halt"
 
     halt_evidence_ref: Optional[Dict[str, str]] = None
-    if halt_record is not None:
-        halt_evidence_ref = append_halt(halt_log_path, halt_record)
+    if isinstance(result, HaltRecord):
+        halt_evidence_ref = append_halt(halt_log_path, result)
 
     if ep is not None:
         _append_episode_artifact(
@@ -353,12 +345,28 @@ def evaluate_invariant_gates(
                 },
                 "pre_consume": [_to_dict(outcome) for outcome in pre_consume],
                 "post_write": [_to_dict(outcome) for outcome in post_write],
-                "kind": result.kind,
-                "prediction": _to_dict(result.prediction),
-                "halt": _to_dict(result.halt),
+                "kind": result_kind,
+                "prediction": _to_dict(result) if isinstance(result, Prediction) else None,
+                "halt": _to_dict(result) if isinstance(result, HaltRecord) else None,
                 "halt_evidence_ref": halt_evidence_ref,
             },
         )
+
+        if isinstance(result, HaltRecord):
+            _append_episode_artifact(
+                ep,
+                {
+                    "artifact_kind": "halt_observation",
+                    "observation_type": "halt",
+                    "halt_id": result.halt_id,
+                    "stage": result.stage,
+                    "invariant_id": result.invariant_id,
+                    "reason": result.reason,
+                    "retryable": result.retryable,
+                    "evidence_refs": [_to_dict(e) for e in result.evidence_refs],
+                    "halt_evidence_ref": halt_evidence_ref,
+                },
+            )
 
     return result
 

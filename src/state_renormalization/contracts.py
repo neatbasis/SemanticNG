@@ -323,7 +323,7 @@ class HaltRecord(BaseModel):
     invariant_id: str
     reason: str
     evidence_refs: List[EvidenceRef] = Field(default_factory=list)
-    timestamp_iso: str
+    timestamp: str
     retryable: bool
 
 

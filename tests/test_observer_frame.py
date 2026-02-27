@@ -82,9 +82,11 @@ def test_observer_passed_through_decision_and_evaluation_artifacts(make_episode,
         projection_state=ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
         prediction_log_available=False,
     )
-    invariant_artifact = curr_ep.artifacts[-1]
-    assert invariant_artifact["artifact_kind"] == "invariant_outcomes"
+    invariant_artifact = next(a for a in curr_ep.artifacts if a.get("artifact_kind") == "invariant_outcomes")
     assert invariant_artifact["observer"]["role"] == "assistant"
+
+    halt_observation = next(a for a in curr_ep.artifacts if a.get("artifact_kind") == "halt_observation")
+    assert halt_observation["observation_type"] == "halt"
 
 
 def test_build_episode_attaches_stable_ids_from_feature_doc(tmp_path: Path, make_policy_decision) -> None:

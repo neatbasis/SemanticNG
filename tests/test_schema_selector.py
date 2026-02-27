@@ -6,13 +6,15 @@ import inspect
 import pytest
 
 from state_renormalization.adapters.schema_selector import (
+    BaseRule,
+    SelectorContext,
     _legacy_naive_schema_selector,
     build_selector_context,
     naive_schema_selector,
     RULE_PHASES,
     RULES_BY_PHASE,
 )
-from state_renormalization.contracts import CaptureOutcome, CaptureStatus
+from state_renormalization.contracts import CaptureOutcome, CaptureStatus, SchemaHit, SchemaSelection
 
 
 SELECTOR_FIXTURES: list[tuple[str | None, CaptureOutcome | None]] = [
@@ -102,3 +104,30 @@ def test_rule_phases_and_rule_units_are_structured_for_extension() -> None:
             assert isinstance(rule.name, str) and rule.name
             assert callable(rule.applies)
             assert callable(rule.emit)
+
+
+def test_variant_addition_can_be_localized_to_a_single_phase_rule() -> None:
+    class KitchenLightsRule(BaseRule):
+        name: str = "kitchen_lights"
+
+        def applies(self, ctx: SelectorContext) -> bool:
+            return "kitchen" in ctx.tokens and "lights" in ctx.tokens
+
+        def emit(self, ctx: SelectorContext) -> SchemaSelection:
+            return SchemaSelection(
+                schemas=[SchemaHit(name="lights.kitchen", score=0.99, about=None)],
+                ambiguities=[],
+            )
+
+    fallback = RULES_BY_PHASE["fallback"]
+    original = list(fallback)
+    try:
+        fallback.insert(0, KitchenLightsRule(name="kitchen_lights"))
+
+        localized = naive_schema_selector("turn on kitchen lights", error=None)
+        baseline = naive_schema_selector("turn on bedroom lights", error=None)
+
+        assert [hit.name for hit in localized.schemas] == ["lights.kitchen"]
+        assert [hit.name for hit in baseline.schemas] == ["actionable_intent"]
+    finally:
+        fallback[:] = original

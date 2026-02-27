@@ -5,7 +5,11 @@ import inspect
 
 import pytest
 
-from state_renormalization.adapters.schema_selector import _legacy_naive_schema_selector, naive_schema_selector
+from state_renormalization.adapters.schema_selector import (
+    _legacy_naive_schema_selector,
+    build_selector_context,
+    naive_schema_selector,
+)
 from state_renormalization.contracts import CaptureOutcome, CaptureStatus
 
 
@@ -18,6 +22,9 @@ SELECTOR_FIXTURES: list[tuple[str | None, CaptureOutcome | None]] = [
     ("set timer for ten", None),
     ("maybe", None),
     ("turn on the lights", None),
+    ("maybe https://example.com", None),
+    ("they are coming maybe", None),
+    ("set timer for ten maybe", None),
 ]
 
 
@@ -72,3 +79,13 @@ def test_refactored_selector_matches_legacy_snapshots(text: str | None, error: C
     refactored = naive_schema_selector(text=text, error=error)
 
     assert refactored.model_dump(mode="json") == legacy.model_dump(mode="json")
+
+
+def test_build_selector_context_normalizes_once_and_exposes_signals() -> None:
+    ctx = build_selector_context("They're coming in ten", error=None)
+
+    assert ctx.raw == "They're coming in ten"
+    assert ctx.normalized == "they are coming in ten"
+    assert "they" in ctx.tokens
+    assert ctx.metadata["has_numberish"] is True
+    assert ctx.metadata["mentions_timerish"] is True

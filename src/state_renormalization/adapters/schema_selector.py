@@ -276,6 +276,27 @@ def _actionable_emit(ctx: SelectorContext) -> SchemaSelection:
     )
 
 
+def build_selector_context(text: Optional[str], *, error: Optional[CaptureOutcome]) -> SelectorContext:
+    raw = text or ""
+    normalized = normalize_text(raw)
+    tokens = set(norm_tokens(normalized))
+    return SelectorContext(
+        raw=raw,
+        normalized=normalized,
+        tokens=tokens,
+        error=error,
+        metadata={
+            "has_url": has_url(normalized),
+            "has_numberish": any(tok.isdigit() for tok in tokens) or any(tok in {"ten", "five"} for tok in tokens),
+            "has_unit": any(
+                u in tokens
+                for u in {"s", "sec", "second", "seconds", "m", "min", "minute", "minutes", "h", "hour", "hours"}
+            ),
+            "mentions_timerish": any(w in normalized for w in ["timer", "remind", "reminder", "in "]),
+        },
+    )
+
+
 RULE_PHASES: tuple[str, ...] = ("hard-stop", "disambiguation", "fallback")
 RULES_BY_PHASE: dict[str, list[Rule]] = {
     "hard-stop": [
@@ -327,22 +348,6 @@ RULES_BY_PHASE: dict[str, list[Rule]] = {
         )
     ],
 }
-
-
-def _merge_schema_selections(selections: list[SchemaSelection]) -> SchemaSelection:
-    schemas: list[SchemaHit] = []
-    ambiguities: list[Ambiguity] = []
-    notes: list[str] = []
-    for selection in selections:
-        schemas.extend(selection.schemas)
-        ambiguities.extend(selection.ambiguities)
-        if selection.notes:
-            notes.append(selection.notes)
-    return SchemaSelection(
-        schemas=sort_schema_hits(schemas),
-        ambiguities=ambiguities,
-        notes="; ".join(notes) if notes else None,
-    )
 
 
 def _legacy_naive_schema_selector(text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
@@ -398,28 +403,11 @@ def _legacy_naive_schema_selector(text: Optional[str], *, error: Optional[Captur
     )
 
 def naive_schema_selector(text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
-    raw = text or ""
-    t = normalize_text(raw)
-    tokens = set(norm_tokens(t))
-    ctx = SelectorContext(
-        raw=raw,
-        normalized=t,
-        tokens=tokens,
-        error=error,
-        metadata={
-            "has_url": has_url(t),
-            "has_numberish": any(tok.isdigit() for tok in tokens) or any(tok in {"ten", "five"} for tok in tokens),
-            "has_unit": any(
-                u in tokens
-                for u in {"s", "sec", "second", "seconds", "m", "min", "minute", "minutes", "h", "hour", "hours"}
-            ),
-            "mentions_timerish": any(w in t for w in ["timer", "remind", "reminder", "in "]),
-        },
-    )
+    ctx = build_selector_context(text, error=error)
 
     for phase in RULE_PHASES:
-        matching = [rule.emit(ctx) for rule in RULES_BY_PHASE[phase] if rule.applies(ctx)]
-        if matching:
-            return _merge_schema_selections(matching)
+        for rule in RULES_BY_PHASE[phase]:
+            if rule.applies(ctx):
+                return rule.emit(ctx)
 
     return SchemaSelection(schemas=[], ambiguities=[])

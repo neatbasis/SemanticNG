@@ -121,6 +121,29 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
         "key": pred.scope_key,
         "evidence_refs": [],
     }
+    assert artifact["invariant_checks"] == [
+        {
+            "gate_point": "pre_consume",
+            "invariant_id": "prediction_availability.v1",
+            "passed": True,
+            "evidence": [],
+            "reason": "current_prediction_available",
+        },
+        {
+            "gate_point": "post_write",
+            "invariant_id": "prediction_retrievability.v1",
+            "passed": False,
+            "evidence": [{"kind": "scope", "ref": pred.scope_key}],
+            "reason": "Prediction append did not produce retrievable evidence.",
+        },
+        {
+            "gate_point": "halt_validation",
+            "invariant_id": "explainable_halt_completeness.v1",
+            "passed": True,
+            "evidence": [],
+            "reason": "halt_explainable",
+        },
+    ]
 
     halt_observation = ep.artifacts[1]
     assert halt_observation["artifact_kind"] == "halt_observation"

@@ -36,6 +36,14 @@ class InvariantOutcome:
     action_hints: Optional[Sequence[Mapping[str, Any]]] = None
 
 
+@dataclass(frozen=True)
+class NormalizedCheckerOutput:
+    invariant_id: str
+    passed: bool
+    evidence: Sequence[Mapping[str, Any]] = field(default_factory=tuple)
+    reason: str = ""
+
+
 class CheckContext(Protocol):
     now_iso: str
     scope: str
@@ -207,3 +215,19 @@ def default_check_context(
         just_written_prediction=just_written_prediction,
         halt_candidate=halt_candidate,
     )
+
+
+def normalize_outcome(outcome: InvariantOutcome) -> NormalizedCheckerOutput:
+    return NormalizedCheckerOutput(
+        invariant_id=outcome.invariant_id.value,
+        passed=outcome.passed,
+        evidence=tuple(_normalize_evidence_item(item) for item in outcome.evidence),
+        reason=outcome.reason,
+    )
+
+
+def _normalize_evidence_item(item: Mapping[str, Any]) -> Mapping[str, Any]:
+    return {
+        "kind": str(item.get("kind") or "unknown"),
+        "ref": item.get("ref", item.get("value", "")),
+    }

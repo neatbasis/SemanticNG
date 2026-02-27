@@ -41,9 +41,11 @@ from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.invariants import (
     Flow as InvariantFlow,
     InvariantId,
+    NormalizedCheckerOutput,
     InvariantOutcome,
     REGISTRY,
     default_check_context,
+    normalize_outcome,
 )
 from state_renormalization.stable_ids import derive_stable_ids
 
@@ -83,6 +85,12 @@ class PredictionOutcome:
 
 
 GateDecision = PredictionOutcome | HaltRecord
+
+
+@dataclass(frozen=True)
+class GateInvariantCheck:
+    gate_point: str
+    output: NormalizedCheckerOutput
 
 
 def _observer_allowed_invariants(observer: Optional[ObserverFrame]) -> Optional[set[InvariantId]]:
@@ -321,6 +329,7 @@ def evaluate_invariant_gates(
     }
 
     pre_consume: Sequence[InvariantOutcome] = tuple()
+    gate_checks: list[GateInvariantCheck] = []
     pre_outcome: Optional[InvariantOutcome] = None
     if _observer_allows_invariant(observer=observer, invariant_id=InvariantId.PREDICTION_AVAILABILITY):
         pre_ctx = default_check_context(
@@ -331,6 +340,7 @@ def evaluate_invariant_gates(
         )
         pre_outcome = _run_invariant(InvariantId.PREDICTION_AVAILABILITY, ctx=pre_ctx)
         pre_consume = (pre_outcome,)
+        gate_checks.append(GateInvariantCheck(gate_point="pre_consume", output=normalize_outcome(pre_outcome)))
 
     post_write: Sequence[InvariantOutcome] = tuple()
     if just_written_prediction is not None and _observer_allows_invariant(
@@ -345,6 +355,9 @@ def evaluate_invariant_gates(
             just_written_prediction=just_written_prediction,
         )
         post_write = (_run_invariant(InvariantId.PREDICTION_RETRIEVABILITY, ctx=post_ctx),)
+        gate_checks.append(
+            GateInvariantCheck(gate_point="post_write", output=normalize_outcome(post_write[0]))
+        )
 
     halt_outcome: Optional[InvariantOutcome] = None
     halt_stage: Optional[str] = None
@@ -358,6 +371,23 @@ def evaluate_invariant_gates(
     halt_record: Optional[HaltRecord] = None
     if halt_outcome is not None and halt_stage is not None:
         halt_record = _halt_record_from_outcome(stage=halt_stage, outcome=halt_outcome)
+        gate_checks.append(
+            GateInvariantCheck(
+                gate_point="halt_validation",
+                output=normalize_outcome(
+                    REGISTRY[InvariantId.EXPLAINABLE_HALT_COMPLETENESS](
+                        default_check_context(
+                            scope=scope,
+                            prediction_key=prediction_key,
+                            current_predictions=current_predictions,
+                            prediction_log_available=prediction_log_available,
+                            just_written_prediction=just_written_prediction,
+                            halt_candidate=halt_outcome,
+                        )
+                    )
+                ),
+            )
+        )
 
     result: GateDecision
     result_kind: str
@@ -398,6 +428,16 @@ def evaluate_invariant_gates(
                 "pre_consume": [_to_dict(outcome) for outcome in pre_consume],
                 "post_write": [_to_dict(outcome) for outcome in post_write],
                 "invariant_results": [_to_dict(outcome) for outcome in tuple(pre_consume) + tuple(post_write)],
+                "invariant_checks": [
+                    {
+                        "gate_point": check.gate_point,
+                        "invariant_id": check.output.invariant_id,
+                        "passed": check.output.passed,
+                        "evidence": _to_dict(check.output.evidence),
+                        "reason": check.output.reason,
+                    }
+                    for check in gate_checks
+                ],
                 "kind": result_kind,
                 "prediction": _to_dict(result) if isinstance(result, PredictionOutcome) else None,
                 "halt": _to_dict(result) if isinstance(result, HaltRecord) else None,

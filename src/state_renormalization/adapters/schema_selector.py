@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Callable, Optional, Protocol
+from typing import Optional, Protocol
 
 from state_renormalization.contracts import (
     AboutKind,
@@ -102,16 +102,106 @@ class Rule(Protocol):
 
 
 @dataclass(frozen=True)
-class FunctionRule:
+class BaseRule:
     name: str
-    _applies: Callable[[SelectorContext], bool]
-    _emit: Callable[[SelectorContext], SchemaSelection]
 
     def applies(self, ctx: SelectorContext) -> bool:
-        return self._applies(ctx)
+        raise NotImplementedError
 
     def emit(self, ctx: SelectorContext) -> SchemaSelection:
-        return self._emit(ctx)
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class NoResponseRule(BaseRule):
+    name: str = "no_response"
+
+    def applies(self, ctx: SelectorContext) -> bool:
+        return ctx.error is not None and ctx.error.status == CaptureStatus.NO_RESPONSE
+
+    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+        return _no_response_emit(ctx)
+
+
+@dataclass(frozen=True)
+class EmptyInputRule(BaseRule):
+    name: str = "empty_input"
+
+    def applies(self, ctx: SelectorContext) -> bool:
+        return ctx.error is None and not ctx.normalized.strip()
+
+    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+        return _empty_input_emit(ctx)
+
+
+@dataclass(frozen=True)
+class ExitIntentRule(BaseRule):
+    name: str = "exit_intent"
+
+    def applies(self, ctx: SelectorContext) -> bool:
+        return ctx.error is None and is_exit_intent(ctx.normalized)
+
+    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+        return _exit_emit(ctx)
+
+
+@dataclass(frozen=True)
+class VagueActorRule(BaseRule):
+    name: str = "vague_actor"
+
+    def applies(self, ctx: SelectorContext) -> bool:
+        return bool((ctx.tokens & VAGUE_PRONOUNS) and any(w in ctx.tokens for w in ARRIVAL_WORDS))
+
+    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+        return _vague_actor_emit(ctx)
+
+
+@dataclass(frozen=True)
+class UrlIntentRule(BaseRule):
+    name: str = "url_intent"
+
+    def applies(self, ctx: SelectorContext) -> bool:
+        return bool(ctx.metadata.get("has_url"))
+
+    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+        return _url_emit(ctx)
+
+
+@dataclass(frozen=True)
+class TimerUnitRule(BaseRule):
+    name: str = "timer_unit"
+
+    def applies(self, ctx: SelectorContext) -> bool:
+        return (
+            bool(ctx.metadata.get("mentions_timerish"))
+            and bool(ctx.metadata.get("has_numberish"))
+            and not bool(ctx.metadata.get("has_unit"))
+        )
+
+    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+        return _timer_unit_emit(ctx)
+
+
+@dataclass(frozen=True)
+class UncertaintyRule(BaseRule):
+    name: str = "uncertainty"
+
+    def applies(self, ctx: SelectorContext) -> bool:
+        return has_any_phrase(ctx.normalized, UNCERTAIN_PHRASES)
+
+    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+        return _uncertainty_emit(ctx)
+
+
+@dataclass(frozen=True)
+class ActionableIntentRule(BaseRule):
+    name: str = "actionable_intent"
+
+    def applies(self, ctx: SelectorContext) -> bool:
+        return True
+
+    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+        return _actionable_emit(ctx)
 
 
 def _no_response_emit(ctx: SelectorContext) -> SchemaSelection:
@@ -297,55 +387,21 @@ def build_selector_context(text: Optional[str], *, error: Optional[CaptureOutcom
     )
 
 
-RULE_PHASES: tuple[str, ...] = ("hard-stop", "disambiguation", "fallback")
+RULE_PHASES: tuple[str, ...] = ("hard-stop", "ambiguity-disambiguation", "fallback")
 RULES_BY_PHASE: dict[str, list[Rule]] = {
     "hard-stop": [
-        FunctionRule(
-            name="no_response",
-            _applies=lambda ctx: ctx.error is not None and ctx.error.status == CaptureStatus.NO_RESPONSE,
-            _emit=_no_response_emit,
-        ),
-        FunctionRule(
-            name="empty_input",
-            _applies=lambda ctx: ctx.error is None and not ctx.normalized.strip(),
-            _emit=_empty_input_emit,
-        ),
-        FunctionRule(
-            name="exit_intent",
-            _applies=lambda ctx: ctx.error is None and is_exit_intent(ctx.normalized),
-            _emit=_exit_emit,
-        ),
+        NoResponseRule(),
+        EmptyInputRule(),
+        ExitIntentRule(),
     ],
-    "disambiguation": [
-        FunctionRule(
-            name="vague_actor",
-            _applies=lambda ctx: (ctx.tokens & VAGUE_PRONOUNS) and any(w in ctx.tokens for w in ARRIVAL_WORDS),
-            _emit=_vague_actor_emit,
-        ),
-        FunctionRule(
-            name="url_intent",
-            _applies=lambda ctx: bool(ctx.metadata.get("has_url")),
-            _emit=_url_emit,
-        ),
-        FunctionRule(
-            name="timer_unit",
-            _applies=lambda ctx: bool(ctx.metadata.get("mentions_timerish"))
-            and bool(ctx.metadata.get("has_numberish"))
-            and not bool(ctx.metadata.get("has_unit")),
-            _emit=_timer_unit_emit,
-        ),
-        FunctionRule(
-            name="uncertainty",
-            _applies=lambda ctx: has_any_phrase(ctx.normalized, UNCERTAIN_PHRASES),
-            _emit=_uncertainty_emit,
-        ),
+    "ambiguity-disambiguation": [
+        VagueActorRule(),
+        UrlIntentRule(),
+        TimerUnitRule(),
+        UncertaintyRule(),
     ],
     "fallback": [
-        FunctionRule(
-            name="actionable_intent",
-            _applies=lambda _ctx: True,
-            _emit=_actionable_emit,
-        )
+        ActionableIntentRule()
     ],
 }
 

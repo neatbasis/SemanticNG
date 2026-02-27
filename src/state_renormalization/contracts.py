@@ -304,7 +304,7 @@ class HaltRecord(BaseModel):
     stage: str
     invariant_id: str
     reason: str
-    evidence_refs: List[Dict[str, Any]] = Field(default_factory=list)
+    evidence_refs: List[EvidenceRef] = Field(default_factory=list)
     timestamp_iso: str
     retryable: bool
 

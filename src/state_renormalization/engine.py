@@ -27,6 +27,7 @@ from state_renormalization.contracts import (
     ProjectionState,
     PredictionRecord,
     HaltRecord,
+    EvidenceRef,
     SchemaSelection,
     UtteranceType,
     project_ambiguity_state,
@@ -66,19 +67,34 @@ EXIT_PHRASES = [
 
 
 @dataclass(frozen=True)
-class GateResult:
-    kind: Literal["prediction", "halt"]
+class GatePrediction:
     pre_consume: Sequence[InvariantOutcome] = field(default_factory=tuple)
     post_write: Sequence[InvariantOutcome] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class GateResult:
+    kind: Literal["prediction", "halt"]
+    prediction: Optional[GatePrediction] = None
     halt: Optional[HaltRecord] = None
 
     @property
     def combined(self) -> Sequence[InvariantOutcome]:
-        return tuple(self.pre_consume) + tuple(self.post_write)
+        if self.prediction is None:
+            return tuple()
+        return tuple(self.prediction.pre_consume) + tuple(self.prediction.post_write)
 
     @property
     def should_stop(self) -> bool:
         return any(outcome.flow == InvariantFlow.STOP for outcome in self.combined)
+
+
+def _as_evidence_ref(item: Mapping[str, Any]) -> EvidenceRef:
+    kind = str(item.get("kind") or "unknown")
+    ref = item.get("ref")
+    if ref is None and "value" in item:
+        ref = item["value"]
+    return EvidenceRef(kind=kind, ref=str(ref) if ref is not None else "")
 
 
 def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltRecord:
@@ -88,7 +104,7 @@ def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltR
         stage=stage,
         invariant_id=outcome.invariant_id.value,
         reason=reason,
-        evidence_refs=[_to_dict(item) for item in outcome.evidence],
+        evidence_refs=[_as_evidence_ref(_to_dict(item)) for item in outcome.evidence],
         timestamp_iso=_now_iso(),
         retryable=bool(outcome.action_hints),
     )
@@ -215,12 +231,13 @@ def evaluate_invariant_gates(
     if halt_outcome is not None and halt_stage is not None:
         halt_record = _halt_record_from_outcome(stage=halt_stage, outcome=halt_outcome)
 
-    result = GateResult(
-        kind="halt" if halt_record is not None else "prediction",
-        pre_consume=pre_consume,
-        post_write=post_write,
-        halt=halt_record,
-    )
+    if halt_record is None:
+        result = GateResult(
+            kind="prediction",
+            prediction=GatePrediction(pre_consume=pre_consume, post_write=post_write),
+        )
+    else:
+        result = GateResult(kind="halt", halt=halt_record)
 
     halt_evidence_ref: Optional[Dict[str, str]] = None
     if halt_record is not None:
@@ -237,9 +254,10 @@ def evaluate_invariant_gates(
                     "prediction_log_available": prediction_log_available,
                     "just_written_prediction": _to_dict(just_written_prediction),
                 },
-                "pre_consume": [_to_dict(outcome) for outcome in result.pre_consume],
-                "post_write": [_to_dict(outcome) for outcome in result.post_write],
+                "pre_consume": [_to_dict(outcome) for outcome in pre_consume],
+                "post_write": [_to_dict(outcome) for outcome in post_write],
                 "kind": result.kind,
+                "prediction": _to_dict(result.prediction),
                 "halt": _to_dict(result.halt),
                 "halt_evidence_ref": halt_evidence_ref,
             }

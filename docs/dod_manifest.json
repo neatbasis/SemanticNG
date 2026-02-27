@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "statuses": ["done", "in_progress", "planned"],
+  "capabilities": [
+    {
+      "id": "prediction_persistence_baseline",
+      "title": "Prediction-first contracts and deterministic persistence baseline",
+      "status": "done",
+      "roadmap_section": "Now",
+      "code_paths": [
+        "src/state_renormalization/stable_ids.py",
+        "src/state_renormalization/adapters/persistence.py",
+        "src/state_renormalization/engine.py"
+      ],
+      "pytest_commands": [
+        "pytest tests/test_stable_ids.py tests/test_persistence_jsonl.py tests/test_predictions_contracts_and_gates.py"
+      ]
+    },
+    {
+      "id": "channel_agnostic_pending_obligation",
+      "title": "Channel-agnostic contracts and pending-obligation behavior",
+      "status": "done",
+      "roadmap_section": "Now",
+      "code_paths": [
+        "src/state_renormalization/contracts.py",
+        "src/state_renormalization/engine.py"
+      ],
+      "pytest_commands": [
+        "pytest tests/test_contracts_belief_state.py tests/test_contracts_decision_effect_shape.py tests/test_engine_pending_obligation.py tests/test_engine_pending_obligation_minimal.py"
+      ]
+    },
+    {
+      "id": "schema_selection_ambiguity_baseline",
+      "title": "Schema selection and ambiguity bubbling baseline",
+      "status": "done",
+      "roadmap_section": "Now",
+      "code_paths": [
+        "src/state_renormalization/adapters/schema_selector.py",
+        "src/state_renormalization/contracts.py",
+        "src/state_renormalization/engine.py"
+      ],
+      "pytest_commands": [
+        "pytest tests/test_schema_selector.py tests/test_schema_bubbling_option_a.py tests/test_capture_outcome_states.py tests/test_engine_calls_selector_with_generic_error.py"
+      ]
+    },
+    {
+      "id": "gate_halt_unification",
+      "title": "Unified gate pipeline and halt persistence",
+      "status": "in_progress",
+      "roadmap_section": "Next",
+      "code_paths": [
+        "src/state_renormalization/contracts.py",
+        "src/state_renormalization/engine.py",
+        "src/state_renormalization/adapters/persistence.py"
+      ],
+      "pytest_commands": [
+        "pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py"
+      ]
+    },
+    {
+      "id": "replay_projection_analytics",
+      "title": "Replay-grade projection and correction analytics",
+      "status": "planned",
+      "roadmap_section": "Later",
+      "code_paths": [
+        "src/state_renormalization/engine.py",
+        "src/state_renormalization/adapters/persistence.py",
+        "src/state_renormalization/contracts.py"
+      ],
+      "pytest_commands": []
+    }
+  ]
+}

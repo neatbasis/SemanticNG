@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from state_renormalization.contracts import PredictionRecord, ProjectionState
-from state_renormalization.engine import append_prediction_record, evaluate_invariant_gates, project_current
+from state_renormalization.contracts import HaltRecord, PredictionRecord, ProjectionState
+from state_renormalization.engine import Prediction, append_prediction_record, evaluate_invariant_gates, project_current
 
 
 FIXED_PREDICTION = {
@@ -55,11 +55,9 @@ def test_post_write_gate_passes_when_evidence_and_projection_current() -> None:
         },
     )
 
-    assert gate.kind == "prediction"
-    assert gate.halt is None
-    assert gate.prediction is not None
-    assert gate.prediction.post_write
-    assert gate.prediction.post_write[0].code == "prediction_write_materialized"
+    assert isinstance(gate, Prediction)
+    assert gate.post_write
+    assert gate.post_write[0].code == "prediction_write_materialized"
 
 
 def test_post_write_gate_halts_when_append_evidence_missing(tmp_path: Path) -> None:
@@ -79,15 +77,12 @@ def test_post_write_gate_halts_when_append_evidence_missing(tmp_path: Path) -> N
         halt_log_path=tmp_path / "halts.jsonl",
     )
 
-    assert gate.kind == "halt"
-    assert gate.prediction is None
-    assert gate.combined == ()
-    assert gate.halt is not None
-    assert gate.halt.stage == "post_write"
-    assert gate.halt.invariant_id == "P1_WRITE_BEFORE_USE"
-    assert gate.halt.reason == "Prediction append did not produce retrievable evidence."
-    assert [e.model_dump(mode="json") for e in gate.halt.evidence_refs] == [{"kind": "scope", "ref": pred.scope_key}]
-    assert gate.halt.retryable is True
+    assert isinstance(gate, HaltRecord)
+    assert gate.stage == "post_write"
+    assert gate.invariant_id == "P1_WRITE_BEFORE_USE"
+    assert gate.reason == "Prediction append did not produce retrievable evidence."
+    assert [e.model_dump(mode="json") for e in gate.evidence_refs] == [{"kind": "scope", "ref": pred.scope_key}]
+    assert gate.retryable is True
 
 
 def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path: Path) -> None:
@@ -112,8 +107,8 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
         halt_log_path=tmp_path / "halts.jsonl",
     )
 
-    assert gate.kind == "halt"
-    assert len(ep.artifacts) == 1
+    assert isinstance(gate, HaltRecord)
+    assert len(ep.artifacts) == 2
     artifact = ep.artifacts[0]
     assert artifact["artifact_kind"] == "invariant_outcomes"
     assert artifact["kind"] == "halt"
@@ -124,6 +119,10 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
         "key": pred.scope_key,
         "evidence_refs": [],
     }
+
+    halt_observation = ep.artifacts[1]
+    assert halt_observation["artifact_kind"] == "halt_observation"
+    assert halt_observation["observation_type"] == "halt"
 
 
 def test_append_prediction_and_projection_support_post_write_gate(tmp_path: Path) -> None:
@@ -146,10 +145,8 @@ def test_append_prediction_and_projection_support_post_write_gate(tmp_path: Path
 
     assert evidence["ref"].startswith("predictions.jsonl@")
     assert projected.current_predictions[pred.scope_key] == pred
-    assert gate.kind == "prediction"
-    assert gate.halt is None
-    assert gate.prediction is not None
-    assert gate.prediction.post_write[0].code == "prediction_write_materialized"
+    assert isinstance(gate, Prediction)
+    assert gate.post_write[0].code == "prediction_write_materialized"
 
 
 def test_pre_consume_gate_halts_without_any_projected_predictions(tmp_path: Path) -> None:
@@ -162,7 +159,6 @@ def test_pre_consume_gate_halts_without_any_projected_predictions(tmp_path: Path
         halt_log_path=tmp_path / "halts.jsonl",
     )
 
-    assert gate.kind == "halt"
-    assert gate.halt is not None
-    assert gate.halt.invariant_id == "P0_NO_CURRENT_PREDICTION"
-    assert gate.halt.reason == "Action selection requires at least one projected current prediction."
+    assert isinstance(gate, HaltRecord)
+    assert gate.invariant_id == "P0_NO_CURRENT_PREDICTION"
+    assert gate.reason == "Action selection requires at least one projected current prediction."

@@ -111,6 +111,25 @@ def make_episode(
 
 
 @pytest.fixture
+def make_observer() -> Callable[..., ObserverFrame]:
+    def _make_observer(
+        *,
+        role: str = "assistant",
+        capabilities: list[str] | None = None,
+        authorization_level: str = "baseline",
+        evaluation_invariants: list[str] | None = None,
+    ) -> ObserverFrame:
+        return ObserverFrame(
+            role=role,
+            capabilities=capabilities or ["baseline.dialog", "baseline.schema_selection"],
+            authorization_level=authorization_level,
+            evaluation_invariants=evaluation_invariants or [],
+        )
+
+    return _make_observer
+
+
+@pytest.fixture
 def make_observation() -> Callable[..., Observation]:
     def _make_observation(
         *,

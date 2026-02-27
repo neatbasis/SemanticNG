@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from state_renormalization.adapters.persistence import append_halt, append_jsonl, read_jsonl
+from state_renormalization.engine import to_jsonable_episode
 
 
 def test_append_and_read_jsonl_roundtrip(tmp_path: Path) -> None:
@@ -63,3 +64,14 @@ def test_append_jsonl_propagates_stable_ids_to_nested_events(tmp_path: Path) -> 
     assert rec["events"][0]["scenario_id"] == "scn_1"
     assert rec["events"][0]["step_id"] == "stp_1"
     assert rec["events"][1]["feature_id"] == "feat_1"
+
+
+def test_append_jsonl_persists_episode_observer(make_episode, tmp_path: Path) -> None:
+    p = tmp_path / "episodes.jsonl"
+    ep = make_episode()
+
+    append_jsonl(p, to_jsonable_episode(ep))
+
+    (_, rec), = list(read_jsonl(p))
+    assert rec["observer"]["role"] == "assistant"
+    assert "baseline.dialog" in rec["observer"]["capabilities"]

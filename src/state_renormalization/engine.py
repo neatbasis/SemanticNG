@@ -617,6 +617,7 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
         ep,
         {
             "kind": "schema_selection",
+            "observer": _to_dict(ep.observer),
             "schemas": [{"name": h.name, "score": h.score, "about": _to_dict(h.about)} for h in sel.schemas],
             "ambiguities": [_to_dict(a) for a in belief.ambiguities_active],
             "ambiguity_state": belief.ambiguity_state.value,
@@ -650,6 +651,7 @@ def apply_utterance_interpretation(ep: Episode, belief: BeliefState) -> tuple[Ep
         ep,
         {
             "kind": "utterance_interpretation",
+            "observer": _to_dict(ep.observer),
             "utterance_type": utype.value,
             "text_preview": (user_text[:80] if isinstance(user_text, str) else None),
             "consecutive_no_response": belief.consecutive_no_response,

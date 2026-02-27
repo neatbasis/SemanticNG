@@ -5,6 +5,7 @@ from pathlib import Path
 from state_renormalization.adapters.persistence import append_jsonl, read_jsonl
 from state_renormalization.contracts import (
     AskMetrics,
+    BeliefState,
     Channel,
     EpisodeOutputs,
     ObserverFrame,
@@ -13,9 +14,12 @@ from state_renormalization.contracts import (
     VerbosityLevel,
 )
 from state_renormalization.engine import (
+    apply_schema_bubbling,
+    apply_utterance_interpretation,
     attach_decision_effect,
     build_episode,
     evaluate_invariant_gates,
+    ingest_observation,
     to_jsonable_episode,
 )
 
@@ -120,3 +124,16 @@ Feature: Stable IDs
     assert policy_artifact["feature_id"].startswith("feat_")
     assert policy_artifact["scenario_id"].startswith("scn_")
     assert policy_artifact["step_id"].startswith("stp_")
+
+
+def test_observer_included_in_schema_and_utterance_artifacts(make_episode, make_ask_result) -> None:
+    ep = make_episode(ask=make_ask_result(sentence="hello there"))
+    ep = ingest_observation(ep)
+
+    ep, belief = apply_schema_bubbling(ep, BeliefState())
+    ep, _ = apply_utterance_interpretation(ep, belief)
+
+    schema_artifact = next(a for a in ep.artifacts if a.get("kind") == "schema_selection")
+    utterance_artifact = next(a for a in ep.artifacts if a.get("kind") == "utterance_interpretation")
+    assert schema_artifact["observer"]["role"] == "assistant"
+    assert utterance_artifact["observer"]["role"] == "assistant"

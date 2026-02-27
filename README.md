@@ -1,5 +1,20 @@
 # SemanticNG
 
+## Document status legend
+
+- **Canonical**: normative for contributors.
+- **Operational**: how to run/test.
+- **Exploratory**: ideas/drafts.
+
+### Document lifecycle
+
+Exploratory → Opportunity → Roadmap → Canonical
+
+- **Exploratory**: raw ideas.
+- **Opportunity**: validated potential.
+- **Roadmap**: planned work.
+- **Canonical**: normative truth.
+
 ## Mission
 
 SemanticNG is a Python project focused on state renormalization, schema selection, and behavior-driven test scenarios. See `MISSION.md` for mission, north-star principles, and phase non-goals.

@@ -1,3 +1,5 @@
+NOTE: This file is exploratory. It is not normative and should be treated as draft material unless and until it is promoted into roadmap or architecture documentation.
+
 Below is a **project-aligned “north-star” model set** (contracts + ports) and the **design choices** they encode. I’m keeping it tight and composable so you can drop these into `src/state_renormalization/contracts.py` (and `invariants.py`) with minimal churn.
 
 ---

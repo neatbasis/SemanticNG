@@ -276,6 +276,23 @@ class DecisionEffect(BaseModel):
     hypothesis_eval: Optional[HypothesisEvaluation] = None
 
 
+class ObserverFrame(BaseModel):
+    model_config = _CONTRACT_CONFIG
+    role: str
+    capabilities: List[str] = Field(default_factory=list)
+    authorization_level: str
+    evaluation_invariants: List[str] = Field(default_factory=list)
+
+
+def default_observer_frame() -> ObserverFrame:
+    return ObserverFrame(
+        role="assistant",
+        capabilities=["baseline.dialog", "baseline.schema_selection"],
+        authorization_level="baseline",
+        evaluation_invariants=[],
+    )
+
+
 class Episode(BaseModel):
     model_config = _CONTRACT_CONFIG
     episode_id: str
@@ -283,6 +300,7 @@ class Episode(BaseModel):
     turn_index: int
     t_asked_iso: str
     assistant_prompt_asked: str
+    observer: Optional[ObserverFrame] = None
     policy_decision: VerbosityDecision
     ask: AskResult
     observations: List[Observation] = Field(default_factory=list)

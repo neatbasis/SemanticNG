@@ -14,9 +14,11 @@ from state_renormalization.contracts import (
     Episode,
     Observation,
     ObservationType,
+    ObserverFrame,
     SchemaSelection,
     VerbosityDecision,
     VerbosityLevel,
+    default_observer_frame,
 )
 
 
@@ -88,6 +90,7 @@ def make_episode(
         decision: VerbosityDecision | None = None,
         ask: AskResult | None = None,
         observations: list[Observation] | None = None,
+        observer: ObserverFrame | None = None,
     ) -> Episode:
         return Episode(
             episode_id=episode_id,
@@ -95,6 +98,7 @@ def make_episode(
             turn_index=turn_index,
             t_asked_iso=t_asked_iso,
             assistant_prompt_asked=assistant_prompt_asked,
+            observer=observer or default_observer_frame(),
             policy_decision=decision or make_policy_decision(),
             ask=ask or make_ask_result(),
             observations=observations or [],

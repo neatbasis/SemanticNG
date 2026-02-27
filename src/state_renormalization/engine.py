@@ -24,12 +24,14 @@ from state_renormalization.contracts import (
     EpisodeOutputs,
     Observation,
     ObservationType,
+    ObserverFrame,
     ProjectionState,
     PredictionRecord,
     HaltRecord,
     EvidenceRef,
     SchemaSelection,
     UtteranceType,
+    default_observer_frame,
     project_ambiguity_state,
 )
 from state_renormalization.adapters.persistence import append_halt, append_prediction
@@ -247,6 +249,7 @@ def evaluate_invariant_gates(
         ep.artifacts.append(
             {
                 "artifact_kind": "invariant_outcomes",
+                "observer": _to_dict(getattr(ep, "observer", None)),
                 "scope": scope,
                 "prediction_key": prediction_key,
                 "invariant_context": {
@@ -297,6 +300,7 @@ def build_episode(
     policy_decision,
     payload: Dict[str, Any],
     outputs: EpisodeOutputs,
+    observer: Optional[ObserverFrame] = None,
 ) -> Episode:
     err = payload.get("error")
     capture: Optional[CaptureOutcome]
@@ -340,6 +344,7 @@ def build_episode(
         turn_index=int(turn_index),
         t_asked_iso=_now_iso(),
         assistant_prompt_asked=assistant_prompt_asked,
+        observer=observer or default_observer_frame(),
         policy_decision=policy_decision,
         ask=ask,
         observations=[],
@@ -416,6 +421,7 @@ def attach_decision_effect(prev_ep: Optional[Episode], curr_ep: Episode) -> Epis
         notes={
             "hypothesis": hyp,
             "held": held,
+            "observer": _to_dict(curr_ep.observer),
         },
         hypothesis_eval=HypothesisEvaluation(hypothesis=hyp, held=held),
     )

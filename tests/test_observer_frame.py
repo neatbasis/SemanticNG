@@ -1,0 +1,86 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from state_renormalization.adapters.persistence import append_jsonl, read_jsonl
+from state_renormalization.contracts import (
+    AskMetrics,
+    Channel,
+    EpisodeOutputs,
+    ObserverFrame,
+    OutputRenderingArtifact,
+    VerbosityLevel,
+)
+from state_renormalization.engine import (
+    attach_decision_effect,
+    build_episode,
+    evaluate_invariant_gates,
+    to_jsonable_episode,
+)
+
+
+def _outputs() -> EpisodeOutputs:
+    return EpisodeOutputs(
+        assistant_text_full="full",
+        assistant_text_channel="channel",
+        rendering=OutputRenderingArtifact(
+            kind="text",
+            channel=Channel.SATELLITE,
+            verbosity_level=VerbosityLevel.V3_CONCISE,
+            method="template",
+        ),
+    )
+
+
+def test_build_episode_uses_default_observer(make_policy_decision) -> None:
+    ep = build_episode(
+        conversation_id="conv:test",
+        turn_index=1,
+        assistant_prompt_asked="prompt",
+        policy_decision=make_policy_decision(),
+        payload={"sentence": "hi", "metrics": AskMetrics().model_dump(mode="json")},
+        outputs=_outputs(),
+    )
+
+    assert ep.observer is not None
+    assert ep.observer.role == "assistant"
+    assert "baseline.dialog" in ep.observer.capabilities
+
+
+def test_observer_preserved_in_persisted_episode_json(tmp_path: Path, make_episode) -> None:
+    ep = make_episode(
+        observer=ObserverFrame(
+            role="assistant",
+            capabilities=["baseline.dialog"],
+            authorization_level="baseline",
+            evaluation_invariants=["P0_NO_CURRENT_PREDICTION"],
+        )
+    )
+    serialized = to_jsonable_episode(ep)
+
+    out = tmp_path / "episodes.jsonl"
+    append_jsonl(out, serialized)
+
+    (_, rec), = list(read_jsonl(out))
+    assert rec["observer"]["role"] == "assistant"
+    assert rec["observer"]["capabilities"] == ["baseline.dialog"]
+    assert rec["observer"]["evaluation_invariants"] == ["P0_NO_CURRENT_PREDICTION"]
+
+
+def test_observer_passed_through_decision_and_evaluation_artifacts(make_episode, make_ask_result) -> None:
+    prev_ep = make_episode()
+    curr_ep = make_episode(ask=make_ask_result(sentence="hello"))
+
+    curr_ep = attach_decision_effect(prev_ep, curr_ep)
+    assert curr_ep.effects[0].notes["observer"]["role"] == "assistant"
+
+    evaluate_invariant_gates(
+        ep=curr_ep,
+        scope="scope:test",
+        prediction_key=None,
+        current_predictions={},
+        prediction_log_available=False,
+    )
+    invariant_artifact = curr_ep.artifacts[-1]
+    assert invariant_artifact["artifact_kind"] == "invariant_outcomes"
+    assert invariant_artifact["observer"]["role"] == "assistant"

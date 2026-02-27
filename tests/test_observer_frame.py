@@ -58,7 +58,7 @@ def test_observer_preserved_in_persisted_episode_json(tmp_path: Path, make_episo
             role="assistant",
             capabilities=["baseline.dialog"],
             authorization_level="baseline",
-            evaluation_invariants=["P0_NO_CURRENT_PREDICTION"],
+            evaluation_invariants=["prediction_availability.v1"],
         )
     )
     serialized = to_jsonable_episode(ep)
@@ -69,7 +69,7 @@ def test_observer_preserved_in_persisted_episode_json(tmp_path: Path, make_episo
     (_, rec), = list(read_jsonl(out))
     assert rec["observer"]["role"] == "assistant"
     assert rec["observer"]["capabilities"] == ["baseline.dialog"]
-    assert rec["observer"]["evaluation_invariants"] == ["P0_NO_CURRENT_PREDICTION"]
+    assert rec["observer"]["evaluation_invariants"] == ["prediction_availability.v1"]
 
 
 def test_observer_passed_through_decision_and_evaluation_artifacts(make_episode, make_ask_result) -> None:

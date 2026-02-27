@@ -69,3 +69,13 @@ def read_jsonl(path: PathLike) -> Iterator[Tuple[JsonObj, JsonObj]]:
 #        "line_no": line_no,
 #    }
 #    continue
+
+
+def append_prediction(path: PathLike, record: Any) -> JsonObj:
+    p = Path(path)
+    next_offset = 1
+    if p.exists():
+        next_offset = len(p.read_text(encoding="utf-8").splitlines()) + 1
+
+    append_jsonl(p, record)
+    return {"kind": "jsonl", "ref": f"{p.name}@{next_offset}"}

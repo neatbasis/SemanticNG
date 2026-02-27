@@ -4,7 +4,7 @@ from __future__ import annotations
 from gherkin.parser import Parser
 from gherkin.token_scanner import TokenScanner
 
-from state_renormalization.stable_ids import derive_stable_ids
+from state_renormalization.stable_ids import derive_prediction_id, derive_stable_ids
 
 
 FEATURE_TEXT = """
@@ -45,3 +45,40 @@ def test_stable_ids_change_if_uri_changes():
     ids_b = derive_stable_ids(doc_b)
 
     assert ids_a.feature_id != ids_b.feature_id
+
+
+def test_prediction_ids_are_deterministic() -> None:
+    kwargs = {
+        "scope_key": "room:kitchen:light",
+        "horizon_iso": "2026-02-13T00:05:00+00:00",
+        "issued_at_iso": "2026-02-13T00:00:00+00:00",
+        "filtration_id": "filt:1",
+        "distribution_kind": "bernoulli",
+        "distribution_params": {"p": 0.7},
+    }
+
+    first = derive_prediction_id(**kwargs)
+    second = derive_prediction_id(**kwargs)
+
+    assert first == second
+
+
+def test_prediction_ids_change_when_scope_changes() -> None:
+    base = derive_prediction_id(
+        scope_key="room:kitchen:light",
+        horizon_iso="2026-02-13T00:05:00+00:00",
+        issued_at_iso="2026-02-13T00:00:00+00:00",
+        filtration_id="filt:1",
+        distribution_kind="bernoulli",
+        distribution_params={"p": 0.7},
+    )
+    changed = derive_prediction_id(
+        scope_key="room:bedroom:light",
+        horizon_iso="2026-02-13T00:05:00+00:00",
+        issued_at_iso="2026-02-13T00:00:00+00:00",
+        filtration_id="filt:1",
+        distribution_kind="bernoulli",
+        distribution_params={"p": 0.7},
+    )
+
+    assert base != changed

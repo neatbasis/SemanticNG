@@ -104,3 +104,23 @@ def derive_stable_ids(gherkin_document: Dict[str, Any], *, uri: Optional[str] = 
         scenario_ids=scenario_ids,
         step_ids=step_ids,
     )
+
+
+def derive_prediction_id(
+    *,
+    scope_key: str,
+    horizon_iso: str,
+    issued_at_iso: str,
+    filtration_id: str,
+    distribution_kind: str,
+    distribution_params: Dict[str, Any],
+) -> str:
+    key_obj = {
+        "scope_key": scope_key,
+        "horizon_iso": horizon_iso,
+        "issued_at_iso": issued_at_iso,
+        "filtration_id": filtration_id,
+        "distribution_kind": distribution_kind,
+        "distribution_params": distribution_params,
+    }
+    return "pred_" + _sha256_hex(_canon(key_obj))

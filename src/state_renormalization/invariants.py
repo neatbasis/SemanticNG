@@ -106,6 +106,18 @@ def check_p1_write_before_use(ctx: CheckContext) -> InvariantOutcome:
             action_hints=({"kind": "fallback", "action": "buffer_prediction"},),
         )
 
+    evidence_refs = written.get("evidence_refs")
+    if not evidence_refs:
+        return InvariantOutcome(
+            invariant_id=InvariantId.P1_WRITE_BEFORE_USE,
+            flow=Flow.STOP,
+            validity=Validity.INVALID,
+            code="prediction_append_unverified",
+            evidence=({"kind": "scope", "value": ctx.scope},),
+            details={"message": "Prediction append did not produce retrievable evidence."},
+            action_hints=({"kind": "retry_append", "scope": ctx.scope},),
+        )
+
     key = str(written.get("key") or ctx.prediction_key or "")
     if key and key not in ctx.current_predictions:
         return InvariantOutcome(

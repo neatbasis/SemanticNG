@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Any, Dict, Mapping, Optional, Sequence
 from pydantic import BaseModel
@@ -23,10 +24,13 @@ from state_renormalization.contracts import (
     EpisodeOutputs,
     Observation,
     ObservationType,
+    ProjectionState,
+    PredictionRecord,
     SchemaSelection,
     UtteranceType,
     project_ambiguity_state,
 )
+from state_renormalization.adapters.persistence import append_prediction
 from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.invariants import (
     Flow as InvariantFlow,
@@ -196,6 +200,21 @@ def evaluate_invariant_gates(
 
     return result
 
+
+
+
+def append_prediction_record(
+    pred: PredictionRecord,
+    *,
+    prediction_log_path: str | Path = "predictions.jsonl",
+) -> dict[str, str]:
+    return append_prediction(prediction_log_path, pred)
+
+
+def project_current(pred: PredictionRecord, projection_state: ProjectionState) -> ProjectionState:
+    current = dict(projection_state.current_predictions)
+    current[pred.scope_key] = pred.prediction_id
+    return ProjectionState(current_predictions=current, updated_at_iso=_now_iso())
 
 def build_episode(
     *,

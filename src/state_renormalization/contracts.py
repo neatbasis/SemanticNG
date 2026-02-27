@@ -290,6 +290,44 @@ class Episode(BaseModel):
     artifacts: List[Dict[str, Any]] = Field(default_factory=list)
     effects: List[DecisionEffect] = Field(default_factory=list)
 
+
+class EvidenceRef(BaseModel):
+    model_config = _CONTRACT_CONFIG
+    kind: str
+    ref: str
+
+
+class PredictionRecord(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    prediction_id: str
+    scope_key: str
+    filtration_id: str
+    variable: str
+    horizon_iso: str
+
+    distribution_kind: str
+    distribution_params: Dict[str, Any] = Field(default_factory=dict)
+    confidence: float
+    uncertainty: float
+
+    issued_at_iso: str
+    valid_until_iso: Optional[str] = None
+    stopping_time_iso: Optional[str] = None
+    invariants_assumed: List[str] = Field(default_factory=list)
+    evidence_refs: List[EvidenceRef] = Field(default_factory=list)
+
+    # Optional numeric moments for numeric distributions.
+    conditional_expectation: Optional[float] = None
+    conditional_variance: Optional[float] = None
+
+
+class ProjectionState(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    current_predictions: Dict[str, str] = Field(default_factory=dict)
+    updated_at_iso: str
+
 # ------------------------------------------------------------------------------
 # Demo-only statuses + BeliefState (Option A)
 # ------------------------------------------------------------------------------

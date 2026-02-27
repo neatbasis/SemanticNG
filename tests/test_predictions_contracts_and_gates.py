@@ -51,8 +51,9 @@ def test_post_write_gate_passes_when_evidence_and_projection_current() -> None:
 
     assert gate.kind == "prediction"
     assert gate.halt is None
-    assert gate.post_write
-    assert gate.post_write[0].code == "prediction_write_materialized"
+    assert gate.prediction is not None
+    assert gate.prediction.post_write
+    assert gate.prediction.post_write[0].code == "prediction_write_materialized"
 
 
 def test_post_write_gate_halts_when_append_evidence_missing(tmp_path: Path) -> None:
@@ -69,13 +70,13 @@ def test_post_write_gate_halts_when_append_evidence_missing(tmp_path: Path) -> N
     )
 
     assert gate.kind == "halt"
-    assert gate.post_write
-    assert gate.post_write[0].code == "prediction_append_unverified"
+    assert gate.prediction is None
+    assert gate.combined == ()
     assert gate.halt is not None
     assert gate.halt.stage == "post_write"
     assert gate.halt.invariant_id == "P1_WRITE_BEFORE_USE"
     assert gate.halt.reason == "Prediction append did not produce retrievable evidence."
-    assert gate.halt.evidence_refs == [{"kind": "scope", "value": pred.scope_key}]
+    assert [e.model_dump(mode="json") for e in gate.halt.evidence_refs] == [{"kind": "scope", "ref": pred.scope_key}]
     assert gate.halt.retryable is True
 
 
@@ -132,4 +133,5 @@ def test_append_prediction_and_projection_support_post_write_gate(tmp_path: Path
     assert projected.current_predictions[pred.scope_key] == pred.prediction_id
     assert gate.kind == "prediction"
     assert gate.halt is None
-    assert gate.post_write[0].code == "prediction_write_materialized"
+    assert gate.prediction is not None
+    assert gate.prediction.post_write[0].code == "prediction_write_materialized"

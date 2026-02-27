@@ -1,0 +1,504 @@
+Here are the biggest frictions I see in the current plan (where you’ll get complexity, ambiguity, or future rewrites), and a tightened plan that keeps your “north star” invariant while reducing churn.
+Frictions and failure modes
+1) Invariants layer is under-specified for composition
+
+Friction: InvariantResult(passed: bool) is too low-resolution. You already need Continue vs Stop, Validity, recommended actions, and issue obligations. If invariants only return pass/fail, the “why/how to unblock” logic leaks back into engine.py or ad-hoc code.
+
+Fix: Make invariant checks return a typed outcome aligned with your Result algebra:
+
+    flow: CONTINUE/STOP
+
+    validity: VALID/DEGRADED/INVALID
+
+    code + invariant_id
+
+    evidence + details
+
+    action_hints (probe/retry/fallback)
+
+    optional issues
+
+This lets you compose invariants deterministically (STOP dominates).
+2) The “single gate point before action selection” is too late
+
+Friction: Some invariants are write-before-use (P1) and retrievability while current (P2). If you only check once “before action selection,” you miss:
+
+    prediction created but not persisted (violating P1)
+
+    current view stale vs log
+
+    store down during append step
+
+Fix: Put invariants at two stable boundary points (still simple):
+
+    Before consumption of a prediction (pre-action gate).
+
+    Immediately after production/append (post-write gate).
+
+These are the minimal two places that prevent silent epistemic drift.
+3) PredictionRecord is mixing math semantics and system semantics awkwardly
+
+Friction: Fields like conditional_expectation/conditional_variance are great for numeric variables, but you’re already modeling real-world domains (lights, presence, “unknown”). You’ll quickly need:
+
+    categorical distributions (Bernoulli, categorical)
+
+    structured predictions (state transition, event within time)
+
+    confidence and calibration fields that apply across types
+
+If you lock contracts to expectation/variance early, you’ll refactor.
+
+Fix: Keep the record stable by representing the prediction as:
+
+    distribution_kind + distribution_params (or Distribution object)
+
+    confidence and uncertainty as normalized scalars
+
+    optional point_estimate for convenience
+
+You can still include expectation/variance as derived metrics for certain distributions.
+4) ProjectionState.current_predictions: list[...] will become a hotspot
+
+Friction: Lists don’t express the key invariant: “one current prediction per scope.” You’ll end up writing ad-hoc search logic everywhere and introduce duplication bugs.
+
+Fix: Make current predictions keyed by Scope:
+
+    current: dict[ScopeKey, PredictionPointer] (or prediction_id)
+
+    scope key string "{mission}:{entity}:{variable}"
+
+Then CurrentView.get_current(scope) becomes O(1) and deterministic.
+5) JSONL-only persistence is great, but you’re missing “rebuild view” requirements
+
+Friction: You say “append_jsonl predictions.jsonl,” but the plan doesn’t define:
+
+    projection rebuild procedure and determinism
+
+    how to handle corruption/partial writes
+
+    how to ensure retrievability SLO is testable locally
+
+Fix: Add one small adapter API:
+
+    PredictionLog.append(record)
+
+    CurrentView.project_from_log(log, at=...)
+
+Even if both are JSONL, the interface forces you to keep “view derivable from log” true.
+6) GateResult(kind='prediction'|'halt') is too narrow
+
+Friction: You already need WARNING and ISSUE as first-class outcomes, and you’ve moved toward axis decomposition. A binary union will force you to bolt warnings on later.
+
+Fix: Standardize on one Result envelope everywhere (even if minimal initially):
+
+    flow (continue/stop)
+
+    validity (valid/degraded/invalid)
+
+    value optional
+
+    rationale
+
+    issues
+
+    action_hints
+
+Then HALT is just (STOP, INVALID) with code/invariant.
+7) Invariants registry map can become fragile without stable signatures
+
+Friction: “Pure checker functions receiving minimal state object(s)” is good, but if each checker takes different inputs, you’ll end up with a messy registry and lots of adapter glue.
+
+Fix: Define a single minimal CheckContext contract:
+
+    now
+
+    scope
+
+    prediction_log handle (port)
+
+    current_view handle (port)
+
+    episode ids (stable ids)
+
+    evidence refs
+
+    observer frame
+
+Each invariant gets the same ctx signature; pure means “no side effects.”
+8) Schema selector refactor risks coupling to experiments/episodes
+
+Friction: You’re refactoring selector rules at the same time as introducing prediction/invariant/gating semantics. That’s two big axes of change; fixtures will be noisy and it’ll obscure failures.
+
+Fix: Stage it:
+
+    Land the Result envelope + prediction log + halt semantics + stable IDs.
+
+    Then refactor schema selector behind same outward API, using snapshot tests.
+
+Keep the “ordered phases” idea—it’s excellent—but don’t mix it with core epistemic substrate work.
+9) ObserverFrame is good, but “capabilities”/authorization must be used or it’s dead weight
+
+Friction: If ObserverFrame is only persisted, it won’t affect behavior, and you’ll later have to thread it into decisions retroactively.
+
+Fix: Add one minimal enforcement now:
+
+    a CapabilityAuthorizationGate invariant that can return STOP/INVALID if prompt/probe is not allowed.
+
+Even if policy is permissive initially, it makes the wiring real.
+10) Stable IDs: good plan, but missing event schema uniformity
+
+Friction: You’ll write many JSONL streams (episodes, predictions, halts). If they don’t share a common “EventEnvelope”, your indexing pipeline becomes brittle.
+
+Fix: Define one tiny EventEnvelope used by all JSONL writes:
+
+    event_type
+
+    timestamp
+
+    feature_id/scenario_id/step_id
+
+    episode_id
+
+    scope
+
+    payload object
+
+This makes downstream ingestion trivial.
+Improved plan (minimal changes, maximal stability)
+Phase 0 — Define the one Result envelope (do this first)
+
+Create contracts.py:
+
+    Flow, Validity, Code, Rationale, ActionHint, IssueRef
+
+    Result[T]
+
+Replace GateResult with Result.
+
+Unlocks: deterministic halts/warnings/issues everywhere.
+Phase 1 — Prediction log + current view as ports
+
+Create interfaces in adapters/ (even if implemented via JSONL):
+
+    PredictionLog.append/get/append_resolution
+
+    CurrentView.get_current/project_from_log
+
+Implement both with JSONL + in-memory index.
+
+Unlocks: view derivable from log; retrievability becomes testable.
+Phase 2 — PredictionRecord with distribution + confidence
+
+Update PredictionRecord to:
+
+    scope (mission/entity/variable)
+
+    distribution_kind, distribution_params
+
+    confidence, uncertainty
+
+    issued_at, valid_until
+
+    filtration_id, evidence_refs, invariants_assumed, supersedes
+
+Keep expectation/variance optional/derived if you want.
+
+Unlocks: works for lights and meters, not just numeric series.
+Phase 3 — Invariants become checks returning Result[None]
+
+invariants.py:
+
+    InvariantId enum
+
+    CheckContext
+
+    each check_* returns Result[None] (CONTINUE/STOP × VALIDITY)
+
+    combine_results(results) (STOP dominates; INVALID dominates; merge hints/issues)
+
+Add two gate points in engine.py:
+
+    pre-consume gate (must have current prediction)
+
+    post-write gate (write-before-use & retrievability)
+
+Unlocks: mathematical integrity + controlled halting with unblock actions.
+Phase 4 — HaltRecord becomes just a serialized Result
+
+You can still keep HaltRecord as a view, but don’t duplicate semantics.
+Persist the Result (with flow=STOP) as an event.
+
+Unlocks: no semantic drift between “halt” and “result”.
+Phase 5 — Add ObservationFreshness feature + Ask request adapter
+
+Add ObservationRecord + staleness evaluator capability that returns:
+
+    CONTINUE/VALID if fresh
+
+    CONTINUE/DEGRADED + ActionHint(prompt via Ask) if stale
+
+    STOP/INVALID if required observation missing and cannot be obtained
+
+Ask integration stays behind a RequestOutbox port:
+
+    create_request(title, question, context) -> request_id
+
+Unlocks: human-in-loop measurement as a formal instrument.
+Phase 6 — Only then refactor schema_selector to rules
+
+Keep API stable; snapshot test outputs.
+
+Unlocks: maintainable growth.
+Phase 7 — Stable IDs + unified event envelope
+
+In Behave steps, attach stable IDs and emit events using one envelope.
+
+Unlocks: robust indexing, embeddings, ontology linking.
+Concrete deltas you can apply immediately
+
+    Replace InvariantResult(passed: bool) with Result[None].
+
+    Replace GateResult(prediction|halt) with Result[PredictionRecord].
+
+    Replace PredictionRecord(expectation/variance) with PredictionRecord(distribution+confidence) (or keep expectation/variance optional).
+
+    Make ProjectionState.current_predictions a dict keyed by scope key.
+
+    Add CheckContext so invariant signatures are uniform.
+
+    Two gate points instead of one.
+
+    Add a single EventEnvelope used by all JSONL writes.
+
+These changes reduce future refactors dramatically while keeping your plan’s spirit.
+
+If you want, I can draft the exact file skeletons (contracts.py, invariants.py, engine.py gate functions, JSONL event envelope) in a way that matches your existing repository layout and Behave fixtures.
+
+Sinä sanoit:
+Explain what we can benefit from this and how we can best benefit from it
+
+Phase 1: Define the Invariant Contract (invariants.py)
+
+    Strict Enums: Define InvariantId(str, Enum) to ensure compatibility with JSON serialization and ruff's PEP 8 naming conventions.
+    Type-Safe Models: Use Pydantic or @dataclass for InvariantResult.
+        Mypy Requirement: Explicitly type evidence (e.g., dict[str, Any]) and details (e.g., str | None) to avoid Any leaks that mypy will later flag.
+    Functional Purity: Implement checker functions with a signature of (state: ProjectState) -> InvariantResult.
+        Mypy Requirement: Add full type hints for all arguments and return values. If ProjectState is not yet stable, use a Protocol to define the minimal required interface.
+    The Registry: Create a REGISTRY: dict[InvariantId, Callable[[ProjectState], InvariantResult]]. 
+
+Phase 2: Implementation Guidelines
+To ensure this code survives the eventual "rule hammer":
+
+    Avoid Circular Imports: Place invariants.py at a low level in your src/ hierarchy to prevent dependency cycles.
+    Defensive Logic: Since rules aren't enforced, manually use absolute imports (e.g., from state_renormalization.models import ...) which Ruff's TID rules will eventually require.
+    Documentation: Every checker must have a docstring. Ruff (via D rules) will likely require this for public functions in the future. 
+
+Phase 3: Integration in engine.py
+
+    Gate Point: In engine.py, create a validate_state_invariants(state) wrapper.
+    Structured Observability:
+        Iterate through the REGISTRY and collect all InvariantResult objects.
+        Fail-Fast vs. Report: Decide if a passed=False should raise an exception or just log. For an unstable project, structured logging is better than crashing.
+    Artifact Injection: Convert the list of InvariantResult to a serializable format and append it to your episode metadata. 
+
+How to Start Enforcing Rules
+Don't wait for "stability" to run the tools. You can adopt them incrementally: 
+
+    Ruff: Run ruff check --select E,F,I now. These are low-noise rules (errors, syntax, imports) that stabilize your codebase without being "annoying."
+    Mypy: Set check_untyped_defs = True but keep disallow_untyped_calls = False in your pyproject.toml. This allows you to type your new invariant code while ignoring older, unstable parts of the engine. 
+    
+    
+    
+    
+    
+    
+    
+    Create HaltRecord in contracts.py with fields: halt_id, stage, invariant_id, reason, evidence_refs, timestamp_iso, retryable.
+
+Define a small union-like output shape for gate functions in engine.py, e.g.:
+
+* GateResult(kind='prediction', prediction=...)
+* GateResult(kind='halt', halt=...)
+
+Refactor the current decision path to return GateResult instead of relying on mixed status/error channels for expected halts. Persist halt records to JSONL and attach to episode artifacts.
+
+In src/state_renormalization/adapters/schema_selector.py:
+
+1. Introduce a small Rule protocol/class (name, applies(ctx), emit(ctx)).
+2. Convert each major branch (no response, exit intent, vague actor, URL intent, timer unit, uncertainty) into one rule object/function.
+3. Build a SelectorContext once (raw, normalized text, tokens, capture error, metadata).
+4. Evaluate rules in ordered phases (hard-stop, disambiguation, fallback) and merge outputs via sort_schema_hits.
+5. Keep existing behavior initially by snapshot-testing old vs new outputs for current fixtures.
+
+This keeps adding new variants linear and localized, instead of increasing nested condition complexity.
+
+In src/state_renormalization/adapters/schema_selector.py:
+
+1. Introduce a small Rule protocol/class (name, applies(ctx), emit(ctx)).
+2. Convert each major branch (no response, exit intent, vague actor, URL intent, timer unit, uncertainty) into one rule object/function.
+3. Build a SelectorContext once (raw, normalized text, tokens, capture error, metadata).
+4. Evaluate rules in ordered phases (hard-stop, disambiguation, fallback) and merge outputs via sort_schema_hits.
+5. Keep existing behavior initially by snapshot-testing old vs new outputs for current fixtures.
+
+This keeps adding new variants linear and localized, instead of increasing nested condition complexity.
+
+ChatGPT sanoi:
+What you benefit from (the real “why”)
+
+You’re building a system that must stay coherent under change. The invariant-contract + gate + structured halt plan gives you three compounding advantages:
+
+    You turn “implicit assumptions” into explicit, testable objects
+    Instead of “it seems broken” you get: which invariant failed, with what evidence, at what stage, and what would unblock it.
+    This is the difference between debugging symptoms and debugging model integrity.
+
+    You create a stable substrate that future features can’t bypass
+    Once “validate invariants → return Result/Halt” is the only way through the engine, every new capability, schema rule, or experiment is forced to “stay on-shell.”
+    That prevents the classic drift where new branches accidentally ignore logging, IDs, confidence, or persistence.
+
+    You get measurable learning instead of anecdotal improvement
+    Recording invariant outcomes and halts as episode artifacts gives you a dataset of:
+
+        which invariants fail most (Pareto)
+
+        which contexts trigger failures
+
+        whether changes reduce failure rate / correction cost
+        That’s your “85% rule” infrastructure: you can actually find the 20% of causes creating 80% of pain.
+
+How to best benefit (tighten semantics + reduce future refactors)
+
+Right now, the plan is good but has a couple of hidden frictions. The best benefits come if you make two key adjustments:
+1) Don’t stop at InvariantResult(passed: bool)
+
+A boolean forces policy decisions to leak into engine.py. You’ll end up re-encoding “halt vs warn vs proceed” elsewhere.
+
+Best move: Let invariants return a structured Outcome, not just pass/fail:
+
+    flow: CONTINUE | STOP
+
+    validity: VALID | DEGRADED | INVALID
+
+    code, invariant_id
+
+    evidence, details
+
+    action_hints (probe/retry/fallback)
+
+    optional issue attachment (if this should open a durable obligation)
+
+This keeps invariants “epistemically complete”: they can say what broke and what to do next.
+2) Replace GateResult(prediction|halt) with one envelope
+
+A union of only prediction/halt will force a later redesign once you need WARNING and ISSUE.
+
+Best move: Use one Result[T] everywhere. A halt is just Result(flow=STOP, validity=INVALID, value=None, ...).
+You can still serialize a HaltRecord view if you want, but don’t make it the primary semantic type.
+What each phase buys you (and how to extract maximum value)
+Phase 1: Invariant contract (invariants.py)
+
+Benefits
+
+    A canonical place to encode “on-shell” rules
+
+    Deterministic failure modes (no silent None/implicit assumptions)
+
+    Type safety early prevents “Any leaks” that poison the codebase later
+
+Maximize benefit
+
+    Use a Protocol for ProjectState immediately so invariants don’t depend on engine internals.
+
+    Make checker signature: (ctx: CheckContext) -> Result[None]
+    Where CheckContext includes now, scope, and minimal read-only ports (prediction log/current view).
+
+This gives you “functional purity” without tying you to unstable state objects.
+Phase 2: Implementation guidelines (survive the rule hammer)
+
+Benefits
+
+    You avoid future rewrites due to circular imports and ruff enforcement
+
+    Your invariants become a stable “core layer” other modules can depend on
+
+Maximize benefit
+
+    Put invariants.py + outcome types in the lowest dependency layer (e.g., state_renormalization/core/).
+
+    Make invariants pure and ports injected (no global singletons except the registry).
+
+Phase 3: engine integration
+
+Benefits
+
+    You get controlled halting with structured returns instead of exceptions
+
+    You get observability datasets “for free” as you run scenarios
+
+Maximize benefit
+
+    Two gate points (minimal but critical):
+
+        Pre-consume: before any action selection uses predictions
+
+        Post-write: right after a prediction is recorded (write-before-use)
+
+    Emit a uniform event envelope with stable IDs so downstream indexing works.
+
+How to start enforcing rules without getting blocked
+
+Your incremental approach is correct.
+
+Ruff now: E,F,I is excellent; add UP (pyupgrade) early too if it’s low noise for your codebase.
+Mypy: your suggested configuration is right: type the new invariant substrate first; don’t try to “boil the ocean.”
+
+One extra tweak that pays off:
+
+    keep warn_return_any = True (or equivalent) so “Any leaks” are visible early.
+
+The “Rule-based schema selector” part: what it unlocks and how it fits
+
+Benefits
+
+    Makes adding new variants linear
+
+    Prevents “nested if pyramid” complexity growth
+
+    Supports your experiments: rules can emit alternative actions and scores
+
+Maximize benefit
+
+    Treat schema selection itself as a capability that returns Result[SchemaHit]
+
+    Snapshot testing “old vs new” is the right migration strategy
+
+    Keep the selector context stable; don’t let rules re-tokenize or re-normalize separately
+
+One thing to avoid: refactoring selector rules before the Result/invariant substrate is in place. Do the substrate first; then the rule refactor is safer and easier to evaluate.
+Concrete “best benefit” edits to your plan (minimal changes)
+
+    Change InvariantResult → Result[None] (Flow×Validity + rationale + hints)
+
+    Change GateResult union → Result[PredictionRecord]
+
+    Keep HaltRecord as a serialized view of Result(flow=STOP), not as a parallel semantic type
+
+    Add CheckContext Protocol so invariants don’t depend on unstable engine state
+
+    Integrate invariants at two gate points (pre-consume + post-write)
+
+    Add one EventEnvelope for all JSONL artifacts (predictions, invariant checks, halts, decisions)
+
+Those six changes preserve everything you want, and drastically reduce future semantic churn.
+What you’ll be able to do once this is in
+
+    Run Gherkin scenarios and get a trace of invariant outcomes per step
+
+    Identify top failure causes (Pareto) across runs
+
+    Compare prompting policies experimentally (A/B) with consistent attribution
+
+    Prove (with logs) why a prompt happened or didn’t happen
+
+    Keep adding domain rules without breaking epistemic integrity
+
+If you want, paste your current engine.py gate flow (even truncated), and I’ll map exactly where the two gate points go and what the minimal CheckContext should include given your existing structures.

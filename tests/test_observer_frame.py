@@ -84,3 +84,36 @@ def test_observer_passed_through_decision_and_evaluation_artifacts(make_episode,
     invariant_artifact = curr_ep.artifacts[-1]
     assert invariant_artifact["artifact_kind"] == "invariant_outcomes"
     assert invariant_artifact["observer"]["role"] == "assistant"
+
+
+def test_build_episode_attaches_stable_ids_from_feature_doc(tmp_path: Path, make_policy_decision) -> None:
+    feature = tmp_path / "sample.feature"
+    feature.write_text(
+        """
+Feature: Stable IDs
+  Scenario: keyed scenario
+    Given a concrete step
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    ep = build_episode(
+        conversation_id="conv:test",
+        turn_index=1,
+        assistant_prompt_asked="prompt",
+        policy_decision=make_policy_decision(),
+        payload={
+            "sentence": "hi",
+            "metrics": AskMetrics().model_dump(mode="json"),
+            "feature_uri": str(feature),
+            "scenario_name": "keyed scenario",
+            "step_text": "a concrete step",
+        },
+        outputs=_outputs(),
+    )
+
+    policy_artifact = ep.artifacts[0]
+    assert policy_artifact["feature_id"].startswith("feat_")
+    assert policy_artifact["scenario_id"].startswith("scn_")
+    assert policy_artifact["step_id"].startswith("stp_")

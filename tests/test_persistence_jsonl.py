@@ -36,3 +36,30 @@ def test_append_halt_jsonl_roundtrip_and_evidence_ref_format(tmp_path: Path) -> 
     file_name, line_no = ref["ref"].split("@", 1)
     assert file_name == "halts.jsonl"
     assert line_no == "1"
+
+
+def test_append_jsonl_propagates_stable_ids_to_nested_events(tmp_path: Path) -> None:
+    p = tmp_path / "events.jsonl"
+
+    append_jsonl(
+        p,
+        {
+            "kind": "episode",
+            "stable_ids": {
+                "feature_id": "feat_1",
+                "scenario_id": "scn_1",
+                "step_id": "stp_1",
+            },
+            "events": [
+                {"kind": "step", "name": "Given x"},
+                {"kind": "decision", "name": "choose y"},
+            ],
+        },
+    )
+
+    (_, rec), = list(read_jsonl(p))
+    assert rec["feature_id"] == "feat_1"
+    assert rec["events"][0]["feature_id"] == "feat_1"
+    assert rec["events"][0]["scenario_id"] == "scn_1"
+    assert rec["events"][0]["step_id"] == "stp_1"
+    assert rec["events"][1]["feature_id"] == "feat_1"

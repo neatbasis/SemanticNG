@@ -369,8 +369,13 @@ def evaluate_invariant_gates(
         result_kind = "halt"
 
     halt_evidence_ref: Optional[Dict[str, str]] = None
+    stable_ids = _episode_stable_ids(ep) if ep is not None else {}
     if isinstance(result, HaltRecord):
-        halt_evidence_ref = append_halt(halt_log_path, result)
+        halt_evidence_ref = append_halt_record(
+            result,
+            halt_log_path=halt_log_path,
+            stable_ids=stable_ids,
+        )
 
     if ep is not None:
         _append_episode_artifact(
@@ -436,16 +441,24 @@ def append_prediction_record(
     pred: PredictionRecord,
     *,
     prediction_log_path: str | Path = "artifacts/predictions.jsonl",
+    stable_ids: Optional[Mapping[str, str]] = None,
 ) -> dict[str, str]:
-    return append_prediction(prediction_log_path, pred)
+    payload: Any = pred
+    if stable_ids:
+        payload = {**dict(stable_ids), **pred.model_dump(mode="json")}
+    return append_prediction(prediction_log_path, payload)
 
 
 def append_halt_record(
     halt: HaltRecord,
     *,
     halt_log_path: str | Path = "halts.jsonl",
+    stable_ids: Optional[Mapping[str, str]] = None,
 ) -> dict[str, str]:
-    return append_halt(halt_log_path, halt)
+    payload: Any = halt
+    if stable_ids:
+        payload = {**dict(stable_ids), **halt.model_dump(mode="json")}
+    return append_halt(halt_log_path, payload)
 
 
 def project_current(pred: PredictionRecord, projection_state: ProjectionState) -> ProjectionState:
@@ -468,7 +481,11 @@ def run_mission_loop(
 
     for pending in pending_predictions:
         pred = pending if isinstance(pending, PredictionRecord) else PredictionRecord.model_validate(pending)
-        evidence_ref = append_prediction_record(pred, prediction_log_path=prediction_log_path)
+        evidence_ref = append_prediction_record(
+            pred,
+            prediction_log_path=prediction_log_path,
+            stable_ids=_episode_stable_ids(ep),
+        )
         updated_projection = project_current(pred, updated_projection)
         _append_episode_artifact(
             ep,

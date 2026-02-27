@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from state_renormalization.contracts import HaltRecord, PredictionRecord, ProjectionState
+from state_renormalization.adapters.persistence import read_jsonl
 from state_renormalization.engine import PredictionOutcome, append_prediction_record, evaluate_invariant_gates, project_current
 
 
@@ -165,3 +166,46 @@ def test_pre_consume_gate_halts_without_any_projected_predictions(tmp_path: Path
     assert isinstance(gate, HaltRecord)
     assert gate.violated_invariant_id == "prediction_availability.v1"
     assert gate.reason == "Action selection requires at least one projected current prediction."
+
+
+def test_append_prediction_record_persists_supplied_stable_ids(tmp_path: Path) -> None:
+    pred = PredictionRecord.model_validate(FIXED_PREDICTION)
+    prediction_path = tmp_path / "predictions.jsonl"
+
+    append_prediction_record(
+        pred,
+        prediction_log_path=prediction_path,
+        stable_ids={"feature_id": "feat_1", "scenario_id": "scn_1", "step_id": "stp_1"},
+    )
+
+    (_, rec), = list(read_jsonl(prediction_path))
+    assert rec["feature_id"] == "feat_1"
+    assert rec["scenario_id"] == "scn_1"
+    assert rec["step_id"] == "stp_1"
+
+
+def test_evaluate_invariant_gates_persists_halt_with_episode_stable_ids(tmp_path: Path) -> None:
+    class DummyEpisode:
+        def __init__(self) -> None:
+            self.artifacts = [{"kind": "stable_ids", "feature_id": "feat_1", "scenario_id": "scn_1", "step_id": "stp_1"}]
+
+    pred = PredictionRecord.model_validate(FIXED_PREDICTION)
+    projected = project_current(
+        pred,
+        ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+    )
+
+    evaluate_invariant_gates(
+        ep=DummyEpisode(),
+        scope=pred.scope_key,
+        prediction_key=pred.scope_key,
+        projection_state=projected,
+        prediction_log_available=True,
+        just_written_prediction={"key": pred.scope_key, "evidence_refs": []},
+        halt_log_path=tmp_path / "halts.jsonl",
+    )
+
+    (_, rec), = list(read_jsonl(tmp_path / "halts.jsonl"))
+    assert rec["feature_id"] == "feat_1"
+    assert rec["scenario_id"] == "scn_1"
+    assert rec["step_id"] == "stp_1"

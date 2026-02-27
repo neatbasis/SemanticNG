@@ -4,10 +4,15 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
 from behave import given, when, then
+from gherkin.parser import Parser
+from gherkin.token_scanner import TokenScanner
+
+from state_renormalization.stable_ids import derive_stable_ids
 
 
 # ----------------------------
@@ -114,6 +119,44 @@ def build_resource(
     return resource
 
 
+def _derive_context_stable_ids(context) -> Dict[str, str]:
+    feature_path = getattr(getattr(context, "feature", None), "filename", None)
+    scenario = getattr(context, "scenario", None)
+    step = getattr(context, "step", None)
+
+    if not isinstance(feature_path, str) or not feature_path:
+        return {}
+
+    try:
+        doc = Parser().parse(TokenScanner(Path(feature_path).read_text(encoding="utf-8")))
+    except Exception:
+        return {}
+
+    stable = derive_stable_ids(doc, uri=feature_path)
+    out: Dict[str, str] = {"feature_id": stable.feature_id}
+
+    scenario_name = getattr(scenario, "name", None)
+    if isinstance(scenario_name, str) and scenario_name.strip():
+        for key, sid in stable.scenario_ids.items():
+            if key.split(":", 1)[-1].split("@", 1)[0] == scenario_name:
+                out["scenario_id"] = sid
+                break
+
+    step_name = getattr(step, "name", None)
+    scenario_id = out.get("scenario_id")
+    if isinstance(step_name, str) and step_name.strip() and isinstance(scenario_id, str):
+        scenario_key = next((k for k, v in stable.scenario_ids.items() if v == scenario_id), None)
+        if scenario_key is not None:
+            for key, sid in stable.step_ids.items():
+                key_scenario, step_part = key.split("::", 1)
+                key_step_text = step_part.split(":", 1)[-1].split("@", 1)[0]
+                if key_scenario == scenario_key and key_step_text == step_name:
+                    out["step_id"] = sid
+                    break
+
+    return out
+
+
 def _ensure_resource_draft(context) -> None:
     context._meta = getattr(context, "_meta", {})
     context._payload = getattr(context, "_payload", None)
@@ -127,11 +170,16 @@ def _set_meta_field(context, key: str, value: str) -> None:
 
 def _build_and_store_resource(context) -> None:
     _ensure_resource_draft(context)
+    stable_ids = _derive_context_stable_ids(context)
+    if stable_ids:
+        context._meta["stable_ids"] = dict(stable_ids)
     context.resource = build_resource(
         meta=context._meta,
         payload=context._payload,
         extensions=context._extensions,
     )
+    if stable_ids:
+        context.resource.update(stable_ids)
     context.store.put(context.resource)
 
 

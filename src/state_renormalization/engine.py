@@ -31,7 +31,7 @@ from state_renormalization.contracts import (
     UtteranceType,
     project_ambiguity_state,
 )
-from state_renormalization.adapters.persistence import append_prediction
+from state_renormalization.adapters.persistence import append_halt, append_prediction
 from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.invariants import (
     Flow as InvariantFlow,
@@ -180,6 +180,7 @@ def evaluate_invariant_gates(
     current_predictions: Mapping[str, Any],
     prediction_log_available: bool,
     just_written_prediction: Optional[Mapping[str, Any]] = None,
+    halt_log_path: str | Path = "halts.jsonl",
 ) -> GateResult:
     pre_ctx = default_check_context(
         scope=scope,
@@ -221,15 +222,26 @@ def evaluate_invariant_gates(
         halt=halt_record,
     )
 
+    halt_evidence_ref: Optional[Dict[str, str]] = None
+    if halt_record is not None:
+        halt_evidence_ref = append_halt(halt_log_path, halt_record)
+
     if ep is not None:
         ep.artifacts.append(
             {
-                "kind": "invariant_outcomes",
+                "artifact_kind": "invariant_outcomes",
                 "scope": scope,
+                "prediction_key": prediction_key,
+                "invariant_context": {
+                    "current_predictions": dict(current_predictions),
+                    "prediction_log_available": prediction_log_available,
+                    "just_written_prediction": _to_dict(just_written_prediction),
+                },
                 "pre_consume": [_to_dict(outcome) for outcome in result.pre_consume],
                 "post_write": [_to_dict(outcome) for outcome in result.post_write],
                 "kind": result.kind,
                 "halt": _to_dict(result.halt),
+                "halt_evidence_ref": halt_evidence_ref,
             }
         )
 
@@ -244,6 +256,14 @@ def append_prediction_record(
     prediction_log_path: str | Path = "predictions.jsonl",
 ) -> dict[str, str]:
     return append_prediction(prediction_log_path, pred)
+
+
+def append_halt_record(
+    halt: HaltRecord,
+    *,
+    halt_log_path: str | Path = "halts.jsonl",
+) -> dict[str, str]:
+    return append_halt(halt_log_path, halt)
 
 
 def project_current(pred: PredictionRecord, projection_state: ProjectionState) -> ProjectionState:

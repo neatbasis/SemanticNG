@@ -12,6 +12,16 @@ The system converges by repeatedly applying the same invariant tests across many
 
 ---
 
+## Mission alignment (read this first)
+
+See `MISSION.md` for the concise product mission, north-star principles, and explicit non-goals for this phase. This architecture document operationalizes that mission in three code anchors:
+
+- `src/state_renormalization/contracts.py`: defines artifact shapes and validation boundaries.
+- `src/state_renormalization/invariants.py`: defines admissibility gates and explainable stop conditions.
+- `src/state_renormalization/engine.py`: enforces prediction-first execution and append-only lineage.
+
+---
+
 ## Architectural Axiom
 
 > The system must never silently assume correctness.  
@@ -404,6 +414,14 @@ In the current phase, projection operates in **strict fail-closed mode**:
 * correctness > performance
 
 This phase exists to harden the substrate so future capabilities can safely expand.
+
+
+### Phase non-goals (enforced by architecture choices)
+
+- no silent state repair that bypasses explicit invariant outcomes
+- no mutable in-memory truth that cannot be reconstructed from append-only records
+- no capability growth that outruns contract coverage and invariant checks
+- no performance-driven shortcuts that reduce determinism or post-hoc explainability
 
 ---
 

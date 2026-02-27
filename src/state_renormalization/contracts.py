@@ -229,6 +229,7 @@ class VerbosityDecision(BaseModel):
 class ObservationType(str, Enum):
     USER_UTTERANCE = "user_utterance"
     SILENCE = "silence"
+    HALT = "halt"
 
 class UtteranceType(str, Enum):
     NONE = "none"
@@ -318,13 +319,25 @@ class EvidenceRef(BaseModel):
 class HaltRecord(BaseModel):
     model_config = _CONTRACT_CONFIG
 
-    halt_id: str
+    stable_halt_id: str = Field(validation_alias=AliasChoices("stable_halt_id", "halt_id"))
     stage: str
-    invariant_id: str
+    violated_invariant_id: str = Field(validation_alias=AliasChoices("violated_invariant_id", "invariant_id"))
     reason: str
     evidence_refs: List[EvidenceRef] = Field(default_factory=list)
     timestamp: str
-    retryable: bool
+    retryability: bool = Field(validation_alias=AliasChoices("retryability", "retryable"))
+
+    @property
+    def halt_id(self) -> str:
+        return self.stable_halt_id
+
+    @property
+    def invariant_id(self) -> str:
+        return self.violated_invariant_id
+
+    @property
+    def retryable(self) -> bool:
+        return self.retryability
 
 
 class PredictionRecord(BaseModel):

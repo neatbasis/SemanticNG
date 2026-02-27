@@ -394,6 +394,42 @@ def project_current(pred: PredictionRecord, projection_state: ProjectionState) -
     current[pred.scope_key] = pred
     return ProjectionState(current_predictions=current, updated_at_iso=_now_iso())
 
+def run_mission_loop(
+    ep: Episode,
+    belief: BeliefState,
+    projection_state: ProjectionState,
+    *,
+    pending_predictions: Sequence[PredictionRecord | Mapping[str, Any]] = (),
+    prediction_log_path: str | Path = "artifacts/predictions.jsonl",
+) -> tuple[Episode, BeliefState, ProjectionState]:
+    """
+    Mission-loop helper: materialize prediction updates before decision stages.
+    """
+    updated_projection = projection_state
+
+    for pending in pending_predictions:
+        pred = pending if isinstance(pending, PredictionRecord) else PredictionRecord.model_validate(pending)
+        evidence_ref = append_prediction_record(pred, prediction_log_path=prediction_log_path)
+        updated_projection = project_current(pred, updated_projection)
+        _append_episode_artifact(
+            ep,
+            {
+                "artifact_kind": "prediction_update",
+                "prediction_id": pred.prediction_id,
+                "scope_key": pred.scope_key,
+                "filtration_id": pred.filtration_id,
+                "target_variable": pred.target_variable,
+                "target_horizon_iso": pred.target_horizon_iso,
+                "evidence_ref": evidence_ref,
+                "projection_updated_at_iso": updated_projection.updated_at_iso,
+            },
+        )
+
+    ep = ingest_observation(ep)
+    ep, belief = apply_utterance_interpretation(ep, belief)
+    ep, belief = apply_schema_bubbling(ep, belief)
+    return ep, belief, updated_projection
+
 def build_episode(
     *,
     conversation_id: str,

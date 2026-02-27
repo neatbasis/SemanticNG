@@ -425,6 +425,8 @@ def evaluate_invariant_gates(
                 "observer_enforcement": {
                     "requested_evaluation_invariants": list(getattr(observer, "evaluation_invariants", []) or []),
                     "enforced": bool(getattr(observer, "evaluation_invariants", []) or []),
+                    "observer_role": getattr(observer, "role", None),
+                    "authorization_level": getattr(observer, "authorization_level", None),
                 },
                 "scope": scope,
                 "prediction_key": prediction_key,
@@ -724,6 +726,8 @@ def attach_decision_effect(prev_ep: Optional[Episode], curr_ep: Episode) -> Epis
             "hypothesis": hyp,
             "held": held,
             "observer": _to_dict(curr_ep.observer),
+            "observer_role": getattr(curr_ep.observer, "role", None),
+            "authorization_level": getattr(curr_ep.observer, "authorization_level", None),
         },
         hypothesis_eval=HypothesisEvaluation(hypothesis=hyp, held=held),
     )
@@ -845,6 +849,10 @@ def apply_utterance_interpretation(ep: Episode, belief: BeliefState) -> tuple[Ep
         {
             "kind": "utterance_interpretation",
             "observer": _to_dict(ep.observer),
+            "interpretation_frame": {
+                "observer_role": getattr(ep.observer, "role", None),
+                "authorization_level": getattr(ep.observer, "authorization_level", None),
+            },
             "utterance_type": utype.value,
             "text_preview": (user_text[:80] if isinstance(user_text, str) else None),
             "consecutive_no_response": belief.consecutive_no_response,

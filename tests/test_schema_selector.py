@@ -9,6 +9,8 @@ from state_renormalization.adapters.schema_selector import (
     _legacy_naive_schema_selector,
     build_selector_context,
     naive_schema_selector,
+    RULE_PHASES,
+    RULES_BY_PHASE,
 )
 from state_renormalization.contracts import CaptureOutcome, CaptureStatus
 
@@ -89,3 +91,14 @@ def test_build_selector_context_normalizes_once_and_exposes_signals() -> None:
     assert "they" in ctx.tokens
     assert ctx.metadata["has_numberish"] is True
     assert ctx.metadata["mentions_timerish"] is True
+
+
+def test_rule_phases_and_rule_units_are_structured_for_extension() -> None:
+    assert RULE_PHASES == ("hard-stop", "ambiguity-disambiguation", "fallback")
+
+    for phase in RULE_PHASES:
+        assert RULES_BY_PHASE[phase], f"Expected rules for phase {phase}"
+        for rule in RULES_BY_PHASE[phase]:
+            assert isinstance(rule.name, str) and rule.name
+            assert callable(rule.applies)
+            assert callable(rule.emit)

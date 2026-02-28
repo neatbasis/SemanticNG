@@ -14,6 +14,15 @@ def _load_manifest() -> dict:
     return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
 
+def _assert_pytest_command_targets_existing_tests(command: str) -> None:
+    parts = shlex.split(command)
+    assert parts and parts[0] == "pytest", f"Command must begin with pytest: {command}"
+    test_paths = [part for part in parts[1:] if part.startswith("tests/")]
+    assert test_paths, f"Command must include explicit tests paths: {command}"
+    for p in test_paths:
+        assert (ROOT / p).exists(), f"Missing referenced test path: {p}"
+
+
 def test_dod_manifest_exists_and_has_known_statuses() -> None:
     assert MANIFEST_PATH.exists(), "docs/dod_manifest.json must exist"
     manifest = _load_manifest()
@@ -46,12 +55,7 @@ def test_done_capabilities_define_pytest_commands_over_existing_tests() -> None:
         assert commands, f"Done capability {cap['id']} must define at least one pytest command"
 
         for command in commands:
-            parts = shlex.split(command)
-            assert parts and parts[0] == "pytest", f"Command must begin with pytest: {command}"
-            test_paths = [part for part in parts[1:] if part.startswith("tests/")]
-            assert test_paths, f"Command must include explicit tests paths: {command}"
-            for p in test_paths:
-                assert (ROOT / p).exists(), f"Missing referenced test path: {p}"
+            _assert_pytest_command_targets_existing_tests(command)
 
 
 def test_in_progress_capabilities_have_executable_pytest_commands() -> None:
@@ -65,8 +69,8 @@ def test_in_progress_capabilities_have_executable_pytest_commands() -> None:
         assert commands, f"In-progress capability {cap['id']} must define at least one pytest command"
 
         for command in commands:
+            _assert_pytest_command_targets_existing_tests(command)
             parts = shlex.split(command)
-            assert parts and parts[0] == "pytest", f"Command must begin with pytest: {command}"
 
             completed = subprocess.run(
                 [*parts, "--collect-only"],

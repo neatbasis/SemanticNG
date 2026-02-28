@@ -71,7 +71,7 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 
 ## Later (larger architecture goals)
 
-### 1) Replay projection analytics contract (replay-grade projection engine and longitudinal correction analytics)
+### 1) Replay projection analytics contract (replay-grade projection engine and longitudinal correction analytics) ✅ completed
 - **Owner area/module:** Engine + Persistence + Correction artifacts (`src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`)
 - **Success criteria (test outcomes):**
   - New replay tests pass, proving `ProjectionState` reconstructed from append-only logs is deterministic across repeated runs and independent process restarts.
@@ -108,7 +108,7 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 
 ## Backlog dependency tags
 
-- `Later` item 1 (Replay projection analytics contract): `requires gate_halt_unification`, `requires invariant matrix complete`
+- `Later` item 1 (Replay projection analytics contract): ✅ dependencies satisfied and capability marked done in `docs/dod_manifest.json`.
 - `Later` item 2 (Capability-invocation governance): `requires gate_halt_unification`, `requires invariant matrix complete`
 - `Later` item 3 (Repair-aware projection evolution): `requires gate_halt_unification`, `requires invariant matrix complete`
 
@@ -169,7 +169,7 @@ Use this short table at each planning checkpoint to pick exactly one next PR sco
 
 | Capability ID | Dependency status (met/blocked) | Governance readiness (manifest+roadmap+contract-map aligned) | Test evidence completeness | Risk-reduction score | Recommended next action |
 | --- | --- | --- | --- | --- | --- |
-| `replay_projection_analytics` | blocked (`gate_halt_unification`, `invariant matrix complete`) | blocked | partial | 3/5 | Finish remaining `Next` gate/halt and invariant matrix work; reassess after CI is fully green. |
+| `replay_projection_analytics` | met | aligned | complete | 4/5 | Keep regression suite in milestone gate and monitor lineage-only replay invariants in weekly CI review. |
 | `observer_authorization` | met | partial | partial | 4/5 | Prioritize a focused PR that lands authorization allowlist/runtime gating with persisted explainable halt coverage. |
 | `capability_invocation_governance` | blocked (`gate_halt_unification`, `invariant matrix complete`) | blocked | missing | 5/5 | Keep design/doc prep only; defer merge work until sequencing gate dependencies are marked met. |
 | `repair_aware_projection` | blocked (`gate_halt_unification`, `invariant matrix complete`) | blocked | missing | 3/5 | Draft explicit auditable repair-event contract tests while keeping strict halt-only behavior as default. |

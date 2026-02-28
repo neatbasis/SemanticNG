@@ -163,7 +163,9 @@ def test_append_only_replay_preserves_minimal_correction_lineage_for_analytics(
         prediction_log_path=prediction_log,
     )
 
-    replayed = replay_projection_analytics(prediction_log).projection_state.current_predictions["turn:1"]
+    replay_result = replay_projection_analytics(prediction_log)
+    replayed = replay_result.projection_state.current_predictions["turn:1"]
+    assert replay_result.analytics_snapshot.correction_count == 1
     assert replayed.was_corrected is True
     assert replayed.correction_root_prediction_id == "pred:base"
     assert replayed.correction_parent_prediction_id == "pred:base"

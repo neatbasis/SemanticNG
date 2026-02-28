@@ -41,7 +41,11 @@ from state_renormalization.contracts import (
     default_observer_frame,
     project_ambiguity_state,
 )
-from state_renormalization.adapters.persistence import append_halt, append_prediction_record_event, read_jsonl
+from state_renormalization.adapters.persistence import (
+    append_halt,
+    append_prediction_record_event,
+    iter_projection_lineage_records,
+)
 from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.invariants import (
     Flow as InvariantFlow,
@@ -770,16 +774,16 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
     records_processed = 0
     lineage_rows: list[Mapping[str, Any]] = []
 
-    for _, raw in read_jsonl(path):
+    for raw in iter_projection_lineage_records(path):
+        lineage_rows.append(raw)
         if raw.get("event_kind") not in {"prediction_record", "prediction"}:
             continue
 
         payload = {k: v for k, v in raw.items() if k in fields}
         pred = PredictionRecord.model_validate(payload)
-        event_time = pred.corrected_at_iso or pred.compared_at_iso or pred.issued_at_iso
+        event_time = pred.corrected_at_iso or pred.compared_at_iso or pred.observed_at_iso or pred.issued_at_iso
         projection = _project_current_at(pred, projection, updated_at_iso=event_time)
         records_processed += 1
-        lineage_rows.append(raw)
 
     analytics = derive_projection_analytics_from_lineage(lineage_rows)
 
@@ -791,7 +795,7 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
 
     last_comparison_at_iso = next(
         (
-            pred.compared_at_iso or pred.corrected_at_iso
+            pred.corrected_at_iso or pred.compared_at_iso or pred.observed_at_iso
             for pred in reversed(projection.prediction_history)
             if pred.was_corrected
         ),
@@ -808,6 +812,7 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
     return ProjectionReplayResult(
         projection_state=projection,
         records_processed=records_processed,
+        analytics_snapshot=analytics,
     )
 
 

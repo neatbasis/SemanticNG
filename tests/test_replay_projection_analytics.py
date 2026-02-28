@@ -125,6 +125,35 @@ def test_halt_explainability_fields_survive_episode_persistence_roundtrip(
     assert set(expected).issuperset(HaltRecord.required_explainability_fields())
 
 
+
+
+def test_replay_projection_analytics_snapshot_is_derived_from_persisted_lineage_only(
+    make_episode: Callable[..., Episode],
+    make_ask_result: Callable[..., AskResult],
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / "predictions.jsonl"
+    ep = make_episode(
+        conversation_id="conv:lineage-snapshot",
+        turn_index=1,
+        ask=make_ask_result(status=AskStatus.OK, sentence="affirmative"),
+    )
+
+    run_mission_loop(
+        ep,
+        BeliefState(),
+        ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+        pending_predictions=[PredictionRecord.model_validate(FIXED_PREDICTION)],
+        prediction_log_path=log_path,
+    )
+
+    persisted_rows = [row for _, row in read_jsonl(log_path)]
+    expected = derive_projection_analytics_from_lineage(persisted_rows)
+    replay = replay_projection_analytics(log_path)
+
+    assert replay.analytics_snapshot.model_dump(mode="json") == expected.model_dump(mode="json")
+
+
 def test_derive_projection_analytics_from_lineage_is_deterministic_and_log_only() -> None:
     lineage = [
         {

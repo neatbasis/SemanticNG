@@ -81,8 +81,10 @@ def test_process_restart_replay_is_deterministic_for_identical_persisted_inputs(
     log_a.write_text(seed_contents, encoding="utf-8")
     log_b.write_text(seed_contents, encoding="utf-8")
 
-    replay_projection_a = replay_projection_analytics(log_a).projection_state
-    replay_projection_b = replay_projection_analytics(log_b).projection_state
+    replay_result_a = replay_projection_analytics(log_a)
+    replay_result_b = replay_projection_analytics(log_b)
+    replay_projection_a = replay_result_a.projection_state
+    replay_projection_b = replay_result_b.projection_state
 
     second_turn = make_episode(
         conversation_id="conv:restart",
@@ -104,6 +106,7 @@ def test_process_restart_replay_is_deterministic_for_identical_persisted_inputs(
         prediction_log_path=log_b,
     )
 
+    assert replay_result_a.analytics_snapshot.model_dump(mode="json") == replay_result_b.analytics_snapshot.model_dump(mode="json")
     assert projection_after_first_turn.correction_metrics == replay_projection_a.correction_metrics == replay_projection_b.correction_metrics
     assert restarted_after_second_turn_a.current_predictions.keys() == restarted_after_second_turn_b.current_predictions.keys()
     assert restarted_after_second_turn_a.correction_metrics == restarted_after_second_turn_b.correction_metrics

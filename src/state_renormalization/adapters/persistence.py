@@ -6,7 +6,7 @@ from dataclasses import is_dataclass, asdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, Tuple, Union
 
-from state_renormalization.contracts import HaltRecord
+from state_renormalization.contracts import HaltPayloadValidationError, HaltRecord
 
 from pydantic import BaseModel
 
@@ -113,6 +113,26 @@ def read_jsonl(path: PathLike) -> Iterator[Tuple[JsonObj, JsonObj]]:
                 raise ValueError(f"Expected JSON object on line {lineno}, got {type(obj).__name__}")
             meta: JsonObj = {"path": str(p), "lineno": lineno}
             yield meta, obj
+
+
+def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
+    """Yield persisted replay lineage records in append-only order.
+
+    Only records that can be deterministically rehydrated from persistence are returned:
+    prediction rows (`event_kind` of `prediction_record`/`prediction`) and canonical halt rows.
+    """
+
+    for _, raw in read_jsonl(path):
+        kind = raw.get("event_kind")
+        if kind in {"prediction_record", "prediction"}:
+            yield raw
+            continue
+
+        try:
+            HaltRecord.from_payload(raw)
+        except HaltPayloadValidationError:
+            continue
+        yield raw
 
 
 # TODO: This prevents weird non-dict JSON from exploding later when you call raw.get(...).

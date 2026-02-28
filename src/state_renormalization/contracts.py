@@ -566,6 +566,7 @@ class ProjectionReplayResult(BaseModel):
 
     projection_state: ProjectionState
     records_processed: int = 0
+    analytics_snapshot: "ProjectionAnalyticsSnapshot" = Field(default_factory=lambda: ProjectionAnalyticsSnapshot())
 
 
 class CorrectionCostAttribution(BaseModel):

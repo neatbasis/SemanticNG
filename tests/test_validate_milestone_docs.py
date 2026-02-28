@@ -14,40 +14,52 @@ validate_milestone_docs = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(validate_milestone_docs)
 
 
-def test_commands_missing_evidence_accepts_http_and_https_urls() -> None:
+def test_commands_with_invalid_evidence_format_accepts_exact_command_plus_https_line() -> None:
     command = "pytest tests/test_dod_manifest.py"
     pr_body = "\n".join(
         [
-            f"- {command}",
-            "  - CI run: http://ci.example/runs/100",
-            "- second command",
-            "  - CI run: https://ci.example/runs/101",
+            command,
+            "Evidence: https://ci.example/runs/100",
+            "pytest tests/test_invariants.py",
+            "Evidence: https://ci.example/runs/101",
         ]
     )
 
-    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == []
+    assert validate_milestone_docs._commands_with_invalid_evidence_format(pr_body, [command]) == []
 
 
-def test_commands_missing_evidence_accepts_artifact_and_attached_output_tokens() -> None:
+def test_commands_with_invalid_evidence_format_rejects_non_https_evidence_line() -> None:
     command = "pytest tests/test_replay_projection_determinism.py"
     pr_body = "\n".join(
         [
-            f"- {command}",
-            "  - Log artifact: artifact://milestone/projection-determinism",
-            "  - Inline output: attached:projection-determinism.txt",
+            command,
+            "Evidence: artifact://milestone/projection-determinism",
         ]
     )
 
-    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == []
+    assert validate_milestone_docs._commands_with_invalid_evidence_format(pr_body, [command]) == [command]
 
 
-def test_commands_missing_evidence_reports_missing_when_no_supported_evidence_is_present() -> None:
+def test_commands_with_invalid_evidence_format_reports_missing_when_no_immediate_evidence_line() -> None:
     command = "pytest tests/test_invariants.py"
     pr_body = "\n".join(
         [
             f"- {command}",
-            "  - Evidence: see CI logs in the repo",
+            "Evidence: https://ci.example/runs/200",
         ]
     )
 
-    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == [command]
+    assert validate_milestone_docs._commands_with_invalid_evidence_format(pr_body, [command]) == [command]
+
+
+def test_commands_with_invalid_evidence_format_reports_missing_when_evidence_not_next_line() -> None:
+    command = "pytest tests/test_invariants.py"
+    pr_body = "\n".join(
+        [
+            command,
+            "Additional details:",
+            "Evidence: https://ci.example/runs/300",
+        ]
+    )
+
+    assert validate_milestone_docs._commands_with_invalid_evidence_format(pr_body, [command]) == [command]

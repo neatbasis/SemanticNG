@@ -43,8 +43,12 @@ class CheckerResult:
     invariant_id: str
     passed: bool
     reason: str
+    flow: str
+    validity: str
+    code: str
     evidence: Sequence[Mapping[str, Any]] = field(default_factory=tuple)
-    code: str = ""
+    details: Mapping[str, Any] = field(default_factory=dict)
+    action_hints: Sequence[Mapping[str, Any]] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -307,8 +311,12 @@ def normalize_outcome(outcome: InvariantOutcome, *, gate: str = "") -> CheckerRe
         invariant_id=outcome.invariant_id.value,
         passed=outcome.passed,
         reason=outcome.reason,
-        evidence=tuple(_normalize_evidence_item(item) for item in outcome.evidence),
+        flow=outcome.flow.value,
+        validity=outcome.validity.value,
         code=outcome.code,
+        evidence=tuple(_normalize_evidence_item(item) for item in outcome.evidence),
+        details=_normalize_mapping(outcome.details),
+        action_hints=tuple(_normalize_mapping(item) for item in (outcome.action_hints or ())),
     )
 
 
@@ -317,3 +325,9 @@ def _normalize_evidence_item(item: Mapping[str, Any]) -> Mapping[str, Any]:
         "kind": str(item.get("kind") or "unknown"),
         "ref": item.get("ref", item.get("value", "")),
     }
+
+
+def _normalize_mapping(item: Mapping[str, Any] | None) -> Mapping[str, Any]:
+    if item is None:
+        return {}
+    return {str(k): item[k] for k in item}

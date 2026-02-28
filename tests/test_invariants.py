@@ -141,3 +141,41 @@ def test_prediction_outcome_binding_invariant_fail_and_pass() -> None:
     normalized = normalize_outcome(passing)
     assert normalized.invariant_id == "prediction_outcome_binding.v1"
     assert normalized.passed is True
+
+
+def test_normalized_invariant_outcome_has_stable_json_safe_shape_for_continue_and_stop() -> None:
+    continue_outcome = check_prediction_availability(
+        default_check_context(
+            scope="scope:test",
+            prediction_key="scope:test",
+            current_predictions={"scope:test": "pred:1"},
+            prediction_log_available=True,
+        )
+    )
+    stop_outcome = check_prediction_availability(
+        default_check_context(
+            scope="scope:test",
+            prediction_key="scope:test",
+            current_predictions={},
+            prediction_log_available=True,
+        )
+    )
+
+    normalized_continue = normalize_outcome(continue_outcome, gate="pre-decision")
+    normalized_stop = normalize_outcome(stop_outcome, gate="pre-decision")
+
+    for normalized in (normalized_continue, normalized_stop):
+        assert set(normalized.__dict__.keys()) == {
+            "gate",
+            "invariant_id",
+            "passed",
+            "reason",
+            "flow",
+            "validity",
+            "code",
+            "evidence",
+            "details",
+            "action_hints",
+        }
+        assert isinstance(normalized.details, dict)
+        assert isinstance(normalized.action_hints, tuple)

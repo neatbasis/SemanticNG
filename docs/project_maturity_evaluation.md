@@ -19,7 +19,7 @@ SemanticNG is in an **operational hardening** state:
 
 Completion ratio (done / total): **55.6%** (`5/9`).
 
-Current bottleneck capability: **`replay_projection_analytics`** (`in_progress`). Halt/gate unification acceptance is verified by the merged regression command (`82 passed, 4 skipped`), so replay-grade audit/analytics remains the highest-priority unresolved dependency for Later milestone confidence.
+Current bottleneck capability: **`replay_projection_analytics`** (`in_progress`). Halt/gate unification acceptance is verified by the current manifest regression command (`92 passed, 4 skipped`), including explicit STOP/CONTINUE parity assertions and halt payload durability checks, so replay-grade audit/analytics remains the highest-priority unresolved dependency for Later milestone confidence.
 
 This indicates the project is beyond baseline contract hardening and entering replay/analytics completion work.
 
@@ -93,7 +93,8 @@ Non-goals in this phase:
 
 ## Maturity changelog
 
-- 2026-02-28: Revalidated `gate_halt_unification` as `done` against its acceptance command (`pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py` => `82 passed, 4 skipped`), and confirmed `replay_projection_analytics` remains the primary bottleneck.
+- 2026-02-28: Revalidated `gate_halt_unification` as `done` against its acceptance command (`pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py` => `92 passed, 4 skipped`), and confirmed `replay_projection_analytics` remains the primary bottleneck.
+- 2026-02-28: Confirmed `tests/test_predictions_contracts_and_gates.py` enforces deterministic `Flow.CONTINUE`/`Flow.STOP` parity assertions and `tests/test_persistence_jsonl.py` verifies halt payload durability for canonical `details`, `evidence`, and invariant identity (`invariant_id`) round-trips.
 - 2026-02-28: Updated maturity narrative from pre-hardening bottleneck to replay/analytics bottleneck after merged milestone-gate and halt/gate hardening outcomes; halt normalization is now treated as hardened/proven and no longer the principal blocker.
 
 ## Maturity review protocol

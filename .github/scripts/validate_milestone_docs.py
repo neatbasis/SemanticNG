@@ -7,6 +7,10 @@ from pathlib import Path
 
 
 MISSING_PR_EVIDENCE_MARKER = "MILESTONE_VALIDATION_ERROR=MISSING_PR_EVIDENCE"
+MISSING_PR_HEADING_MARKER = "MILESTONE_VALIDATION_ERROR=MISSING_PR_TEMPLATE_HEADING"
+MISSING_PR_FIELD_MARKER = "MILESTONE_VALIDATION_ERROR=MISSING_PR_TEMPLATE_FIELD"
+MISSING_ROLLBACK_PLAN_MARKER = "MILESTONE_VALIDATION_ERROR=MISSING_ROLLBACK_PLAN"
+MISSING_GOVERNANCE_HANDOFF_MARKER = "MILESTONE_VALIDATION_ERROR=MISSING_GOVERNANCE_HANDOFF_FIELDS"
 
 
 def _load_manifest(rev: str) -> dict:
@@ -458,6 +462,102 @@ def _load_pr_body() -> str:
     return pull_request.get("body") or ""
 
 
+def _extract_pr_section(pr_body: str, heading: str) -> str | None:
+    lines = pr_body.splitlines()
+    heading_pattern = re.compile(rf"^##\s+{re.escape(heading)}\s*$", re.IGNORECASE)
+    section_start: int | None = None
+    for idx, raw_line in enumerate(lines):
+        if heading_pattern.match(raw_line.strip()):
+            section_start = idx + 1
+            break
+    if section_start is None:
+        return None
+
+    section_lines: list[str] = []
+    for raw_line in lines[section_start:]:
+        if raw_line.strip().startswith("## "):
+            break
+        section_lines.append(raw_line)
+    return "\n".join(section_lines)
+
+
+def _find_missing_prefixed_fields(section_body: str, field_prefixes: list[str]) -> list[str]:
+    missing: list[str] = []
+    normalized_lines = [line.strip() for line in section_body.splitlines()]
+    for prefix in field_prefixes:
+        matched = False
+        for line in normalized_lines:
+            if not line.startswith("- "):
+                continue
+            if not line.lower().startswith(f"- {prefix.lower()}"):
+                continue
+            after_colon = line.split(":", 1)
+            if len(after_colon) < 2:
+                continue
+            value = after_colon[1].strip()
+            if value:
+                matched = True
+                break
+        if not matched:
+            missing.append(prefix)
+    return missing
+
+
+def _validate_pr_template_fields(pr_body: str, require_governance_fields: bool) -> list[str]:
+    mismatches: list[str] = []
+
+    dependency_heading = "Dependency impact statement (mandatory)"
+    dependency_section = _extract_pr_section(pr_body, dependency_heading)
+    if dependency_section is None:
+        mismatches.append(f"{MISSING_PR_HEADING_MARKER};heading={dependency_heading}")
+    else:
+        dependency_fields = [
+            "Upstream capabilities/contracts consumed:",
+            "Downstream capabilities/contracts affected or unlocked:",
+            "Cross-capability risk if this change regresses:",
+        ]
+        for field in _find_missing_prefixed_fields(dependency_section, dependency_fields):
+            mismatches.append(f"{MISSING_PR_FIELD_MARKER};heading={dependency_heading};field={field}")
+
+    budget_heading = "No-regression budget and rollback plan (mandatory)"
+    budget_section = _extract_pr_section(pr_body, budget_heading)
+    if budget_section is None:
+        mismatches.append(f"{MISSING_PR_HEADING_MARKER};heading={budget_heading}")
+    else:
+        budget_fields = [
+            "Done-capability command packs impacted (if none, write `none`):",
+            "Regression budget impact (`none` / `waiver_requested`):",
+        ]
+        for field in _find_missing_prefixed_fields(budget_section, budget_fields):
+            mismatches.append(f"{MISSING_PR_FIELD_MARKER};heading={budget_heading};field={field}")
+
+        rollback_field = "If waiver requested, include owner + rollback-by date + mitigation command packs:"
+        rollback_missing = _find_missing_prefixed_fields(budget_section, [rollback_field])
+        if rollback_missing:
+            mismatches.append(
+                f"{MISSING_ROLLBACK_PLAN_MARKER};heading={budget_heading};field={rollback_field};"
+                "expected=provide rollback plan details or explicit `not_applicable` rationale"
+            )
+
+    if require_governance_fields:
+        governance_heading = "Documentation freshness and sprint handoff artifacts (mandatory for governance/maturity PRs)"
+        governance_section = _extract_pr_section(pr_body, governance_heading)
+        if governance_section is None:
+            mismatches.append(f"{MISSING_PR_HEADING_MARKER};heading={governance_heading}")
+        else:
+            governance_fields = [
+                "Governed docs updated with fresh regeneration metadata (`yes`/`no`/`not_applicable`):",
+                "Sprint handoff artifact updates included (`yes`/`no`/`not_applicable`):",
+                "If `no`, provide timeboxed follow-up issue/PR and owner:",
+            ]
+            for field in _find_missing_prefixed_fields(governance_section, governance_fields):
+                mismatches.append(
+                    f"{MISSING_GOVERNANCE_HANDOFF_MARKER};heading={governance_heading};field={field}"
+                )
+
+    return mismatches
+
+
 def main() -> int:
     head_sha = os.environ.get("HEAD_SHA") or subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     base_sha = os.environ.get("BASE_SHA")
@@ -481,6 +581,16 @@ def main() -> int:
     if "docs/dod_manifest.json" not in changed_files:
         print("No dod_manifest governance changes detected.")
         return 0
+
+    event_name = os.environ.get("GITHUB_EVENT_NAME", "")
+    if event_name in {"pull_request", "pull_request_target"}:
+        pr_body = _load_pr_body()
+        pr_template_mismatches = _validate_pr_template_fields(pr_body, require_governance_fields=True)
+        if pr_template_mismatches:
+            print("Pull request body is missing mandatory milestone governance fields.")
+            for mismatch in pr_template_mismatches:
+                print(f"  - {mismatch}")
+            return 1
 
     base_manifest = _load_manifest(base_sha)
     head_manifest = _load_manifest(head_sha)

@@ -256,3 +256,114 @@ def test_contract_map_transition_mismatches_requires_done_contract_rows_now_and_
 
     assert any("Milestone: Now" in mismatch for mismatch in mismatches)
     assert any("operational/proven" in mismatch for mismatch in mismatches)
+
+
+def test_validate_pr_template_fields_passes_with_all_required_sections() -> None:
+    pr_body = "\n".join(
+        [
+            "## Dependency impact statement (mandatory)",
+            "- Upstream capabilities/contracts consumed: contract_a",
+            "- Downstream capabilities/contracts affected or unlocked: capability_b",
+            "- Cross-capability risk if this change regresses: low",
+            "",
+            "## No-regression budget and rollback plan (mandatory)",
+            "- Done-capability command packs impacted (if none, write `none`): none",
+            "- Regression budget impact (`none` / `waiver_requested`): none",
+            "- If waiver requested, include owner + rollback-by date + mitigation command packs: not_applicable (no waiver requested)",
+            "",
+            "## Documentation freshness and sprint handoff artifacts (mandatory for governance/maturity PRs)",
+            "- Governed docs updated with fresh regeneration metadata (`yes`/`no`/`not_applicable`): yes",
+            "- Sprint handoff artifact updates included (`yes`/`no`/`not_applicable`): not_applicable",
+            "- If `no`, provide timeboxed follow-up issue/PR and owner: not_applicable",
+        ]
+    )
+
+    assert validate_milestone_docs._validate_pr_template_fields(pr_body, require_governance_fields=True) == []
+
+
+def test_validate_pr_template_fields_fails_missing_dependency_field() -> None:
+    pr_body = "\n".join(
+        [
+            "## Dependency impact statement (mandatory)",
+            "- Upstream capabilities/contracts consumed: contract_a",
+            "- Downstream capabilities/contracts affected or unlocked:",
+            "- Cross-capability risk if this change regresses: low",
+            "",
+            "## No-regression budget and rollback plan (mandatory)",
+            "- Done-capability command packs impacted (if none, write `none`): none",
+            "- Regression budget impact (`none` / `waiver_requested`): none",
+            "- If waiver requested, include owner + rollback-by date + mitigation command packs: not_applicable",
+        ]
+    )
+
+    mismatches = validate_milestone_docs._validate_pr_template_fields(pr_body, require_governance_fields=False)
+
+    assert any(validate_milestone_docs.MISSING_PR_FIELD_MARKER in mismatch for mismatch in mismatches)
+    assert any("Downstream capabilities/contracts affected or unlocked:" in mismatch for mismatch in mismatches)
+
+
+def test_validate_pr_template_fields_fails_missing_budget_declaration() -> None:
+    pr_body = "\n".join(
+        [
+            "## Dependency impact statement (mandatory)",
+            "- Upstream capabilities/contracts consumed: contract_a",
+            "- Downstream capabilities/contracts affected or unlocked: capability_b",
+            "- Cross-capability risk if this change regresses: low",
+            "",
+            "## No-regression budget and rollback plan (mandatory)",
+            "- Done-capability command packs impacted (if none, write `none`): none",
+            "- If waiver requested, include owner + rollback-by date + mitigation command packs: not_applicable",
+        ]
+    )
+
+    mismatches = validate_milestone_docs._validate_pr_template_fields(pr_body, require_governance_fields=False)
+
+    assert any(validate_milestone_docs.MISSING_PR_FIELD_MARKER in mismatch for mismatch in mismatches)
+    assert any("Regression budget impact" in mismatch for mismatch in mismatches)
+
+
+def test_validate_pr_template_fields_fails_without_rollback_plan_or_not_applicable() -> None:
+    pr_body = "\n".join(
+        [
+            "## Dependency impact statement (mandatory)",
+            "- Upstream capabilities/contracts consumed: contract_a",
+            "- Downstream capabilities/contracts affected or unlocked: capability_b",
+            "- Cross-capability risk if this change regresses: low",
+            "",
+            "## No-regression budget and rollback plan (mandatory)",
+            "- Done-capability command packs impacted (if none, write `none`): none",
+            "- Regression budget impact (`none` / `waiver_requested`): none",
+            "- If waiver requested, include owner + rollback-by date + mitigation command packs:",
+        ]
+    )
+
+    mismatches = validate_milestone_docs._validate_pr_template_fields(pr_body, require_governance_fields=False)
+
+    assert any(validate_milestone_docs.MISSING_ROLLBACK_PLAN_MARKER in mismatch for mismatch in mismatches)
+
+
+def test_validate_pr_template_fields_fails_missing_governance_handoff_fields() -> None:
+    pr_body = "\n".join(
+        [
+            "## Dependency impact statement (mandatory)",
+            "- Upstream capabilities/contracts consumed: contract_a",
+            "- Downstream capabilities/contracts affected or unlocked: capability_b",
+            "- Cross-capability risk if this change regresses: low",
+            "",
+            "## No-regression budget and rollback plan (mandatory)",
+            "- Done-capability command packs impacted (if none, write `none`): none",
+            "- Regression budget impact (`none` / `waiver_requested`): none",
+            "- If waiver requested, include owner + rollback-by date + mitigation command packs: not_applicable",
+            "",
+            "## Documentation freshness and sprint handoff artifacts (mandatory for governance/maturity PRs)",
+            "- Governed docs updated with fresh regeneration metadata (`yes`/`no`/`not_applicable`):",
+            "- Sprint handoff artifact updates included (`yes`/`no`/`not_applicable`): no",
+            "- If `no`, provide timeboxed follow-up issue/PR and owner:",
+        ]
+    )
+
+    mismatches = validate_milestone_docs._validate_pr_template_fields(pr_body, require_governance_fields=True)
+
+    assert any(validate_milestone_docs.MISSING_GOVERNANCE_HANDOFF_MARKER in mismatch for mismatch in mismatches)
+    assert any("Governed docs updated with fresh regeneration metadata" in mismatch for mismatch in mismatches)
+    assert any("If `no`, provide timeboxed follow-up issue/PR and owner:" in mismatch for mismatch in mismatches)

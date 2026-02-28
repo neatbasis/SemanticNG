@@ -100,19 +100,22 @@ def _commands_for_pr_template_examples(manifest: dict) -> dict[str, dict[str, ob
 
 
 def _render_pr_template_examples(manifest: dict) -> str:
-    lines: list[str] = ["### Capability command/evidence checklist (generated from `docs/dod_manifest.json`)", ""]
+    lines: list[str] = ["### Capability command blocks (generated from `docs/dod_manifest.json`)", ""]
     commands_by_capability = _commands_for_pr_template_examples(manifest)
     for cap_id in sorted(commands_by_capability):
         capability = commands_by_capability[cap_id]
         status = capability["status"]
         commands = capability["commands"]
         lines.append(f"#### Capability: `{cap_id}` (status: `{status}`)")
+        lines.append("```text")
         for command in commands:
-            lines.append(f"- [ ] `{command}`")
-            lines.append("  - Evidence URL: https://github.com/<org>/<repo>/actions/runs/<run_id>")
+            lines.append(command)
+            lines.append("Evidence URL: https://github.com/<org>/<repo>/actions/runs/<run_id>")
             lines.append("")
+        lines.append("```")
+        lines.append("")
 
-    lines.append("- [ ] I confirmed adjacency formatting was preserved (each command line is immediately followed by its own `https://...` evidence URL line).")
+    lines.append("I confirmed adjacency formatting was preserved (each command line is immediately followed by its own `https://...` evidence URL line).")
     return "\n".join(lines).rstrip() + "\n"
 
 

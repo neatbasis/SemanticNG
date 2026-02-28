@@ -2,6 +2,8 @@
 
 This document defines a shared classification model for runtime decision logic in SemanticNG.
 
+For the normative architecture/planning boundary layer above this classification model, see `docs/AXIOMS.md` (axioms constrain what may be designed; invariants/policies/heuristics classify how runtime logic is implemented).
+
 ## Why this exists
 
 Several runtime components combine strict correctness checks, governance defaults, and ranking logic.

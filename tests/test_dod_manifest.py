@@ -46,6 +46,30 @@ def _assert_pytest_command_is_executable(command: str, capability_id: str) -> No
     )
 
 
+def _run_pytest_command(command: str) -> subprocess.CompletedProcess[str]:
+    parts = shlex.split(command)
+    return subprocess.run(
+        parts,
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _load_previous_manifest_from_git() -> dict | None:
+    completed = subprocess.run(
+        ["git", "show", "HEAD~1:docs/dod_manifest.json"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        return None
+    return json.loads(completed.stdout)
+
+
 def test_dod_manifest_exists_and_has_known_statuses() -> None:
     assert MANIFEST_PATH.exists(), "docs/dod_manifest.json must exist"
     manifest = _load_manifest()
@@ -81,7 +105,7 @@ def test_done_capabilities_define_pytest_commands_over_existing_tests() -> None:
             _assert_pytest_command_targets_existing_tests(command)
 
 
-def test_in_progress_capabilities_have_executable_pytest_commands() -> None:
+def test_in_progress_capabilities_define_pytest_commands_over_existing_tests() -> None:
     manifest = _load_manifest()
 
     for cap in manifest["capabilities"]:
@@ -93,4 +117,53 @@ def test_in_progress_capabilities_have_executable_pytest_commands() -> None:
 
         for command in commands:
             _assert_pytest_command_targets_existing_tests(command)
+
+
+def test_in_progress_capabilities_have_executable_pytest_commands() -> None:
+    manifest = _load_manifest()
+
+    for cap in manifest["capabilities"]:
+        if cap["status"] != "in_progress":
+            continue
+
+        commands = cap.get("pytest_commands", [])
+
+        for command in commands:
             _assert_pytest_command_is_executable(command, cap["id"])
+
+
+def test_done_status_transition_retains_at_least_one_passing_regression_command() -> None:
+    previous_manifest = _load_previous_manifest_from_git()
+    if previous_manifest is None:
+        return
+
+    previous_status_by_id = {
+        cap["id"]: cap["status"]
+        for cap in previous_manifest.get("capabilities", [])
+    }
+
+    current_manifest = _load_manifest()
+
+    for cap in current_manifest["capabilities"]:
+        if cap["status"] != "done":
+            continue
+
+        if previous_status_by_id.get(cap["id"]) == "done":
+            continue
+
+        commands = cap.get("pytest_commands", [])
+        assert commands, (
+            f"Capability {cap['id']} transitioned to done and must retain at least one regression pytest command"
+        )
+
+        passing_commands: list[str] = []
+        for command in commands:
+            _assert_pytest_command_targets_existing_tests(command)
+            completed = _run_pytest_command(command)
+            if completed.returncode == 0:
+                passing_commands.append(command)
+
+        assert passing_commands, (
+            f"Capability {cap['id']} transitioned to done and must retain at least one passing pytest command\n"
+            f"commands={commands}"
+        )

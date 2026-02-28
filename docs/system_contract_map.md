@@ -32,6 +32,11 @@ Maturity levels:
 
 ## Maturity update protocol (apply each milestone review)
 
+Reference convention:
+- Each capability entry in `docs/dod_manifest.json` should include a `contract_map_refs` list.
+- `contract_map_refs` values must exactly match canonical names from the `Contract name` column in this file.
+- Every active contract listed in Milestone `Next` or `Later` must be referenced by at least one capability.
+
 1. Validate contract behavior against milestone pytest commands from `docs/dod_manifest.json`.
 2. Promote `prototype` → `operational` once default-path runtime + gate behavior are covered in CI.
 3. Promote `operational` → `proven` once replay and halt/audit paths are repeatedly validated across milestone regressions.

@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -141,3 +142,30 @@ def test_check_pr_template_autogen_section_returns_one_when_stale(monkeypatch, t
     monkeypatch.setattr(render_transition_evidence, "PR_TEMPLATE_PATH", template_path)
 
     assert render_transition_evidence.check_pr_template_autogen_section() == 1
+
+
+def test_main_emits_deterministic_block_for_same_base_and_head(monkeypatch, capsys) -> None:
+    manifest = {
+        "capabilities": [
+            {"id": "cap_a", "status": "in_progress", "pytest_commands": ["pytest tests/test_alpha.py"]},
+            {"id": "cap_b", "status": "done", "pytest_commands": ["pytest tests/test_beta.py"]},
+        ]
+    }
+
+    def fake_check_output(cmd: list[str], text: bool = True) -> str:
+        assert text is True
+        assert cmd[:2] == ["git", "show"]
+        assert cmd[2].endswith(":docs/dod_manifest.json")
+        return json.dumps(manifest)
+
+    monkeypatch.setattr(subprocess, "check_output", fake_check_output)
+
+    monkeypatch.setattr("sys.argv", ["render_transition_evidence.py", "--base", "abc123", "--head", "abc123"])
+    assert render_transition_evidence.main() == 0
+    first = capsys.readouterr().out
+
+    monkeypatch.setattr("sys.argv", ["render_transition_evidence.py", "--base", "abc123", "--head", "abc123"])
+    assert render_transition_evidence.main() == 0
+    second = capsys.readouterr().out
+
+    assert first == second

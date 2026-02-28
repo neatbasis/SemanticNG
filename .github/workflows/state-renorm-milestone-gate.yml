@@ -126,6 +126,7 @@ jobs:
           if [[ $validator_status -ne 0 ]]; then
             echo
             echo "Action required: paste the exact transition evidence block from artifacts/transition_evidence.txt into the PR body."
+            echo "See the generated block in the job summary under 'Milestone transition evidence' and in artifacts/transition_evidence.txt."
             cat artifacts/transition_evidence.txt
 
             if grep -Fq "MILESTONE_VALIDATION_ERROR=MISSING_PR_EVIDENCE" artifacts/validate_milestone_docs.log; then
@@ -133,7 +134,7 @@ jobs:
 
               echo
               echo "Milestone validation failed: PR description is missing transitioned-capability evidence."
-              echo "See transition evidence block above."
+              echo "See the generated transition evidence block above (also published in the job summary and transition_evidence.txt artifact)."
             else
               echo
               echo "Milestone validation failed. See artifacts/validate_milestone_docs.log for details."

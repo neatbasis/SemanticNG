@@ -288,12 +288,15 @@ STOP_CASES = [
 
 def _assert_result_contract(result: GateDecision) -> None:
     if isinstance(result, Success):
+        assert all(out.flow == Flow.CONTINUE for out in result.artifact.pre_consume)
+        assert all(out.flow == Flow.CONTINUE for out in result.artifact.post_write)
         assert all(out.flow == Flow.CONTINUE for out in result.artifact.combined)
     else:
         assert isinstance(result, HaltRecord)
         assert result.halt_id.startswith("halt:")
         assert result.invariant_id
         assert result.reason
+        assert set(result.to_canonical_payload().keys()) == set(HaltRecord.required_payload_fields())
 
 
 def test_halt_payload_schema_is_canonical_for_stop_emitters() -> None:
@@ -338,13 +341,14 @@ def test_gate_flow_contract_parity_for_continue_and_stop(tmp_path: Path) -> None
     )
 
     assert isinstance(continue_gate, Success)
-    assert all(out.flow == Flow.CONTINUE for out in continue_gate.artifact.pre_consume)
-    assert all(out.flow == Flow.CONTINUE for out in continue_gate.artifact.post_write)
-    assert all(out.flow == Flow.CONTINUE for out in continue_gate.artifact.combined)
+    assert [out.flow for out in continue_gate.artifact.pre_consume] == [Flow.CONTINUE]
+    assert [out.flow for out in continue_gate.artifact.post_write] == [Flow.CONTINUE]
+    assert [out.flow for out in continue_gate.artifact.combined] == [Flow.CONTINUE, Flow.CONTINUE]
 
     assert isinstance(stop_gate, HaltRecord)
     assert stop_gate.stage == "pre-decision:post_write"
     assert stop_gate.invariant_id == InvariantId.EVIDENCE_LINK_COMPLETENESS.value
+    assert set(stop_gate.to_canonical_payload().keys()) == set(HaltRecord.required_payload_fields())
 
 
 def test_prediction_record_json_round_trip() -> None:

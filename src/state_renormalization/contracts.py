@@ -395,6 +395,33 @@ class HaltRecord(BaseModel):
         }
 
     @classmethod
+    def build_canonical_payload(
+        cls,
+        *,
+        halt_id: str,
+        stage: str,
+        invariant_id: str,
+        reason: str,
+        details: Mapping[str, Any],
+        evidence: list[Mapping[str, Any]] | list[EvidenceRef],
+        retryability: bool,
+        timestamp: str,
+    ) -> Dict[str, Any]:
+        """Build and validate a canonical STOP payload shape used by all emitters."""
+        return cls.model_validate(
+            {
+                "halt_id": halt_id,
+                "stage": stage,
+                "invariant_id": invariant_id,
+                "reason": reason,
+                "details": dict(details),
+                "evidence": list(evidence),
+                "retryability": retryability,
+                "timestamp": timestamp,
+            }
+        ).to_canonical_payload()
+
+    @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "HaltRecord":
         raw = dict(payload)
         try:

@@ -4,7 +4,7 @@
 
 SemanticNG is in an **operational hardening** state:
 
-- Core baseline capabilities are implemented and tested (`5/9` manifest capabilities are `done`).
+- Core baseline capabilities are implemented and tested (`5/9` manifest capabilities are `done`, including `gate_halt_unification`).
 - The entire current pytest suite is passing locally.
 - The architecture has clear milestone framing (`Now` / `Next` / `Later`) and contract-level maturity tracking.
 - The most critical unfinished work is now concentrated in replay-grade projection analytics and downstream governance expansion.
@@ -19,7 +19,7 @@ SemanticNG is in an **operational hardening** state:
 
 Completion ratio (done / total): **55.6%** (`5/9`).
 
-Current bottleneck capability: **`replay_projection_analytics`** (`in_progress`), because halt/gate unification hardening is now completed and replay-grade audit/analytics is the highest-priority unresolved dependency for Later milestone confidence.
+Current bottleneck capability: **`replay_projection_analytics`** (`in_progress`). Halt/gate unification acceptance is verified by the merged regression command (`82 passed, 4 skipped`), so replay-grade audit/analytics remains the highest-priority unresolved dependency for Later milestone confidence.
 
 This indicates the project is beyond baseline contract hardening and entering replay/analytics completion work.
 
@@ -93,6 +93,7 @@ Non-goals in this phase:
 
 ## Maturity changelog
 
+- 2026-02-28: Revalidated `gate_halt_unification` as `done` against its acceptance command (`pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py` => `82 passed, 4 skipped`), and confirmed `replay_projection_analytics` remains the primary bottleneck.
 - 2026-02-28: Updated maturity narrative from pre-hardening bottleneck to replay/analytics bottleneck after merged milestone-gate and halt/gate hardening outcomes; halt normalization is now treated as hardened/proven and no longer the principal blocker.
 
 ## Maturity review protocol

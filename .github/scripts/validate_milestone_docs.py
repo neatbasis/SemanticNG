@@ -30,6 +30,48 @@ def _status_transitions(base_manifest: dict, head_manifest: dict) -> dict[str, t
     return transitions
 
 
+def _extract_roadmap_status_alignment(roadmap_text: str) -> dict[str, set[str]]:
+    status_alignment: dict[str, set[str]] = {}
+    in_alignment_section = False
+    bullet_pattern = re.compile(r"^- `([^`]+)`: (.+)\.$")
+
+    for raw_line in roadmap_text.splitlines():
+        line = raw_line.strip()
+        if line.startswith("## Capability status alignment"):
+            in_alignment_section = True
+            continue
+        if in_alignment_section and line.startswith("## "):
+            break
+        if not in_alignment_section:
+            continue
+
+        match = bullet_pattern.match(line)
+        if not match:
+            continue
+
+        status = match.group(1)
+        capability_ids = {cap_id for cap_id in re.findall(r"`([^`]+)`", match.group(2))}
+        status_alignment[status] = capability_ids
+
+    return status_alignment
+
+
+def _roadmap_status_transition_mismatches(
+    status_transitions: dict[str, tuple[str, str]], roadmap_text: str
+) -> list[str]:
+    status_alignment = _extract_roadmap_status_alignment(roadmap_text)
+    mismatches: list[str] = []
+
+    for cap_id, (_, to_status) in sorted(status_transitions.items()):
+        status_caps = status_alignment.get(to_status, set())
+        if cap_id not in status_caps:
+            mismatches.append(
+                f"{cap_id}: transitioned to status '{to_status}' but ROADMAP.md capability status alignment is missing this capability under '{to_status}'."
+            )
+
+    return mismatches
+
+
 def _extract_maturity_map(markdown_text: str) -> dict[str, str]:
     maturity: dict[str, str] = {}
     for line in markdown_text.splitlines():
@@ -311,7 +353,7 @@ def _ci_evidence_links_command_mismatches(head_manifest: dict, transitioned_cap_
 def _commands_missing_evidence(pr_body: str, commands: list[str]) -> list[str]:
     lines = pr_body.splitlines()
     invalid: list[str] = []
-    evidence_line_pattern = re.compile(r"^Evidence:\s+(https?://\S+|artifact://\S+)$")
+    evidence_line_pattern = re.compile(r"^(Evidence:\s+)?https?://\S+$")
     for command in commands:
         found_valid_pair = False
         for idx, line in enumerate(lines):
@@ -341,7 +383,7 @@ def _commands_missing_evidence_by_capability(
         for command in _commands_missing_evidence(pr_body, commands):
             missing.append(
                 f"{cap_id}: command must be present as an exact line and immediately followed by "
-                f"'Evidence: https://...' or 'Evidence: artifact://...': {command}"
+                f"a http(s) evidence URL line (optionally prefixed with 'Evidence: '): {command}"
             )
     return missing
 
@@ -384,6 +426,14 @@ def main() -> int:
                 print(f"  - {path}")
             return 1
 
+        roadmap_text = Path("ROADMAP.md").read_text(encoding="utf-8")
+        roadmap_sync_mismatches = _roadmap_status_transition_mismatches(status_transitions, roadmap_text)
+        if roadmap_sync_mismatches:
+            print("Capability status transitions must stay synchronized with ROADMAP.md capability status alignment bullets.")
+            for mismatch in roadmap_sync_mismatches:
+                print(f"  - {mismatch}")
+            return 1
+
         ci_command_mismatches = _ci_evidence_links_command_mismatches(head_manifest, set(status_transitions))
         if ci_command_mismatches:
             print(
@@ -402,8 +452,8 @@ def main() -> int:
                     "PR description must include adjacency evidence for every required transitioned-capability command."
                 )
                 print(
-                    "Immediately follow each exact command line with one evidence line in either "
-                    "'Evidence: https://...' or 'Evidence: artifact://...' format."
+                    "Immediately follow each exact command line with one http(s) evidence URL line "
+                    "(either a bare URL or 'Evidence: https://...')."
                 )
                 for error in missing_evidence:
                     print(f"  - {error}")

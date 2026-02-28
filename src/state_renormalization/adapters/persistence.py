@@ -129,7 +129,18 @@ def read_jsonl(path: PathLike) -> Iterator[Tuple[JsonObj, JsonObj]]:
 #    continue
 
 
-def append_prediction(path: PathLike = PREDICTIONS_LOG_PATH, record: Any = None) -> JsonObj:
+def _enforce_adapter_gate(*, action: str, adapter_gate: CapabilityAdapterGate) -> None:
+    if not adapter_gate.allowed:
+        raise PermissionError(f"{action} denied: adapter gate is not allowed")
+
+
+def append_prediction(
+    path: PathLike = PREDICTIONS_LOG_PATH,
+    record: Any = None,
+    *,
+    adapter_gate: CapabilityAdapterGate,
+) -> JsonObj:
+    _enforce_adapter_gate(action="append_prediction", adapter_gate=adapter_gate)
     if record is None:
         raise ValueError("append_prediction requires a prediction record")
     p = Path(path)
@@ -144,6 +155,7 @@ def append_prediction(path: PathLike = PREDICTIONS_LOG_PATH, record: Any = None)
 def append_prediction_event(
     record: Any,
     *,
+    adapter_gate: CapabilityAdapterGate,
     path: PathLike = PREDICTIONS_LOG_PATH,
     episode_id: str | None = None,
     conversation_id: str | None = None,
@@ -161,7 +173,7 @@ def append_prediction_event(
     if turn_index is not None:
         event["turn_index"] = int(turn_index)
 
-    return append_prediction(path=path, record=event)
+    return append_prediction(path=path, record=event, adapter_gate=adapter_gate)
 
 
 def append_prediction_record_event(
@@ -173,8 +185,7 @@ def append_prediction_record_event(
     conversation_id: str | None = None,
     turn_index: int | None = None,
 ) -> JsonObj:
-    if not adapter_gate.allowed:
-        raise PermissionError("append_prediction_record_event denied: adapter gate is not allowed")
+    _enforce_adapter_gate(action="append_prediction_record_event", adapter_gate=adapter_gate)
 
     payload = _to_jsonable(record)
     if not isinstance(payload, dict):
@@ -188,7 +199,7 @@ def append_prediction_record_event(
     if turn_index is not None:
         event["turn_index"] = int(turn_index)
 
-    return append_prediction(path=path, record=event)
+    return append_prediction(path=path, record=event, adapter_gate=adapter_gate)
 
 
 def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
@@ -245,7 +256,8 @@ def read_halt_record(record: JsonObj) -> HaltRecord:
     return HaltRecord.from_payload(record)
 
 
-def append_halt(path: PathLike, record: Any) -> JsonObj:
+def append_halt(path: PathLike, record: Any, *, adapter_gate: CapabilityAdapterGate) -> JsonObj:
+    _enforce_adapter_gate(action="append_halt", adapter_gate=adapter_gate)
     p = Path(path)
     next_offset = 1
     if p.exists():

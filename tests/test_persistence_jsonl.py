@@ -7,8 +7,11 @@ import pytest
 from pathlib import Path
 
 from state_renormalization.adapters.persistence import append_halt, append_jsonl, read_halt_record, read_jsonl
-from state_renormalization.contracts import HaltRecord
+from state_renormalization.contracts import CapabilityAdapterGate, HaltRecord
 from state_renormalization.engine import to_jsonable_episode
+
+
+TEST_GATE = CapabilityAdapterGate(invocation_id="invoke:test", allowed=True)
 
 
 def test_append_and_read_jsonl_roundtrip(tmp_path: Path) -> None:
@@ -40,7 +43,7 @@ def test_append_halt_jsonl_roundtrip_and_evidence_ref_format(tmp_path: Path) -> 
         timestamp="2026-02-13T00:00:00+00:00",
     )
 
-    ref = append_halt(p, halt)
+    ref = append_halt(p, halt, adapter_gate=TEST_GATE)
 
     (meta, rec), = list(read_jsonl(p))
     assert rec["halt_id"] == "halt:1"
@@ -142,7 +145,7 @@ def test_append_halt_reprojects_alias_payload_to_canonical_shape(tmp_path: Path)
         "timestamp_iso": "2026-02-13T00:00:00+00:00",
     }
 
-    append_halt(p, payload)
+    append_halt(p, payload, adapter_gate=TEST_GATE)
 
     (_, rec), = list(read_jsonl(p))
     assert set(rec.keys()) == set(HaltRecord.required_payload_fields())
@@ -167,6 +170,7 @@ def test_append_halt_rejects_missing_explainability_fields(tmp_path: Path) -> No
                 "retryability": True,
                 "timestamp": "2026-02-13T00:00:00+00:00",
             },
+            adapter_gate=TEST_GATE,
         )
 
 
@@ -185,6 +189,7 @@ def test_append_halt_rejects_incomplete_payloads(tmp_path: Path) -> None:
                 "evidence": [{"kind": "scope", "ref": "scope:test"}],
                 "retryability": True,
             },
+            adapter_gate=TEST_GATE,
         )
 
 
@@ -205,6 +210,7 @@ def test_append_halt_rejects_conflicting_alias_fields(tmp_path: Path) -> None:
                 "retryability": True,
                 "timestamp": "2026-02-13T00:00:00+00:00",
             },
+            adapter_gate=TEST_GATE,
         )
 
 
@@ -237,8 +243,8 @@ def test_append_halt_flow_parity_across_stop_and_continue_artifacts(tmp_path: Pa
         "timestamp_iso": "2026-02-13T00:00:01+00:00",
     }
 
-    append_halt(p, stop_payload)
-    append_halt(p, continue_payload)
+    append_halt(p, stop_payload, adapter_gate=TEST_GATE)
+    append_halt(p, continue_payload, adapter_gate=TEST_GATE)
 
     rows = [rec for _, rec in read_jsonl(p)]
     stop_rec, continue_rec = rows
@@ -264,7 +270,7 @@ def test_append_halt_roundtrip_reprojects_required_fields_without_mutation(tmp_p
         "timestamp": "2026-02-13T00:00:00+00:00",
     }
 
-    append_halt(p, payload)
+    append_halt(p, payload, adapter_gate=TEST_GATE)
     (_, persisted), = list(read_jsonl(p))
     reprojected = HaltRecord.from_payload(persisted).to_canonical_payload()
 
@@ -288,7 +294,7 @@ def test_append_halt_round_trip_preserves_halt_payload_field_integrity(tmp_path:
         "timestamp_iso": "2026-02-13T00:00:02+00:00",
     }
 
-    append_halt(p, payload)
+    append_halt(p, payload, adapter_gate=TEST_GATE)
     (_, persisted), = list(read_jsonl(p))
     roundtrip = HaltRecord.from_payload(persisted).to_canonical_payload()
 
@@ -347,7 +353,7 @@ def test_append_halt_round_trip_reload_preserves_explainability_payload(tmp_path
         "timestamp": "2026-02-13T00:00:04+00:00",
     }
 
-    append_halt(p, payload)
+    append_halt(p, payload, adapter_gate=TEST_GATE)
     (_, persisted), = list(read_jsonl(p))
     reloaded = read_halt_record(persisted)
 
@@ -372,7 +378,7 @@ def test_append_halt_round_trip_preserves_all_canonical_and_stable_id_fields(tmp
         "timestamp_iso": "2026-02-13T00:00:03+00:00",
     }
 
-    append_halt(p, payload)
+    append_halt(p, payload, adapter_gate=TEST_GATE)
 
     (_, rec), = list(read_jsonl(p))
     canonical = HaltRecord.from_payload(payload).to_canonical_payload()

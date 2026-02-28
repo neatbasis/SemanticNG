@@ -20,6 +20,7 @@ from state_renormalization.invariants import (
     InvariantId,
     InvariantOutcome,
     REGISTRY,
+    REGISTERED_INVARIANT_BRANCH_BEHAVIORS,
     Validity,
     default_check_context,
     normalize_outcome,
@@ -57,13 +58,20 @@ class InvariantScenario:
     build_context: Callable[[], Any]
     expected_passed: bool
     expected_flow: Flow
+    rationale: str
     gate_inputs: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class NonApplicableGateCoverage:
+    rationale: str
 
 
 @dataclass(frozen=True)
 class InvariantCoverage:
     supports_stop: bool
     scenarios: tuple[InvariantScenario, ...]
+    gate_non_applicable: NonApplicableGateCoverage | None = None
 
 
 def _build_allow_context_for_prediction_availability() -> Any:
@@ -173,6 +181,7 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 build_context=_build_allow_context_for_prediction_availability,
                 expected_passed=True,
                 expected_flow=Flow.CONTINUE,
+                rationale="Projected prediction exists for the selected prediction_key.",
                 gate_inputs={"just_written_prediction": None, "has_projected_prediction": True},
             ),
             InvariantScenario(
@@ -180,6 +189,7 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 build_context=_build_stop_context_for_prediction_availability,
                 expected_passed=False,
                 expected_flow=Flow.STOP,
+                rationale="No projected predictions exist, so pre-consume must halt.",
                 gate_inputs={"just_written_prediction": None, "has_projected_prediction": False},
             ),
         ),
@@ -192,6 +202,7 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 build_context=_build_allow_context_for_evidence_link_completeness,
                 expected_passed=True,
                 expected_flow=Flow.CONTINUE,
+                rationale="Post-write append has evidence links and projection is current.",
                 gate_inputs={
                     "just_written_prediction": {"key": "scope:test", "evidence_refs": [{"kind": "jsonl", "ref": "predictions.jsonl@1"}]},
                     "has_projected_prediction": True,
@@ -202,6 +213,7 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 build_context=_build_stop_context_for_evidence_link_completeness,
                 expected_passed=False,
                 expected_flow=Flow.STOP,
+                rationale="Prediction append without evidence links must halt.",
                 gate_inputs={"just_written_prediction": {"key": "scope:test", "evidence_refs": []}, "has_projected_prediction": True},
             ),
         ),
@@ -214,13 +226,18 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 build_context=_build_allow_context_for_prediction_outcome_binding,
                 expected_passed=True,
                 expected_flow=Flow.CONTINUE,
+                rationale="Outcome is bound with prediction_id and numeric error_metric.",
             ),
             InvariantScenario(
                 name="stop",
                 build_context=_build_stop_context_for_prediction_outcome_binding,
                 expected_passed=False,
                 expected_flow=Flow.STOP,
+                rationale="Outcome without prediction_id is invalid and must halt.",
             ),
+        ),
+        gate_non_applicable=NonApplicableGateCoverage(
+            rationale="This invariant is validated independently and currently not executed by evaluate_invariant_gates.",
         ),
     ),
     InvariantId.EXPLAINABLE_HALT_PAYLOAD: InvariantCoverage(
@@ -231,13 +248,18 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 build_context=_build_allow_context_for_explainable_halt_payload,
                 expected_passed=True,
                 expected_flow=Flow.CONTINUE,
+                rationale="STOP candidate provides explainable payload fields.",
             ),
             InvariantScenario(
                 name="stop",
                 build_context=_build_stop_context_for_explainable_halt_payload,
                 expected_passed=False,
                 expected_flow=Flow.STOP,
+                rationale="STOP candidate missing details/evidence must halt as degraded payload.",
             ),
+        ),
+        gate_non_applicable=NonApplicableGateCoverage(
+            rationale="This invariant runs only during halt validation and is not a direct gate input scenario.",
         ),
     ),
 }
@@ -350,6 +372,7 @@ def test_invariant_identifiers_are_enumerated_and_registered() -> None:
 
 def test_invariant_matrix_release_gate_has_required_coverage() -> None:
     assert set(InvariantId) == set(REGISTERED_INVARIANTS) == set(INVARIANT_RELEASE_GATE_MATRIX)
+    assert set(REGISTERED_INVARIANTS) == set(REGISTERED_INVARIANT_BRANCH_BEHAVIORS)
 
     for invariant_id, coverage in INVARIANT_RELEASE_GATE_MATRIX.items():
         assert any(s.expected_passed for s in coverage.scenarios), f"{invariant_id.value} has no pass scenario"
@@ -368,6 +391,17 @@ def test_invariant_matrix_guard_fails_when_registry_gains_uncovered_invariant() 
     assert not stale_matrix_entries, (
         "INVARIANT_RELEASE_GATE_MATRIX contains non-registered invariants: "
         + ", ".join(sorted(invariant.value for invariant in stale_matrix_entries))
+    )
+
+    uncovered_branch_contracts = set(REGISTERED_INVARIANTS) - set(REGISTERED_INVARIANT_BRANCH_BEHAVIORS)
+    stale_branch_contracts = set(REGISTERED_INVARIANT_BRANCH_BEHAVIORS) - set(REGISTERED_INVARIANTS)
+    assert not uncovered_branch_contracts, (
+        "REGISTERED_INVARIANT_BRANCH_BEHAVIORS is missing registered invariants: "
+        + ", ".join(sorted(invariant.value for invariant in uncovered_branch_contracts))
+    )
+    assert not stale_branch_contracts, (
+        "REGISTERED_INVARIANT_BRANCH_BEHAVIORS contains non-registered invariants: "
+        + ", ".join(sorted(invariant.value for invariant in stale_branch_contracts))
     )
 
 
@@ -429,7 +463,10 @@ def test_gate_decisions_and_artifacts_are_deterministic_by_invariant(
     tmp_path: Path,
 ) -> None:
     if scenario.gate_inputs is None:
-        pytest.skip(f"{invariant_id.value} is not directly evaluated by evaluate_invariant_gates")
+        non_applicable = INVARIANT_RELEASE_GATE_MATRIX[invariant_id].gate_non_applicable
+        assert non_applicable is not None
+        assert non_applicable.rationale
+        pytest.skip(f"{invariant_id.value} is not directly evaluated by evaluate_invariant_gates: {non_applicable.rationale}")
 
     just_written_prediction = scenario.gate_inputs["just_written_prediction"]
     has_projected_prediction = scenario.gate_inputs["has_projected_prediction"]
@@ -511,6 +548,16 @@ def test_gate_matrix_covers_all_gate_evaluated_invariants(invariant_id: Invarian
         InvariantId.EVIDENCE_LINK_COMPLETENESS,
     }
     assert scenario_name in {"pass", "stop"}
+
+
+def test_gate_matrix_explicitly_marks_non_applicable_gate_coverage() -> None:
+    for invariant_id, coverage in INVARIANT_RELEASE_GATE_MATRIX.items():
+        has_gate_scenarios = any(scenario.gate_inputs is not None for scenario in coverage.scenarios)
+        if has_gate_scenarios:
+            assert coverage.gate_non_applicable is None, f"{invariant_id.value} unexpectedly marked non-applicable"
+        else:
+            assert coverage.gate_non_applicable is not None, f"{invariant_id.value} must declare non-applicable gate rationale"
+            assert coverage.gate_non_applicable.rationale
 
 
 def test_post_write_gate_passes_when_evidence_and_projection_current() -> None:

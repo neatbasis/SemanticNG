@@ -75,6 +75,19 @@
         "pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py",
         "pytest tests/test_replay_projection_analytics.py tests/test_prediction_outcome_binding.py"
       ]
+    },
+    {
+      "id": "invariant_matrix_coverage",
+      "title": "Invariant matrix coverage and deterministic STOP/CONTINUE branch assertions",
+      "status": "done",
+      "roadmap_section": "Now",
+      "code_paths": [
+        "src/state_renormalization/invariants.py",
+        "tests/test_predictions_contracts_and_gates.py"
+      ],
+      "pytest_commands": [
+        "pytest tests/test_predictions_contracts_and_gates.py"
+      ]
     }
   ]
 }

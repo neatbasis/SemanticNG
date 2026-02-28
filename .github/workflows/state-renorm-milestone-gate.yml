@@ -2,6 +2,7 @@ name: State Renormalization Milestone Gate
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
     paths:
       - 'src/state_renormalization/**'
       - 'docs/dod_manifest.json'
@@ -13,6 +14,7 @@ on:
       - '.github/scripts/render_transition_evidence.py'
       - '.github/workflows/state-renorm-milestone-gate.yml'
   pull_request_target:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
     paths:
       - 'src/state_renormalization/**'
       - 'docs/dod_manifest.json'

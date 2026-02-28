@@ -430,6 +430,22 @@ class ProjectionState(BaseModel):
     def has_current_predictions(self) -> bool:
         return bool(self.current_predictions)
 
+
+class PredictionOutcome(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    prediction_id: str
+    observed_outcome: Any
+    error_metric: float
+    absolute_error: float
+    recorded_at_iso: str = Field(validation_alias=AliasChoices("recorded_at_iso", "recorded_at"))
+    prediction_scope_key: Optional[str] = None
+    target_variable: Optional[str] = None
+
+    @property
+    def recorded_at(self) -> str:
+        return self.recorded_at_iso
+
 # ------------------------------------------------------------------------------
 # Demo-only statuses + BeliefState (Option A)
 # ------------------------------------------------------------------------------

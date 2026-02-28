@@ -8,6 +8,7 @@ from state_renormalization.invariants import (
     check_explainable_halt_payload,
     check_prediction_availability,
     check_evidence_link_completeness,
+    check_prediction_outcome_binding,
     default_check_context,
     normalize_outcome,
 )
@@ -112,4 +113,31 @@ def test_explainable_halt_completeness_invariant_pass_and_fail() -> None:
     )
     normalized = normalize_outcome(passing)
     assert normalized.invariant_id == "explainable_halt_payload.v1"
+    assert normalized.passed is True
+
+
+def test_prediction_outcome_binding_invariant_fail_and_pass() -> None:
+    failing = check_prediction_outcome_binding(
+        default_check_context(
+            scope="scope:test",
+            prediction_key="scope:test",
+            current_predictions={"scope:test": "pred:1"},
+            prediction_log_available=True,
+            prediction_outcome={"error_metric": 0.1},
+        )
+    )
+    assert failing.invariant_id is InvariantId.PREDICTION_OUTCOME_BINDING
+    assert failing.passed is False
+
+    passing = check_prediction_outcome_binding(
+        default_check_context(
+            scope="scope:test",
+            prediction_key="scope:test",
+            current_predictions={"scope:test": "pred:1"},
+            prediction_log_available=True,
+            prediction_outcome={"prediction_id": "pred:1", "error_metric": 0.1},
+        )
+    )
+    normalized = normalize_outcome(passing)
+    assert normalized.invariant_id == "prediction_outcome_binding.v1"
     assert normalized.passed is True

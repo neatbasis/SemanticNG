@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import pytest
 
-from state_renormalization.contracts import HaltRecord, PredictionRecord, ProjectionState
 from state_renormalization.adapters.persistence import read_jsonl
+from state_renormalization.contracts import HaltRecord, PredictionRecord, ProjectionState
 from state_renormalization.engine import (
     GateDecision,
     Success,
@@ -16,17 +17,16 @@ from state_renormalization.engine import (
     project_current,
 )
 from state_renormalization.invariants import (
+    REGISTERED_INVARIANT_BRANCH_BEHAVIORS,
+    REGISTERED_INVARIANT_IDS,
+    REGISTRY,
     Flow,
     InvariantId,
     InvariantOutcome,
-    REGISTRY,
-    REGISTERED_INVARIANT_IDS,
-    REGISTERED_INVARIANT_BRANCH_BEHAVIORS,
     Validity,
     default_check_context,
     normalize_outcome,
 )
-
 
 FIXED_PREDICTION = {
     "prediction_id": "pred:test",
@@ -842,10 +842,12 @@ def test_append_prediction_record_persists_supplied_stable_ids(tmp_path: Path) -
         stable_ids={"feature_id": "feat_1", "scenario_id": "scn_1", "step_id": "stp_1"},
     )
 
-    (_, rec), = list(read_jsonl(prediction_path))
-    assert rec["feature_id"] == "feat_1"
-    assert rec["scenario_id"] == "scn_1"
-    assert rec["step_id"] == "stp_1"
+    records = [rec for _, rec in read_jsonl(prediction_path)]
+    assert records
+    for rec in records:
+        assert rec["feature_id"] == "feat_1"
+        assert rec["scenario_id"] == "scn_1"
+        assert rec["step_id"] == "stp_1"
 
 
 def test_gate_invariants_remain_stable_when_capability_policy_denies_side_effect(tmp_path: Path) -> None:

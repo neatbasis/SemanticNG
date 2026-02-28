@@ -1,8 +1,8 @@
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 MANIFEST_PATH = Path("docs/dod_manifest.json")
 ROADMAP_PATH = Path("ROADMAP.md")
@@ -222,7 +222,9 @@ def contract_maturity_evidence_mismatches(contract_map_text: str) -> list[str]:
     maturity_rank = {"in_progress": 0, "prototype": 1, "operational": 2, "proven": 3}
     mismatches: list[str] = []
     contract_rows = {row.name: row for row in _extract_contract_rows(contract_map_text)}
-    transition_pattern = re.compile(r"-\s+\d{4}-\d{2}-\d{2}\s+\([^)]+\):\s+(.+?)\s+(\w+)\s+->\s+(\w+)")
+    transition_pattern = re.compile(
+        r"-\s+\d{4}-\d{2}-\d{2}\s+\([^)]+\):\s+(?:capability_id=[^;]+;\s+)?(.+?)\s+(\w+)\s+->\s+(\w+)"
+    )
 
     for line in _extract_changelog_lines(contract_map_text):
         if "->" not in line:

@@ -29,3 +29,24 @@ Do not merge milestone or maturity update PRs until all conditions are met:
 1. `State Renormalization Milestone Gate` CI is passing on the PR head SHA.
 2. PR checklist includes command-by-command evidence links for all status transitions.
 3. `ROADMAP.md`, `docs/dod_manifest.json`, and `docs/system_contract_map.md` remain internally consistent after the update.
+
+## Integration PR feature-retention checklist
+
+When preparing an integration PR that reconciles multiple incoming branches, include a feature-retention section in the PR body that enumerates each still-open PR and the exact preserved behavior(s).
+
+Use this template:
+
+```markdown
+## Feature-retention checklist
+
+- [ ] PR #<number> — <short title>
+  - Preserved behavior: <specific behavior retained after reconciliation>
+  - Validation command: `<exact command>`
+  - Evidence: <https://... or artifact://...>
+- [ ] PR #<number> — <short title>
+  - Preserved behavior: <specific behavior retained after reconciliation>
+  - Validation command: `<exact command>`
+  - Evidence: <https://... or artifact://...>
+```
+
+If conflict reconciliation drops or defers any behavior, do not merge immediately: open follow-up patch PR(s) in the same integration cycle and link them under the affected checklist entry.

@@ -28,6 +28,7 @@ from state_renormalization.contracts import (
     ObservationType,
     ObserverFrame,
     ProjectionState,
+    PredictionOutcome,
     PredictionRecord,
     HaltRecord,
     EvidenceRef,
@@ -74,7 +75,7 @@ EXIT_PHRASES = [
 
 
 @dataclass(frozen=True)
-class PredictionOutcome:
+class GatePredictionOutcome:
     pre_consume: Sequence[InvariantOutcome] = field(default_factory=tuple)
     post_write: Sequence[InvariantOutcome] = field(default_factory=tuple)
 
@@ -86,7 +87,7 @@ class PredictionOutcome:
 
 @dataclass(frozen=True)
 class Success:
-    artifact: PredictionOutcome
+    artifact: GatePredictionOutcome
 
 
 GateDecision = Success | HaltRecord
@@ -536,7 +537,7 @@ def evaluate_invariant_gates(
 
     result_kind: str
     if halt_record is None:
-        result = Success(artifact=PredictionOutcome(pre_consume=pre_consume, post_write=post_write))
+        result = Success(artifact=GatePredictionOutcome(pre_consume=pre_consume, post_write=post_write))
         result_kind = "prediction"
     else:
         result = halt_record
@@ -707,23 +708,21 @@ def _reconcile_predictions(
         if pred.target_variable != "user_response_present" or pred.expectation is None:
             continue
 
-        err = observed_value - pred.expectation
+        updated_pred, outcome = bind_prediction_outcome(pred, observed_outcome=observed_value)
         compared += 1
-        error_total += abs(err)
-        compared_at = _now_iso()
-        updated_pred = pred.model_copy(
-            update={
-                "observed_value": observed_value,
-                "prediction_error": err,
-                "absolute_error": abs(err),
-                "observed_at_iso": compared_at,
-                "compared_at_iso": compared_at,
-                "was_corrected": True,
-                "corrected_at_iso": compared_at,
-            }
-        )
+        error_total += outcome.absolute_error
+        compared_at = outcome.recorded_at_iso
         current_predictions[scope_key] = updated_pred
         append_prediction_record(updated_pred, prediction_log_path=prediction_log_path, stable_ids=_episode_stable_ids(ep), episode=ep)
+
+        binding_ctx = default_check_context(
+            scope=scope_key,
+            prediction_key=scope_key,
+            current_predictions=current_predictions,
+            prediction_log_available=True,
+            prediction_outcome=outcome.model_dump(mode="json"),
+        )
+        binding_outcome = REGISTRY[InvariantId.PREDICTION_OUTCOME_BINDING](binding_ctx)
 
         _append_episode_artifact(
             ep,
@@ -733,9 +732,14 @@ def _reconcile_predictions(
                 "scope_key": scope_key,
                 "expected": pred.expectation,
                 "observed": observed_value,
-                "error": err,
-                "absolute_error": abs(err),
+                "error": outcome.error_metric,
+                "absolute_error": outcome.absolute_error,
                 "compared_at_iso": compared_at,
+                "prediction_outcome": outcome.model_dump(mode="json"),
+                "prediction_outcome_binding": normalize_outcome(
+                    binding_outcome,
+                    gate="post-observation",
+                ).__dict__,
             },
         )
 
@@ -751,6 +755,46 @@ def _reconcile_predictions(
         last_comparison_at_iso=_now_iso() if compared else projection_state.last_comparison_at_iso,
         updated_at_iso=_now_iso(),
     )
+
+
+def bind_prediction_outcome(
+    pred: PredictionRecord,
+    *,
+    observed_outcome: Any,
+    recorded_at_iso: Optional[str] = None,
+) -> tuple[PredictionRecord, PredictionOutcome]:
+    expected = pred.expectation
+    observed_value = float(observed_outcome)
+    if expected is None:
+        error_metric = 0.0
+        absolute_error = 0.0
+    else:
+        error_metric = observed_value - expected
+        absolute_error = abs(error_metric)
+
+    compared_at = recorded_at_iso or _now_iso()
+    updated_pred = pred.model_copy(
+        update={
+            "observed_value": observed_value,
+            "prediction_error": error_metric,
+            "absolute_error": absolute_error,
+            "observed_at_iso": compared_at,
+            "compared_at_iso": compared_at,
+            "was_corrected": True,
+            "corrected_at_iso": compared_at,
+        }
+    )
+
+    outcome = PredictionOutcome(
+        prediction_id=pred.prediction_id,
+        prediction_scope_key=pred.scope_key,
+        target_variable=pred.target_variable,
+        observed_outcome=observed_value,
+        error_metric=error_metric,
+        absolute_error=absolute_error,
+        recorded_at_iso=compared_at,
+    )
+    return updated_pred, outcome
 
 def run_mission_loop(
     ep: Episode,

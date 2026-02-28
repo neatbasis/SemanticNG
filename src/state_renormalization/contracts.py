@@ -350,9 +350,11 @@ class PredictionRecord(BaseModel):
     prediction_id: str
     scope_key: str
     prediction_key: Optional[str] = None
+    prediction_target: Optional[str] = Field(default=None, validation_alias=AliasChoices("prediction_target", "target"))
     filtration_id: str = Field(validation_alias=AliasChoices("filtration_id", "filtration_ref", "filtration_reference"))
     target_variable: str = Field(validation_alias=AliasChoices("target_variable", "variable"))
     target_horizon_iso: str = Field(validation_alias=AliasChoices("target_horizon_iso", "horizon_iso", "horizon"))
+    target_horizon_turns: Optional[int] = Field(default=None, validation_alias=AliasChoices("target_horizon_turns", "horizon_turns"))
 
     # Backward-compatible optional distribution metadata.
     distribution_kind: Optional[str] = None
@@ -362,8 +364,15 @@ class PredictionRecord(BaseModel):
 
     expectation: Optional[float] = Field(default=None, validation_alias=AliasChoices("expectation", "conditional_expectation"))
     variance: Optional[float] = Field(default=None, validation_alias=AliasChoices("variance", "conditional_variance"))
+    observed_value: Optional[float] = None
+    prediction_error: Optional[float] = None
+    absolute_error: Optional[float] = None
+    was_corrected: bool = False
 
     issued_at_iso: str
+    observed_at_iso: Optional[str] = None
+    compared_at_iso: Optional[str] = None
+    corrected_at_iso: Optional[str] = None
     valid_from_iso: Optional[str] = None
     valid_until_iso: Optional[str] = None
     stopping_time_iso: Optional[str] = None
@@ -403,6 +412,9 @@ class ProjectionState(BaseModel):
     model_config = _CONTRACT_CONFIG
 
     current_predictions: Dict[str, PredictionRecord] = Field(default_factory=dict)
+    prediction_history: List[PredictionRecord] = Field(default_factory=list)
+    correction_metrics: Dict[str, float] = Field(default_factory=dict)
+    last_comparison_at_iso: Optional[str] = None
     updated_at_iso: str
 
     @property

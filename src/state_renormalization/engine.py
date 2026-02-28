@@ -36,7 +36,7 @@ from state_renormalization.contracts import (
     default_observer_frame,
     project_ambiguity_state,
 )
-from state_renormalization.adapters.persistence import append_halt, append_prediction_event
+from state_renormalization.adapters.persistence import append_halt, append_prediction_record_event
 from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.invariants import (
     Flow as InvariantFlow,
@@ -501,7 +501,7 @@ def append_prediction_record(
     payload: Any = pred.model_dump(mode="json")
     if stable_ids:
         payload = {**dict(stable_ids), **payload}
-    return append_prediction_event(
+    return append_prediction_record_event(
         payload,
         path=prediction_log_path,
         episode_id=getattr(episode, "episode_id", None),
@@ -525,7 +525,98 @@ def append_halt_record(
 def project_current(pred: PredictionRecord, projection_state: ProjectionState) -> ProjectionState:
     current = dict(projection_state.current_predictions)
     current[pred.scope_key] = pred
-    return ProjectionState(current_predictions=current, updated_at_iso=_now_iso())
+    history = [*projection_state.prediction_history, pred]
+    return ProjectionState(
+        current_predictions=current,
+        prediction_history=history,
+        correction_metrics=dict(projection_state.correction_metrics),
+        last_comparison_at_iso=projection_state.last_comparison_at_iso,
+        updated_at_iso=_now_iso(),
+    )
+
+
+def _emit_turn_prediction(ep: Episode) -> PredictionRecord:
+    expectation = 1.0 if ep.ask.status == AskStatus.OK else 0.0
+    now = _now_iso()
+    return PredictionRecord(
+        prediction_id=_new_id("pred:"),
+        prediction_key=f"turn:{ep.turn_index}:user_response_present",
+        scope_key=f"turn:{ep.turn_index}",
+        prediction_target="user_response_present",
+        filtration_id=f"conversation:{ep.conversation_id}",
+        target_variable="user_response_present",
+        target_horizon_iso=ep.t_asked_iso,
+        target_horizon_turns=1,
+        expectation=expectation,
+        uncertainty=0.5,
+        issued_at_iso=now,
+        assumptions=["turn_observation_available"],
+        evidence_refs=[],
+    )
+
+
+def _reconcile_predictions(
+    ep: Episode,
+    projection_state: ProjectionState,
+    *,
+    prediction_log_path: str | Path,
+) -> ProjectionState:
+    observed_text = extract_user_utterance(ep)
+    observed_value = 1.0 if observed_text else 0.0
+
+    current_predictions = dict(projection_state.current_predictions)
+    metrics = dict(projection_state.correction_metrics)
+    compared = 0
+    error_total = 0.0
+
+    for scope_key, pred in list(current_predictions.items()):
+        if pred.target_variable != "user_response_present" or pred.expectation is None:
+            continue
+
+        err = observed_value - pred.expectation
+        compared += 1
+        error_total += abs(err)
+        compared_at = _now_iso()
+        updated_pred = pred.model_copy(
+            update={
+                "observed_value": observed_value,
+                "prediction_error": err,
+                "absolute_error": abs(err),
+                "observed_at_iso": compared_at,
+                "compared_at_iso": compared_at,
+                "was_corrected": True,
+                "corrected_at_iso": compared_at,
+            }
+        )
+        current_predictions[scope_key] = updated_pred
+        append_prediction_record(updated_pred, prediction_log_path=prediction_log_path, stable_ids=_episode_stable_ids(ep), episode=ep)
+
+        _append_episode_artifact(
+            ep,
+            {
+                "artifact_kind": "prediction_comparison",
+                "prediction_id": updated_pred.prediction_id,
+                "scope_key": scope_key,
+                "expected": pred.expectation,
+                "observed": observed_value,
+                "error": err,
+                "absolute_error": abs(err),
+                "compared_at_iso": compared_at,
+            },
+        )
+
+    if compared > 0:
+        metrics["comparisons"] = float(metrics.get("comparisons", 0.0) + compared)
+        metrics["absolute_error_total"] = float(metrics.get("absolute_error_total", 0.0) + error_total)
+        metrics["mae"] = metrics["absolute_error_total"] / metrics["comparisons"]
+
+    return ProjectionState(
+        current_predictions=current_predictions,
+        prediction_history=list(projection_state.prediction_history),
+        correction_metrics=metrics,
+        last_comparison_at_iso=_now_iso() if compared else projection_state.last_comparison_at_iso,
+        updated_at_iso=_now_iso(),
+    )
 
 def run_mission_loop(
     ep: Episode,
@@ -539,6 +630,26 @@ def run_mission_loop(
     Mission-loop helper: materialize prediction updates before decision stages.
     """
     updated_projection = projection_state
+
+    turn_prediction = _emit_turn_prediction(ep)
+    turn_prediction_ref = append_prediction_record(
+        turn_prediction,
+        prediction_log_path=prediction_log_path,
+        stable_ids=_episode_stable_ids(ep),
+        episode=ep,
+    )
+    updated_projection = project_current(turn_prediction, updated_projection)
+    _append_episode_artifact(
+        ep,
+        {
+            "artifact_kind": "prediction_emit",
+            "prediction_id": turn_prediction.prediction_id,
+            "scope_key": turn_prediction.scope_key,
+            "target_variable": turn_prediction.target_variable,
+            "target_horizon_iso": turn_prediction.target_horizon_iso,
+            "evidence_ref": turn_prediction_ref,
+        },
+    )
 
     for pending in pending_predictions:
         pred = pending if isinstance(pending, PredictionRecord) else PredictionRecord.model_validate(pending)
@@ -587,6 +698,7 @@ def run_mission_loop(
         return ep, belief, updated_projection
 
     ep = ingest_observation(ep)
+    updated_projection = _reconcile_predictions(ep, updated_projection, prediction_log_path=prediction_log_path)
     ep, belief = apply_utterance_interpretation(ep, belief)
     ep, belief = apply_schema_bubbling(ep, belief)
     return ep, belief, updated_projection

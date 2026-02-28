@@ -50,16 +50,21 @@ def test_run_mission_loop_updates_projection_before_decision_stages(
     )
 
     assert "room:kitchen:light" in projection_out.current_predictions
+    assert any(a.get("artifact_kind") == "prediction_emit" for a in ep_out.artifacts)
+    assert any(a.get("artifact_kind") == "prediction_comparison" for a in ep_out.artifacts)
     assert any(a.get("artifact_kind") == "prediction_update" for a in ep_out.artifacts)
     assert ep_out.observations
+    assert projection_out.correction_metrics.get("comparisons", 0.0) >= 1.0
 
-    (_, prediction_event), = list(read_jsonl(tmp_path / "predictions.jsonl"))
+    events = [rec for _, rec in read_jsonl(tmp_path / "predictions.jsonl")]
+    prediction_event = events[0]
     assert prediction_event["episode_id"] == ep.episode_id
     assert prediction_event["conversation_id"] == ep.conversation_id
     assert prediction_event["turn_index"] == ep.turn_index
+    assert all(evt["event_kind"] == "prediction_record" for evt in events)
 
 
-def test_run_mission_loop_halts_before_downstream_decision_without_predictions(
+def test_run_mission_loop_emits_turn_prediction_when_no_pending_predictions(
     belief: BeliefState,
     make_episode: Callable[..., Episode],
     make_policy_decision: Callable[..., VerbosityDecision],
@@ -73,7 +78,7 @@ def test_run_mission_loop_halts_before_downstream_decision_without_predictions(
 
     ep_out, _, projection_out = run_mission_loop(ep, belief, projection)
 
-    assert projection_out.current_predictions == {}
+    assert "turn:0" in projection_out.current_predictions
     assert len(ep_out.observations) == 1
-    assert ep_out.observations[0].type.value == "halt"
-    assert any(a.get("artifact_kind") == "invariant_outcomes" and a.get("kind") == "halt" for a in ep_out.artifacts)
+    assert ep_out.observations[0].type.value == "user_utterance"
+    assert any(a.get("artifact_kind") == "prediction_emit" for a in ep_out.artifacts)

@@ -13,6 +13,7 @@ JsonObj = Dict[str, Any]
 PathLike = Union[str, Path]
 
 PREDICTIONS_LOG_PATH = Path("artifacts/predictions.jsonl")
+PREDICTION_RECORDS_LOG_PATH = Path("artifacts/prediction_records.jsonl")
 
 
 def _to_jsonable(x: Any) -> Any:
@@ -151,6 +152,29 @@ def append_prediction_event(
         raise ValueError("append_prediction_event expects a dict-like prediction payload")
 
     event: JsonObj = {"event_kind": "prediction", **payload}
+    if episode_id:
+        event["episode_id"] = episode_id
+    if conversation_id:
+        event["conversation_id"] = conversation_id
+    if turn_index is not None:
+        event["turn_index"] = int(turn_index)
+
+    return append_prediction(path=path, record=event)
+
+
+def append_prediction_record_event(
+    record: Any,
+    *,
+    path: PathLike = PREDICTION_RECORDS_LOG_PATH,
+    episode_id: str | None = None,
+    conversation_id: str | None = None,
+    turn_index: int | None = None,
+) -> JsonObj:
+    payload = _to_jsonable(record)
+    if not isinstance(payload, dict):
+        raise ValueError("append_prediction_record_event expects a dict-like prediction payload")
+
+    event: JsonObj = {"event_kind": "prediction_record", **payload}
     if episode_id:
         event["episode_id"] = episode_id
     if conversation_id:

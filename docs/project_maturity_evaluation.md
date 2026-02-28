@@ -2,25 +2,25 @@
 
 ## Executive assessment
 
-SemanticNG is in an **operational hardening** state with replay completion now effectively achieved and remaining work concentrated in policy/governance expansion:
+SemanticNG is in an **operational hardening** state with replay completion achieved and remaining work concentrated in policy/governance expansion:
 
 - Core baseline capabilities remain implemented and tested.
-- Capability accounting from the manifest is still `5/9` done, with one entry pending status-sync housekeeping.
-- Roadmap and contract-map narratives now treat replay projection analytics as completed implementation work, shifting the practical bottleneck to authorization/governance rollout.
+- Capability accounting from the manifest is now `6/9` done.
+- Roadmap sequencing and contract-map maturity framing place the critical path on authorization/governance rollout.
 
 ## Evidence snapshot
 
 ### Capability delivery status (from DoD manifest)
 
-- **Done:** 5
-- **In progress:** 1
+- **Done:** 6
+- **In progress:** 0
 - **Planned:** 3
 
-Completion ratio (done / total): **55.6%** (`5/9`).
+Completion ratio (done / total): **66.7%** (`6/9`).
 
-Status-sync note: `replay_projection_analytics` is still marked `in_progress` in `docs/dod_manifest.json`, but roadmap and contract-map framing now treat replay work as functionally complete/done and no longer the principal execution blocker. The current bottleneck is therefore **authorization/governance activation** (`observer_authorization_contract` followed by `capability_invocation_governance`).
+Current bottleneck capability (highest-priority non-`done`): **`observer_authorization_contract`**. It is the first `Next` governance dependency and blocks safe expansion into policy-aware capability invocation.
 
-This indicates the project is beyond replay completion and entering governance hardening + expansion sequencing.
+This indicates the project is beyond replay completion and is now in governance hardening + expansion sequencing.
 
 ### Quality and validation signals
 
@@ -53,13 +53,13 @@ It does **not yet** have:
 
 ### #1 Immediate priority
 
-**Prioritize `observer_authorization_contract` and then `capability_invocation_governance` (do not treat replay completion as the next blocker).**
+**Prioritize `observer_authorization_contract` and then `capability_invocation_governance`.**
 
 Why this is most timely:
 
-1. Replay completion is no longer the practical bottleneck in roadmap/contract-map execution framing.
+1. Replay projection analytics is marked `done` in the manifest and is no longer the gating bottleneck.
 2. Authorization semantics are the gating dependency for safe policy-aware capability invocation.
-3. Governance expansion now provides the largest incremental risk reduction for Later milestone confidence.
+3. Governance expansion now provides the largest incremental risk reduction for the next milestone window.
 
 ### #2 Concrete near-term execution sequence
 
@@ -67,8 +67,8 @@ Why this is most timely:
    - Promote authorization checks from prototype-only contract framing to default-path runtime behavior.
 2. **Stabilize governance policy guardrails**
    - Add deterministic tests for allowed/denied capability invocation outcomes.
-3. **Preserve replay/halt regressions as non-regression gates**
-   - Keep replay/restart + halt explainability packs green while governance work lands.
+3. **Keep replay/halt packs as non-regression gates**
+   - Preserve replay/restart + halt explainability packs as required green checks while governance work lands.
 
 ### #3 Defer until #1 is green
 
@@ -77,13 +77,13 @@ Why this is most timely:
 
 ## Suggested maturity targets for next review
 
-- Sync `docs/dod_manifest.json` capability status for `replay_projection_analytics` to `done` once governance docs complete the same review cycle.
 - Promote observer authorization from `prototype` toward `operational` with CI-backed default-path enforcement evidence.
+- Establish `capability_invocation_governance` baseline test evidence after observer authorization enforcement is active.
 - Recompute capability completion and confirm observer + governance tests pass in CI before expanding repair-aware scope.
 
 ## Maturity changelog
 
-- 2026-02-28: Synced this maturity evaluation with current roadmap/contract-map direction and manifest command groupings; replay completion is no longer treated as the next priority, with focus shifted to authorization/governance sequencing.
+- 2026-02-28: Sync pass — updated this evaluation to match manifest totals (`6 done / 0 in_progress / 3 planned`), roadmap sequencing, and contract-map maturity framing; replay is treated as completed and observer authorization is the current bottleneck.
 - 2026-02-28: Revalidated `gate_halt_unification` as `done` against its acceptance command (`pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py` => `92 passed, 4 skipped`).
 - 2026-02-28: Confirmed `tests/test_predictions_contracts_and_gates.py` enforces deterministic `Flow.CONTINUE`/`Flow.STOP` parity assertions and `tests/test_persistence_jsonl.py` verifies halt payload durability for canonical `details`, `evidence`, and invariant identity (`invariant_id`) round-trips.
 

@@ -1,6 +1,10 @@
 # Sprint Plan 5x
 
-This document defines a five-sprint execution plan that extends the current roadmap with explicit capability-ID exits, contract-map maturity transitions, and manifest-aligned pytest command packs.
+This document defines a five-sprint execution plan with explicit capability-ID scope, measurable exits, and parity gates across:
+
+- `ROADMAP.md`
+- `docs/dod_manifest.json`
+- `docs/system_contract_map.md`
 
 Canonical references:
 - Capability status and pytest command packs: `docs/dod_manifest.json`.
@@ -16,194 +20,222 @@ Canonical references:
 | Horizon sequencing | `ROADMAP.md` | Horizon notes derive from capability IDs and dependency map; execution docs consume this sequence without redefining horizon ownership. |
 | Sprint execution controls | `docs/sprint_plan_5x.md` | Sprint controls (gates, PR requirements, templates) govern execution mechanics only and must reference capability IDs for scope. |
 
-## Governance outcomes to implement across this plan
+## Sprint 1 — Governance substrate lock
 
-The sprint plan below is constrained to deliver these governance outcomes by Sprint 5:
+### Objective
+Finalize no-regression budget, doc freshness SLO checks, handoff minimums, and parity validators so governance substrate controls are enforced before new capability promotions.
 
-1. Machine-enforced sprint exit criteria and capability maturity entry/exit gates.
-2. A no-regression budget policy for `done` capabilities.
-3. Mandatory dependency impact statements in all PRs.
-4. Timeboxed rollback plans for all exception paths.
-5. Documentation freshness SLOs with CI-visible checks.
-6. Sprint handoff artifact minimums.
+### Capability IDs in scope
+- `capability_invocation_governance`
+- `observer_authorization_contract`
+- `invariant_matrix_coverage`
+- `channel_agnostic_pending_obligation`
 
-## Sprint goals and exit criteria
+### Dependency assumptions
+- Existing `done` dependencies remain green and non-regressing while governance substrate controls are introduced.
+- No capability maturity promotion is allowed in this sprint unless parity validators and freshness SLO checks are already machine-enforced.
 
-### Sprint 1 — Documentation consolidation and governance baseline cleanup (source-of-truth alignment)
+### Required pytest command packs (from `docs/dod_manifest.json`)
+- `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_predictions_contracts_and_gates.py`
+- `pytest tests/test_observer_frame.py`
+- `pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py`
+- `pytest tests/test_predictions_contracts_and_gates.py`
+- `pytest tests/test_contracts_belief_state.py tests/test_contracts_decision_effect_shape.py tests/test_engine_pending_obligation.py tests/test_engine_pending_obligation_minimal.py`
 
-**Goal**
-- Consolidate planning/governance documentation so capability status, ownership, and command-pack evidence remain synchronized across canonical docs.
+### Maturity transition targets (from `docs/system_contract_map.md`)
+- `Observer authorization contract`: hold at `operational` (readiness baseline only in this sprint).
+- `Channel-agnostic decision/effect contract`: hold at `operational` (readiness baseline only in this sprint).
+- `Projection view contract`: hold at `operational` under no-regression freeze.
 
-**Exit criteria**
-- Manifest capability alignment:
-  - `capability_invocation_governance` remains explicitly tracked as current non-done governance target in planning docs.
-  - `repair_aware_projection_evolution` remains dependency-gated behind governance + replay readiness.
-- Contract-map maturity transition:
-  - No forced maturity promotion; only consistency pass confirming existing maturity labels (`operational` / `proven`) and changelog format validity in `docs/system_contract_map.md`.
-- Required pytest command packs:
-  - `pytest tests/test_validate_milestone_docs.py tests/test_dod_manifest.py tests/test_capability_parity_report.py tests/test_governance_doc_parity.py`
-- Governance policy artifacts:
-  - Author and approve a no-regression budget policy for all `done` capabilities (including allowed waiver window + required owner).
-  - Define documentation freshness SLO thresholds and the exact governed docs list.
-  - Publish sprint handoff artifact minimum template used in Sprint 2+ reviews.
+### Measurable exits
+- No-regression budget policy approved and referenced in CI checks for all `done` capabilities.
+- Doc freshness SLO checks implemented for canonical governance docs.
+- Handoff minimum template published and required in sprint-close artifacts.
+- Parity validators fail closed on capability-ID mismatch across roadmap/manifest/contract map.
 
-### Sprint 2 — Capability invocation governance implementation and test hardening
+### Doc-alignment checkpoints
+- Capability IDs and statuses in sprint notes exactly match `docs/dod_manifest.json`.
+- Contract names used in sprint notes exactly match `docs/system_contract_map.md` names.
+- `ROADMAP.md` sequencing references only manifest-defined IDs.
 
-**Goal**
-- Implement and harden policy-aware capability invocation governance so unauthorized or unpredicted external actions fail closed with auditable halts.
+### Alignment gate checklist (must pass before sprint close)
+- [ ] `ROADMAP.md` capability IDs/statuses are parity-checked against `docs/dod_manifest.json`.
+- [ ] `docs/dod_manifest.json` capability refs map to canonical contract names in `docs/system_contract_map.md`.
+- [ ] `docs/system_contract_map.md` maturity statements referenced by this sprint are unchanged or explicitly changelogged.
+- [ ] Governance artifacts (no-regression budget, SLO checks, handoff minimums) are linked in sprint close evidence.
 
-**Exit criteria**
-- Manifest capability alignment:
-  - `capability_invocation_governance` promoted from `planned` -> `in_progress` (implementation start) and then `in_progress` -> `done` only when all listed packs are green and evidence links are recorded.
-  - Dependencies remain explicit: `observer_authorization_contract`, `invariant_matrix_coverage`, `channel_agnostic_pending_obligation`.
-- Contract-map maturity transition:
-  - `Observer authorization contract`: `operational` -> `proven` once governance-path regressions repeatedly validate authorization-gated invocation behavior.
-  - `Channel-agnostic decision/effect contract`: `operational` -> `proven` once policy-aware effect gating is stable under governance suites.
-- Required pytest command packs:
-  - `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_predictions_contracts_and_gates.py`
-  - `pytest tests/test_capability_adapter_surface_policy_guards.py tests/test_observer_frame.py tests/test_invariants.py`
-- Governance control implementation:
-  - Implement machine-enforced capability maturity transition checks (`planned` -> `in_progress` -> `done`) in CI validation scripts.
-  - Require mandatory dependency impact statements in PRs via template + validator checks.
-  - Require timeboxed rollback plans for every governance exception path (including explicit rollback date and accountable owner).
+## Sprint 2 — Capability invocation governance
 
-### Sprint 3 — Repair-aware projection evolution (auditable repair events + replay guarantees)
+### Objective
+Promote `capability_invocation_governance` to `done` with policy-aware side-effect gate tests and explicit exception rollback controls.
 
-**Goal**
-- Evolve repair mode to emit auditable repair events with deterministic replay/restart guarantees and no silent mutation.
+### Capability IDs in scope
+- `capability_invocation_governance`
+- `observer_authorization_contract`
+- `invariant_matrix_coverage`
+- `channel_agnostic_pending_obligation`
 
-**Exit criteria**
-- Manifest capability alignment:
-  - `repair_aware_projection_evolution` promoted from `planned` -> `in_progress` at sprint start, and to `done` only after repair lineage and replay guarantee evidence are complete.
-  - `capability_invocation_governance` remains `done` and non-regression-gated while repair evolution lands.
-- Contract-map maturity transition:
-  - `Replay projection analytics contract`: `operational` -> `proven` after repair-event replay/restart determinism is repeatedly validated.
-  - `Projection view contract`: `operational` -> `proven` after repair events are represented without breaking projection determinism.
-- Required pytest command packs:
-  - `pytest tests/test_repair_mode_projection.py tests/test_repair_events_auditability.py`
-  - `pytest tests/test_replay_projection_analytics.py tests/test_replay_projection_determinism.py tests/test_replay_projection_restart_contracts.py tests/replay_projection_analytics/test_append_only_replay.py`
-  - `pytest tests/test_predictions_contracts_and_gates.py`
-- Governance control implementation:
-  - Enforce no-regression budget policy in CI for all `done` capability command packs.
-  - Enforce documentation freshness SLO checks in CI for governed docs.
-  - Require sprint handoff artifact minimum set on each sprint-close PR.
+### Dependency assumptions
+- `observer_authorization_contract`, `invariant_matrix_coverage`, and `channel_agnostic_pending_obligation` remain `done` and green.
+- Sprint 1 governance substrate controls are active in CI before promotion to `done`.
 
-### Sprint 4 — Coherent refactor pass (module boundaries, adapter contracts, dead-path removal, naming normalization) with no behavior regressions
+### Required pytest command packs (from `docs/dod_manifest.json`)
+- `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_predictions_contracts_and_gates.py`
+- `pytest tests/test_observer_frame.py`
+- `pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py`
+- `pytest tests/test_predictions_contracts_and_gates.py`
+- `pytest tests/test_contracts_belief_state.py tests/test_contracts_decision_effect_shape.py tests/test_engine_pending_obligation.py tests/test_engine_pending_obligation_minimal.py`
 
-**Goal**
-- Execute a coherence refactor that improves boundaries and naming while preserving runtime behavior and governance guarantees.
+### Maturity transition targets (from `docs/system_contract_map.md`)
+- `Observer authorization contract`: `operational` -> `proven`.
+- `Channel-agnostic decision/effect contract`: `operational` -> `proven`.
+- `Projection view contract`: hold at `operational` unless replay/repair evidence also satisfies promotion protocol.
 
-**Exit criteria**
-- Manifest capability alignment:
-  - No capability status regressions (`done` capabilities remain `done`; no implicit reopening without explicit roadmap + manifest edits).
-  - `contract_map_refs` for touched capabilities remain accurate after module/path normalization.
-- Contract-map maturity transition:
-  - No maturity downgrade permitted.
-  - Any promoted contract must include changelog evidence URL and repeated regression pass coverage.
-- Required pytest command packs:
-  - `pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_contracts_halt_record.py tests/test_persistence_jsonl.py`
-  - `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_capability_adapter_surface_policy_guards.py`
-  - `pytest tests/test_replay_projection_analytics.py tests/test_replay_projection_determinism.py tests/test_repair_events_auditability.py`
-- Governance control implementation:
-  - Verify all machine-enforced gates remain green after refactor (maturity transitions, regression budget, dependency impact and rollback sections, freshness SLO, sprint handoff artifacts).
-  - Resolve all temporary governance waivers or re-file with updated rollback deadlines approved for Sprint 5 only.
+### Measurable exits
+- `capability_invocation_governance` transitions `planned` -> `in_progress` -> `done` with linked evidence.
+- Policy-aware side-effect gates fail closed for unauthorized invocations in CI suites.
+- Dependency impact statements and timeboxed rollback plans are present in all sprint PRs.
 
-### Sprint 5 — Strategic documentation of capabilities worth developing and capabilities required to support them (dependency graph + maturity pathways)
+### Doc-alignment checkpoints
+- Manifest status for `capability_invocation_governance` is updated and mirrored in roadmap notes.
+- Contract-map changelog entries exist for any maturity promotions.
+- Policy gate test names in sprint evidence match manifest command packs exactly.
 
-**Goal**
-- Publish a forward strategy for new capabilities, explicitly separating target outcomes from reusable enabling capabilities and defining maturity pathways.
+### Alignment gate checklist (must pass before sprint close)
+- [ ] `ROADMAP.md` reflects `capability_invocation_governance` final sprint state.
+- [ ] `docs/dod_manifest.json` status and pytest packs are unchanged from executed evidence or updated in same PR.
+- [ ] `docs/system_contract_map.md` maturity promotions include required changelog syntax and evidence URL.
+- [ ] Parity validator reports zero drift across roadmap/manifest/contract map.
 
-**Exit criteria**
-- Manifest capability alignment:
-  - New planned capabilities (if introduced) are added to `docs/dod_manifest.json` with prerequisites, `contract_map_refs`, and initial command packs.
-  - Existing capability IDs are referenced consistently across roadmap, manifest, and contract map.
-- Contract-map maturity transition:
-  - Each newly proposed capability maps to at least one existing contract (or proposes a new contract row with initial maturity target `prototype`).
-  - Promotion pathways (`prototype` -> `operational` -> `proven`) documented for each proposed contract-capability pairing.
-- Required pytest command packs:
-  - `pytest tests/test_dod_manifest.py tests/test_capability_parity_report.py tests/test_validate_milestone_docs.py`
-  - `pytest tests/test_governance_doc_parity.py tests/test_pr_template_autogen_governance.py tests/test_governance_pr_evidence_validator.py`
-- Governance control implementation:
-  - Publish a maturity-gate operations guide explaining how entry/exit gates, no-regression budget policy, and rollback plans are administered.
-  - Publish freshness SLO trend report for the full five-sprint window.
-  - Publish sprint handoff archive index proving artifact minimums were met for each sprint.
+## Sprint 3 — Repair-aware projection evolution
 
-## Machine-enforced gate design (delivery blueprint)
+### Objective
+Deliver auditable repair events and deterministic replay/restart guarantees while preserving governance constraints from Sprint 2.
 
-Use this as the implementation contract for CI/governance scripts during Sprints 2-4.
+### Capability IDs in scope
+- `repair_aware_projection_evolution`
+- `replay_projection_analytics`
+- `capability_invocation_governance`
 
-### Capability maturity entry/exit gates
+### Dependency assumptions
+- `capability_invocation_governance` is `done` and enforced in CI.
+- Replay analytics baseline remains stable enough to validate deterministic repair replay.
 
-- Entry gate (`planned` -> `in_progress`):
-  - Dependency capabilities listed as prerequisites must be `done`.
-  - Command packs for target capability must exist in `docs/dod_manifest.json`.
-- Exit gate (`in_progress` -> `done`):
-  - All target capability command packs are green and have evidence URLs.
-  - Contract map maturity changes (if any) include changelog evidence links.
+### Required pytest command packs (from `docs/dod_manifest.json`)
+- `pytest tests/test_repair_mode_projection.py tests/test_repair_events_auditability.py`
+- `pytest tests/test_predictions_contracts_and_gates.py`
+- `pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py`
+- `pytest tests/test_replay_projection_analytics.py tests/test_replay_projection_determinism.py tests/test_replay_projection_restart_contracts.py tests/test_prediction_outcome_binding.py`
+- `pytest tests/replay_projection_analytics/test_append_only_replay.py`
 
-### No-regression budget policy
+### Maturity transition targets (from `docs/system_contract_map.md`)
+- `Replay projection analytics contract`: `operational` -> `proven`.
+- `Projection view contract`: `operational` -> `proven` (conditioned on deterministic replay/restart + repair-event audit evidence).
 
-- `done` capabilities have a zero-fail budget on canonical command packs.
-- Any temporary waiver must include owner, reason, and rollback-by sprint/date.
-- Waivers auto-expire at the next sprint-close unless renewed with explicit approval.
+### Measurable exits
+- `repair_aware_projection_evolution` transitions `planned` -> `in_progress` -> `done` with evidence links.
+- Repair events are append-only, auditable, and replayable without silent mutation.
+- Replay/restart determinism is repeated and documented across command packs.
 
-### PR governance requirements
+### Doc-alignment checkpoints
+- Manifest status transitions for `repair_aware_projection_evolution` are reflected in roadmap and sprint close notes.
+- Contract-map maturity transitions include capability-ID references and evidence URLs.
+- Repair/replay test evidence references exact command packs from manifest.
 
-- Every PR must include:
-  - dependency impact statement,
-  - regression budget impact declaration,
-  - rollback plan (or explicit `not_applicable` reason).
+### Alignment gate checklist (must pass before sprint close)
+- [ ] `ROADMAP.md` records repair-aware capability completion and dependency closure.
+- [ ] `docs/dod_manifest.json` aligns with executed repair/replay command packs.
+- [ ] `docs/system_contract_map.md` contains corresponding maturity changes and changelog entries.
+- [ ] Parity validator reports no ID/name/status mismatch.
 
-### Documentation freshness SLO
+## Sprint 4 — Coherence refactor under invariant freeze
 
-- Governed docs must contain `Last regenerated` (or equivalent) metadata.
-- SLO threshold breach is CI-failing for milestone/governance PRs.
+### Objective
+Complete module boundary cleanup and naming normalization under invariant freeze with zero behavior drift.
 
-### Sprint handoff artifact minimums
+### Capability IDs in scope
+- `schema_selection_ambiguity_baseline`
+- `channel_agnostic_pending_obligation`
+- `gate_halt_unification`
+- `invariant_matrix_coverage`
 
-- Required sprint-close artifacts:
-  - exit-criteria pass/fail table,
-  - open-risk register with owners and target dates,
-  - next-sprint preload list mapped to capability IDs.
+### Dependency assumptions
+- Refactor work is constrained to structural and naming coherence only.
+- Runtime behavior, invariant outcomes, and gate/halt semantics must remain unchanged.
 
-## Supporting capability leverage table
+### Required pytest command packs (from `docs/dod_manifest.json`)
+- `pytest tests/test_schema_selector.py tests/test_schema_bubbling_option_a.py tests/test_capture_outcome_states.py tests/test_engine_calls_selector_with_generic_error.py`
+- `pytest tests/test_contracts_belief_state.py tests/test_contracts_decision_effect_shape.py tests/test_engine_pending_obligation.py tests/test_engine_pending_obligation_minimal.py`
+- `pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py`
+- `pytest tests/test_predictions_contracts_and_gates.py`
 
-Required capabilities below are listed as reusable platform investments, each with broader multi-context benefits beyond single-use dependencies.
+### Maturity transition targets (from `docs/system_contract_map.md`)
+- `Ambiguity selection contract`: hold at `operational` unless repeated no-drift evidence supports promotion.
+- `Pending-obligation belief contract`: hold at `operational` unless repeated no-drift evidence supports promotion.
+- `Halt normalization contract`: hold at `proven` with strict no-regression budget enforcement.
 
-| Required capability ID | Primary role in this plan | Broader benefit 1 (reusable) | Broader benefit 2 (reusable) |
-| --- | --- | --- | --- |
-| `observer_authorization_contract` | Policy envelope for capability invocation gating. | Enables scoped sandboxing for future external adapters and tool integrations. | Standardizes audit-ready authorization context for CI evidence and incident reviews. |
-| `invariant_matrix_coverage` | Regression safety net across gate paths. | Improves change confidence during refactors by preserving deterministic stop semantics. | Provides reusable failure taxonomy (`invariant_id`) for planning prioritization and SLO tracking. |
-| `channel_agnostic_pending_obligation` | Stable decision/effect carrier for governance checks. | Supports multi-channel interface growth without reworking core decision contracts. | Enables consistent pending-obligation analytics across adapters and replay consumers. |
-| `replay_projection_analytics` | Deterministic replay/restart foundation for repair evolution. | Enables post-incident forensic reconstruction without runtime side channels. | Supports longitudinal quality analytics and correction-cost attribution for roadmap decisions. |
-| `gate_halt_unification` | Shared fail-closed control plane for governance + repair. | Keeps explainability payloads stable for compliance-facing evidence exports. | Reduces integration risk by centralizing stop-path semantics across modules. |
+### Measurable exits
+- Refactor PRs demonstrate zero behavior drift through unchanged test outcomes and artifact parity.
+- Naming normalization is completed with backward-compatible references and no contract-ID churn.
+- Invariant freeze exceptions, if any, include timeboxed rollback plans.
 
-## Future planned capabilities register
+### Doc-alignment checkpoints
+- Contract names, invariants, and producing/consuming stage labels remain canonical in contract map.
+- Manifest command packs remain authoritative and unchanged unless explicitly revised.
+- Roadmap narrative reflects refactor-only scope without introducing new capability statuses.
 
-Use this register when introducing additional `planned` capability IDs.
+### Alignment gate checklist (must pass before sprint close)
+- [ ] `ROADMAP.md` indicates coherence/refactor scope with no unauthorized status changes.
+- [ ] `docs/dod_manifest.json` capability IDs and command packs remain in parity with sprint evidence.
+- [ ] `docs/system_contract_map.md` reflects no behavior drift and only approved naming updates.
+- [ ] Parity validator confirms roadmap/manifest/contract map consistency.
 
-| Capability ID (proposed) | Intent | Enabling prerequisites (capability IDs) | Reusable support value | Maturity target | Evidence needed for promotion |
-| --- | --- | --- | --- | --- | --- |
-| `capability_dependency_graph_service` | Provide machine-readable dependency graph generation for roadmap/manifest synchronization. | `capability_invocation_governance`, `invariant_matrix_coverage` | Reusable planning graph for prioritization, blast-radius analysis, and onboarding. | `operational` | Graph generation tests + parity checks proving manifest/roadmap/contract-map consistency in CI. |
-| `repair_policy_simulation_harness` | Simulate policy outcomes for repair proposals before runtime activation. | `repair_aware_projection_evolution`, `observer_authorization_contract`, `replay_projection_analytics` | Reusable what-if analysis for policy tuning and incident rehearsal. | `prototype` -> `operational` | Deterministic simulation fixtures, replay equivalence assertions, and governance guard regression packs. |
-| `cross_capability_evidence_orchestrator` | Automate capability-level evidence assembly for promotion PRs and release gates. | `capability_dependency_graph_service`, `invariant_matrix_coverage` | Reusable compliance/reporting backbone for all maturity transitions, not just one feature. | `operational` | End-to-end evidence rendering tests, URL integrity checks, and manifest command-pack extraction validation. |
+## Sprint 5 — Proven-maturity hardening + release readiness
 
-## Dependency and maturity pathway notes
+### Objective
+Upgrade qualifying contracts from `operational` to `proven` using repeated evidence and close governance requirements for release readiness.
 
-- Capability promotion must always be synchronized across:
-  1. `docs/dod_manifest.json` status + pytest command packs,
-  2. `ROADMAP.md` status alignment,
-  3. `docs/system_contract_map.md` maturity rows/changelog,
-  4. Promotion workflow checklist items in `README.md`.
-- A capability cannot be promoted to `done` unless its required command packs pass and its contract maturity transition rationale is recorded.
+### Capability IDs in scope
+- `capability_invocation_governance`
+- `repair_aware_projection_evolution`
+- `schema_selection_ambiguity_baseline`
+- `channel_agnostic_pending_obligation`
+- `replay_projection_analytics`
 
-### Canonical dependency statements (capability-ID only)
+### Dependency assumptions
+- Sprint 1–4 controls and no-regression budget checks are active and enforced.
+- Candidate contracts for promotion have repeated green evidence across at least two sprint cycles.
 
-- `capability_invocation_governance` depends on: `observer_authorization_contract`, `invariant_matrix_coverage`, `channel_agnostic_pending_obligation`.
-- `repair_aware_projection_evolution` depends on: `capability_invocation_governance`, `replay_projection_analytics`.
+### Required pytest command packs (from `docs/dod_manifest.json`)
+- `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_predictions_contracts_and_gates.py`
+- `pytest tests/test_repair_mode_projection.py tests/test_repair_events_auditability.py`
+- `pytest tests/test_predictions_contracts_and_gates.py`
+- `pytest tests/test_schema_selector.py tests/test_schema_bubbling_option_a.py tests/test_capture_outcome_states.py tests/test_engine_calls_selector_with_generic_error.py`
+- `pytest tests/test_contracts_belief_state.py tests/test_contracts_decision_effect_shape.py tests/test_engine_pending_obligation.py tests/test_engine_pending_obligation_minimal.py`
+- `pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py`
+- `pytest tests/test_replay_projection_analytics.py tests/test_replay_projection_determinism.py tests/test_replay_projection_restart_contracts.py tests/test_prediction_outcome_binding.py`
+- `pytest tests/replay_projection_analytics/test_append_only_replay.py`
 
-### Changelog entry template (required for dependency/maturity changes)
+### Maturity transition targets (from `docs/system_contract_map.md`)
+- `Projection view contract`: `operational` -> `proven` (if not promoted in Sprint 3, must be closed here).
+- `Ambiguity selection contract`: `operational` -> `proven` (qualification-based).
+- `Pending-obligation belief contract`: `operational` -> `proven` (qualification-based).
+- `Channel-agnostic decision/effect contract`: ensure `proven` closure if not already complete in Sprint 2.
+- `Observer authorization contract`: ensure `proven` closure if not already complete in Sprint 2.
+- `Replay projection analytics contract`: ensure `proven` closure if not already complete in Sprint 3.
 
-Use this template in sprint-close updates and governance PR summaries:
+### Measurable exits
+- All targeted contract promotions are changelogged with required syntax and evidence URLs.
+- Governance closure package includes no-regression budget compliance report, freshness SLO report, and handoff artifact audit.
+- Release readiness review signs off only after parity gate passes across roadmap/manifest/contract map.
 
-- `- YYYY-MM-DD: capability_id=<capability_id>; change=<status|maturity|dependency>; dependency_delta=<added:[...], removed:[...], unchanged:[...]>; re_evaluation_date=YYYY-MM-DD; evidence=https://...`
+### Doc-alignment checkpoints
+- Final roadmap capability states exactly match manifest terminal states.
+- Contract-map maturity table and changelog fully reflect promoted contracts.
+- Manifest `contract_map_refs` remain canonical and complete for all active capabilities.
+
+### Alignment gate checklist (must pass before sprint close)
+- [ ] `ROADMAP.md` terminal statuses match `docs/dod_manifest.json` exactly.
+- [ ] `docs/dod_manifest.json` pytest packs and contract refs align with executed evidence.
+- [ ] `docs/system_contract_map.md` maturity values and changelog entries reflect all approved promotions.
+- [ ] Governance closure artifacts are linked and auditable from sprint close notes.

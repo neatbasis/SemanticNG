@@ -17,3 +17,10 @@ Use shared fixtures from `tests/conftest.py` for recurring contract objects:
 ## Behave step setup
 
 For step definitions under `src/features/steps/`, keep step functions thin and move reusable scenario setup logic into clearly named helper functions in the same module.
+
+## Invariant matrix maintenance
+
+- Keep `INVARIANT_RELEASE_GATE_MATRIX` in `tests/test_predictions_contracts_and_gates.py` in sync with `InvariantId`/`REGISTRY`.
+- For each newly added invariant, add deterministic `pass` and `stop` scenarios when the checker can meaningfully return both outcomes.
+- If an invariant is not directly evaluated by `evaluate_invariant_gates`, keep `gate_inputs=None` in its scenarios and still assert checker/normalization contracts.
+- If an invariant is gate-evaluated, provide `gate_inputs` so artifact-contract assertions exercise both prediction and halt branches.

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from dataclasses import is_dataclass, asdict
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, Tuple, Union
+from typing import Any, Dict, Iterator, Tuple, Union
 
 from state_renormalization.contracts import CapabilityAdapterGate, HaltRecord
 
@@ -202,6 +202,37 @@ def append_prediction_record_event(
     return append_prediction(path=path, record=event, adapter_gate=adapter_gate)
 
 
+
+
+def append_ask_outbox_request_event(
+    record: Any,
+    *,
+    adapter_gate: CapabilityAdapterGate,
+    path: PathLike = PREDICTIONS_LOG_PATH,
+) -> JsonObj:
+    _enforce_adapter_gate(action="append_ask_outbox_request_event", adapter_gate=adapter_gate)
+
+    payload = _to_jsonable(record)
+    if not isinstance(payload, dict):
+        raise ValueError("append_ask_outbox_request_event expects a dict-like payload")
+
+    return append_prediction(path=path, record=payload, adapter_gate=adapter_gate)
+
+
+def append_ask_outbox_response_event(
+    record: Any,
+    *,
+    adapter_gate: CapabilityAdapterGate,
+    path: PathLike = PREDICTIONS_LOG_PATH,
+) -> JsonObj:
+    _enforce_adapter_gate(action="append_ask_outbox_response_event", adapter_gate=adapter_gate)
+
+    payload = _to_jsonable(record)
+    if not isinstance(payload, dict):
+        raise ValueError("append_ask_outbox_response_event expects a dict-like payload")
+
+    return append_prediction(path=path, record=payload, adapter_gate=adapter_gate)
+
 def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
     """Yield append-only projection lineage rows that can be rehydrated.
 
@@ -228,7 +259,7 @@ def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
                 continue
 
             kind = raw.get("event_kind")
-            if kind in {"prediction_record", "prediction", "repair_proposal", "repair_resolution"}:
+            if kind in {"prediction_record", "prediction", "repair_proposal", "repair_resolution", "ask_outbox_request", "ask_outbox_response"}:
                 yield raw
                 continue
 

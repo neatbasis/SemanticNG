@@ -13,6 +13,7 @@ from state_renormalization.contracts import (
     PredictionRecord,
     ProjectionState,
 )
+from state_renormalization.adapters.persistence import iter_projection_lineage_records, read_jsonl
 from state_renormalization.engine import run_mission_loop
 
 
@@ -204,3 +205,98 @@ def test_hitl_resume_with_override_provenance_is_persisted(
     assert lifecycle["action"] == "resume"
     assert lifecycle["override_source"] == "operator"
     assert lifecycle["override_provenance"] == "ticket:ops-77"
+
+class _RecordingAskOutboxAdapter:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def create_request(self, title: str, question: str, context: dict[str, object]) -> str:
+        request_id = f"ask:{len(self.calls)+1}"
+        self.calls.append({"title": title, "question": question, "context": dict(context), "request_id": request_id})
+        return request_id
+
+
+def test_hitl_outbox_allow_persists_append_only_request_response_events(
+    make_episode: Callable[..., Episode],
+    tmp_path: Path,
+) -> None:
+    episode = make_episode(conversation_id="conv:ask-allow", turn_index=1)
+    outbox = _RecordingAskOutboxAdapter()
+    log_path = tmp_path / "predictions.jsonl"
+
+    run_mission_loop(
+        episode,
+        BeliefState(),
+        _blank_projection(),
+        prediction_log_path=log_path,
+        intervention_hook=lambda **_: {"action": "none", "reason": "continue"},
+        ask_outbox_adapter=outbox,
+    )
+
+    assert len(outbox.calls) == 4
+    request_artifacts = [a for a in episode.artifacts if a.get("artifact_kind") == "ask_outbox_request"]
+    response_artifacts = [a for a in episode.artifacts if a.get("artifact_kind") == "ask_outbox_response"]
+    assert len(request_artifacts) == len(response_artifacts) == 4
+
+    log_rows = [row for _, row in read_jsonl(log_path)]
+    outbox_rows = [r for r in log_rows if r.get("event_kind") in {"ask_outbox_request", "ask_outbox_response"}]
+    assert len(outbox_rows) == 8
+    assert outbox_rows[0]["event_kind"] == "ask_outbox_request"
+    assert outbox_rows[1]["event_kind"] == "ask_outbox_response"
+
+
+def test_hitl_outbox_deny_uses_policy_guard_and_halts_without_dispatch(
+    make_episode: Callable[..., Episode],
+    make_observer: Callable[..., object],
+    tmp_path: Path,
+) -> None:
+    observer = make_observer(capabilities=["baseline.invariant_evaluation"])
+    episode = make_episode(conversation_id="conv:ask-deny", turn_index=1, observer=observer)
+    outbox = _RecordingAskOutboxAdapter()
+    prediction_log = tmp_path / "predictions.jsonl"
+    halt_log = tmp_path / "halts.jsonl"
+
+    run_mission_loop(
+        episode,
+        BeliefState(),
+        _blank_projection(),
+        prediction_log_path=prediction_log,
+        intervention_hook=lambda **_: {"action": "none"},
+        ask_outbox_adapter=outbox,
+        halt_log_path=halt_log,
+    )
+
+    assert outbox.calls == []
+    assert any(a.get("artifact_kind") == "capability_policy_denial" for a in episode.artifacts)
+    halt_rows = [row for _, row in read_jsonl(halt_log)]
+    assert halt_rows[0]["details"]["policy_code"] == "observer_scope_denied"
+
+
+def test_hitl_outbox_timeout_and_escalation_are_persisted_for_replay(
+    make_episode: Callable[..., Episode],
+    tmp_path: Path,
+) -> None:
+    episode = make_episode(conversation_id="conv:ask-timeout", turn_index=1)
+    outbox = _RecordingAskOutboxAdapter()
+    log_path = tmp_path / "predictions.jsonl"
+
+    def hook(*, phase, **_kwargs):
+        if phase == "mission_loop:start":
+            return {"action": "timeout", "reason": "operator-timeout"}
+        return {"action": "escalate", "reason": "manual-escalation"}
+
+    run_mission_loop(
+        episode,
+        BeliefState(),
+        _blank_projection(),
+        prediction_log_path=log_path,
+        intervention_hook=hook,
+        ask_outbox_adapter=outbox,
+    )
+
+    rows = list(iter_projection_lineage_records(log_path))
+    response_rows = [r for r in rows if r.get("event_kind") == "ask_outbox_response"]
+    assert response_rows
+    assert response_rows[0]["status"] == "timeout"
+
+

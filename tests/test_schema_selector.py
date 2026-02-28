@@ -7,8 +7,12 @@ import pytest
 
 from state_renormalization.adapters.schema_selector import (
     BaseRule,
+    SelectorDecisionStatus,
     SelectorContext,
+    _decide_selection_policy,
     _legacy_naive_schema_selector,
+    _propose_candidates,
+    _validate_selector_invariants,
     build_selector_context,
     naive_schema_selector,
     register_rule,
@@ -171,3 +175,16 @@ def test_regression_stays_stable_as_non_matching_rules_grow() -> None:
         fallback[:] = original
 
     assert snapshot_after == snapshot_before
+
+
+def test_selector_pipeline_surfaces_policy_findings_for_ambiguity_phase() -> None:
+    ctx = build_selector_context("they are coming", error=None)
+
+    candidates = _propose_candidates(ctx, domain="default")
+    violations = _validate_selector_invariants(candidates)
+    decision = _decide_selection_policy(candidates, violations=violations)
+
+    assert decision.status == SelectorDecisionStatus.OK
+    assert decision.chosen is not None
+    assert decision.chosen.rule_name == "vague_actor"
+    assert any(f.code == "selector.prefer_clarification_on_ambiguity.v1" for f in decision.policy_findings)

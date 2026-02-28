@@ -38,10 +38,13 @@ https://github.com/<org>/<repo>/actions/runs/<run_id>
 pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py
 https://github.com/<org>/<repo>/actions/runs/<run_id>
 
-pytest tests/test_replay_projection_analytics.py tests/test_replay_projection_determinism.py tests/test_replay_projection_restart_contracts.py tests/test_prediction_outcome_binding.py
+pytest tests/test_replay_projection_analytics.py tests/test_replay_projection_determinism.py tests/test_replay_projection_restart_contracts.py tests/test_prediction_outcome_binding.py tests/replay_projection_analytics/test_append_only_replay.py
 https://github.com/<org>/<repo>/actions/runs/<run_id>
 
-pytest tests/replay_projection_analytics/test_append_only_replay.py
+pytest tests/test_hitl_protocol.py tests/test_engine_projection_mission_loop.py tests/test_contracts_halt_record.py tests/test_demo_runner.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
+pytest tests/test_scenario_convergence_reporting.py
 https://github.com/<org>/<repo>/actions/runs/<run_id>
 
 # Capability: invariant_matrix_coverage

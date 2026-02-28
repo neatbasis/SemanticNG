@@ -52,7 +52,7 @@ For every status-transition capability in this PR, paste the exact `pytest` comm
 - [ ] `pytest tests/test_predictions_contracts_and_gates.py`
   - Evidence URL: https://github.com/<org>/<repo>/actions/runs/<run_id>
 
-#### Capability: `replay_projection_analytics` (status: `in_progress`)
+#### Capability: `replay_projection_analytics` (status: `done`)
 - [ ] `pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py`
   - Evidence URL: https://github.com/<org>/<repo>/actions/runs/<run_id>
 

@@ -89,6 +89,23 @@ def _added_changelog_entries(base_sha: str, head_sha: str) -> list[str]:
     return entries
 
 
+def _commands_missing_evidence(pr_body: str, commands: list[str]) -> list[str]:
+    lines = pr_body.splitlines()
+    missing: list[str] = []
+    for command in commands:
+        found_with_evidence = False
+        for idx, line in enumerate(lines):
+            if command not in line:
+                continue
+            window = "\n".join(lines[idx : idx + 4])
+            if "http://" in window or "https://" in window:
+                found_with_evidence = True
+                break
+        if not found_with_evidence:
+            missing.append(command)
+    return missing
+
+
 def _load_pr_body() -> str:
     event_path = os.environ.get("GITHUB_EVENT_PATH")
     if not event_path:
@@ -130,15 +147,23 @@ def main() -> int:
         if event_name == "pull_request":
             pr_body = _load_pr_body()
             head_caps = {cap["id"]: cap for cap in head_manifest.get("capabilities", [])}
-            missing_commands: list[str] = []
+            required_commands: list[str] = []
             for cap_id in status_transitions:
-                for command in head_caps.get(cap_id, {}).get("pytest_commands", []):
-                    if command not in pr_body:
-                        missing_commands.append(command)
+                required_commands.extend(head_caps.get(cap_id, {}).get("pytest_commands", []))
+
+            missing_commands = [command for command in required_commands if command not in pr_body]
             if missing_commands:
                 print("PR description must include exact milestone pytest commands for capability status transitions.")
                 for command in sorted(set(missing_commands)):
                     print(f"  - Missing command in PR body: {command}")
+                return 1
+
+            missing_evidence = _commands_missing_evidence(pr_body, sorted(set(required_commands)))
+            if missing_evidence:
+                print("PR description must link passing CI evidence near each milestone pytest command.")
+                print("Include workflow/job URL(s) or attached output for every command.")
+                for command in missing_evidence:
+                    print(f"  - Missing evidence link near command: {command}")
                 return 1
 
     head_map_text = Path("docs/system_contract_map.md").read_text(encoding="utf-8")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shlex
 import subprocess
 from pathlib import Path
@@ -21,6 +22,28 @@ def _assert_pytest_command_targets_existing_tests(command: str) -> None:
     assert test_paths, f"Command must include explicit tests paths: {command}"
     for p in test_paths:
         assert (ROOT / p).exists(), f"Missing referenced test path: {p}"
+
+
+def _assert_pytest_command_is_executable(command: str, capability_id: str) -> None:
+    parts = shlex.split(command)
+    completed = subprocess.run(
+        [*parts, "--collect-only"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    output = f"{completed.stdout}\n{completed.stderr}"
+    assert completed.returncode == 0, (
+        f"In-progress capability {capability_id} has a non-executable pytest command: {command}\n"
+        f"stdout:\n{completed.stdout}\n"
+        f"stderr:\n{completed.stderr}"
+    )
+    assert re.search(r"(?:collected\s+(?!0\b)\d+\s+items?|(?<!0\s)\d+\s+tests?\s+collected)", output), (
+        f"In-progress capability {capability_id} command did not collect any tests: {command}\n"
+        f"stdout:\n{completed.stdout}\n"
+        f"stderr:\n{completed.stderr}"
+    )
 
 
 def test_dod_manifest_exists_and_has_known_statuses() -> None:
@@ -70,17 +93,4 @@ def test_in_progress_capabilities_have_executable_pytest_commands() -> None:
 
         for command in commands:
             _assert_pytest_command_targets_existing_tests(command)
-            parts = shlex.split(command)
-
-            completed = subprocess.run(
-                [*parts, "--collect-only"],
-                cwd=ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            assert completed.returncode == 0, (
-                f"In-progress capability {cap['id']} has a non-executable pytest command: {command}\n"
-                f"stdout:\n{completed.stdout}\n"
-                f"stderr:\n{completed.stderr}"
-            )
+            _assert_pytest_command_is_executable(command, cap["id"])

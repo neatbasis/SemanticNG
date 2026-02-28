@@ -23,7 +23,7 @@ This document is the canonical source for active release/integration workflow ex
 - [ ] **Regression waiver timeboxed:** Any waiver includes owner, rationale, rollback-by date, and mitigation command packs.
 - [ ] **Dependency impact statements present:** Every merged PR includes upstream/downstream impact and cross-capability risk statements.
 - [ ] **Capability maturity gates enforced:** `planned -> in_progress -> done` transitions are validated by CI entry/exit gate checks.
-- [ ] **Documentation freshness SLO met:** Governed docs are within freshness threshold and include current regeneration metadata.
+- [ ] **Documentation freshness SLO met:** `docs/doc_freshness_slo.json` governs the freshness metadata policy and `python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json` passes.
 - [ ] **Sprint handoff minimum artifacts attached:** Sprint-close report includes exit table, open-risk register, and next-sprint preload list.
 
 ## Copy/paste evidence block (validator-compatible)
@@ -42,7 +42,7 @@ Do not merge milestone or maturity update PRs until all conditions are met:
 
 1. `State Renormalization Milestone Gate` CI is passing on the PR head SHA.
 2. `docs/dod_manifest.json` contains the canonical command/evidence mapping for transitioned capabilities.
-3. Any derived docs are regenerated from the manifest when required.
+3. `python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json` passes for governed docs before merge.
 
 ## Exceptional integration stabilization controls (reactivation only)
 

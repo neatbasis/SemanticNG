@@ -71,7 +71,7 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 
 ## Next (promotion checkpoint)
 
-_No planned capabilities remain in `Next`; `observer_authorization_contract` is aligned as `done` in `Now` and tracked as a non-regression dependency for `Later` sequencing._
+_No planned capabilities remain in `Next`; observer authorization promotion is complete (`observer_authorization_contract` = `done`) and remains a non-regression dependency while `Later` capabilities advance._
 
 ## Capability status alignment (manifest source-of-truth sync)
 

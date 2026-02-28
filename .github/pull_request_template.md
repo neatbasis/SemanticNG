@@ -48,7 +48,7 @@ https://github.com/<org>/<repo>/actions/runs/<run_id>
 
 ```
 
-#### Capability: `observer_authorization_contract` (status: `planned`)
+#### Capability: `observer_authorization_contract` (status: `done`)
 ```text
 pytest tests/test_observer_frame.py
 https://github.com/<org>/<repo>/actions/runs/<run_id>

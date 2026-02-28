@@ -197,8 +197,7 @@
         "src/state_renormalization/adapters/"
       ],
       "pytest_commands": [
-        "pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py",
-        "pytest tests/test_predictions_contracts_and_gates.py"
+        "pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_predictions_contracts_and_gates.py"
       ],
       "contract_map_refs": [
         "Channel-agnostic decision/effect contract",
@@ -206,11 +205,7 @@
       ],
       "ci_evidence_links": [
         {
-          "command": "pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py",
-          "evidence": "https://github.com/neatbasis/SemanticNG/actions/runs/18994531201"
-        },
-        {
-          "command": "pytest tests/test_predictions_contracts_and_gates.py",
+          "command": "pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_predictions_contracts_and_gates.py",
           "evidence": "https://github.com/neatbasis/SemanticNG/actions/runs/18994531201"
         }
       ]

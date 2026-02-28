@@ -6,7 +6,7 @@ from dataclasses import is_dataclass, asdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, Tuple, Union
 
-from state_renormalization.contracts import HaltRecord
+from state_renormalization.contracts import CapabilityAdapterGate, HaltRecord
 
 from pydantic import BaseModel
 
@@ -167,11 +167,15 @@ def append_prediction_event(
 def append_prediction_record_event(
     record: Any,
     *,
+    adapter_gate: CapabilityAdapterGate,
     path: PathLike = PREDICTION_RECORDS_LOG_PATH,
     episode_id: str | None = None,
     conversation_id: str | None = None,
     turn_index: int | None = None,
 ) -> JsonObj:
+    if not adapter_gate.allowed:
+        raise PermissionError("append_prediction_record_event denied: adapter gate is not allowed")
+
     payload = _to_jsonable(record)
     if not isinstance(payload, dict):
         raise ValueError("append_prediction_record_event expects a dict-like prediction payload")

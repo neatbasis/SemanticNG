@@ -636,6 +636,59 @@ class PredictionRecord(BaseModel):
         return self.variance
 
 
+class CapabilityInvocationPolicyCode(str, Enum):
+    CURRENT_PREDICTION_REQUIRED = "current_prediction_required"
+    EXPLICIT_GATE_PASS_REQUIRED = "explicit_gate_pass_required"
+    OBSERVER_SCOPE_DENIED = "observer_scope_denied"
+
+
+class CapabilityInvocationAttempt(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    invocation_id: str
+    capability: str
+    action: str
+    stage: str
+    scope_key: str
+    prediction_key: Optional[str] = None
+    required_capability: str
+    explicit_gate_pass_present: bool
+    current_prediction_available: bool
+    observer_role: Optional[str] = None
+    observer_authorization_level: Optional[str] = None
+    observer_capabilities: List[str] = Field(default_factory=list)
+
+
+class CapabilityPolicyHaltPayload(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    halt_id: str
+    stage: str
+    invariant_id: str
+    reason: str
+    details: Dict[str, Any]
+    evidence: List[EvidenceRef]
+    retryability: bool
+    timestamp: str
+
+
+class CapabilityInvocationPolicyDecision(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    attempt: CapabilityInvocationAttempt
+    allowed: bool
+    denial_code: Optional[CapabilityInvocationPolicyCode] = None
+    denial_reason: Optional[str] = None
+    halt_payload: Optional[CapabilityPolicyHaltPayload] = None
+
+
+class CapabilityAdapterGate(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    invocation_id: str
+    allowed: bool = True
+
+
 class ProjectionState(BaseModel):
     model_config = _CONTRACT_CONFIG
 

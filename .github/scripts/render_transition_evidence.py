@@ -14,8 +14,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_PATH = ROOT / "docs" / "dod_manifest.json"
 PR_TEMPLATE_PATH = ROOT / ".github" / "pull_request_template.md"
-AUTOGEN_BEGIN = "<!-- BEGIN AUTOGEN: capability-examples -->"
-AUTOGEN_END = "<!-- END AUTOGEN: capability-examples -->"
+AUTOGEN_BEGIN = "<!-- BEGIN AUTOGEN: milestone-evidence -->"
+AUTOGEN_END = "<!-- END AUTOGEN: milestone-evidence -->"
 
 
 def _load_manifest(rev: str) -> dict:
@@ -100,7 +100,7 @@ def _commands_for_pr_template_examples(manifest: dict) -> dict[str, dict[str, ob
 
 
 def _render_pr_template_examples(manifest: dict) -> str:
-    lines: list[str] = ["### Capability command blocks (generated from `docs/dod_manifest.json`)", ""]
+    lines: list[str] = ["### Capability command/evidence blocks (generated from `docs/dod_manifest.json`)", ""]
     commands_by_capability = _commands_for_pr_template_examples(manifest)
     for cap_id in sorted(commands_by_capability):
         capability = commands_by_capability[cap_id]
@@ -115,7 +115,6 @@ def _render_pr_template_examples(manifest: dict) -> str:
         lines.append("```")
         lines.append("")
 
-    lines.append("I confirmed adjacency formatting was preserved (each command line is immediately followed by its own `https://...` evidence URL line).")
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -170,17 +169,17 @@ def main() -> int:
     parser.add_argument(
         "--regenerate-pr-template",
         action="store_true",
-        help="Regenerate the pull_request_template.md capability examples autogen block",
+        help="Regenerate the pull_request_template.md milestone evidence autogen block",
     )
     parser.add_argument(
         "--check-pr-template-autogen",
         action="store_true",
-        help="Fail if the pull_request_template.md capability examples autogen block is stale",
+        help="Fail if the pull_request_template.md milestone evidence autogen block is stale",
     )
     parser.add_argument(
         "--emit-pr-template-autogen",
         action="store_true",
-        help="Print the rendered pull_request_template.md capability examples autogen block",
+        help="Print the rendered pull_request_template.md milestone evidence autogen block",
     )
     args = parser.parse_args()
 

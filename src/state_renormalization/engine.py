@@ -1,6 +1,10 @@
 # state_renormalization/engine.py
 from __future__ import annotations
 
+# Temporary integration merge-freeze marker:
+# during stabilization of integration/pr-conflict-resolution, merge changes to this
+# module only via the ordered integration stack documented in docs/integration_notes.md.
+
 import hashlib
 import uuid
 from datetime import datetime, timezone

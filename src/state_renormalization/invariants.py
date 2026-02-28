@@ -252,6 +252,9 @@ REGISTRY: dict[InvariantId, Checker] = {
 }
 
 
+REGISTERED_INVARIANT_IDS: tuple[str, ...] = tuple(invariant_id.value for invariant_id in REGISTRY)
+
+
 REGISTERED_INVARIANT_BRANCH_BEHAVIORS: dict[InvariantId, InvariantBranchBehavior] = {
     InvariantId.PREDICTION_AVAILABILITY: InvariantBranchBehavior(
         continue_behavior="Continue when at least one projected prediction exists and prediction_key resolves if provided.",

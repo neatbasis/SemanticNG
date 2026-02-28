@@ -20,6 +20,7 @@ from state_renormalization.invariants import (
     InvariantId,
     InvariantOutcome,
     REGISTRY,
+    REGISTERED_INVARIANT_IDS,
     REGISTERED_INVARIANT_BRANCH_BEHAVIORS,
     Validity,
     default_check_context,
@@ -49,7 +50,6 @@ FIXED_PREDICTION = {
 }
 
 REGISTERED_INVARIANTS = tuple(REGISTRY.keys())
-REGISTERED_INVARIANT_IDS = tuple(invariant_id.value for invariant_id in REGISTERED_INVARIANTS)
 
 
 @dataclass(frozen=True)
@@ -271,6 +271,11 @@ MATRIX_CASES = [
     for scenario in coverage.scenarios
 ]
 
+MATRIX_SCENARIO_NAMES_BY_INVARIANT = {
+    invariant_id: tuple(sorted(scenario.name for scenario in coverage.scenarios))
+    for invariant_id, coverage in INVARIANT_RELEASE_GATE_MATRIX.items()
+}
+
 ADMISSIBLE_CASES = [
     pytest.param(invariant_id, scenario, id=f"{invariant_id.value}:{scenario.name}")
     for invariant_id, coverage in INVARIANT_RELEASE_GATE_MATRIX.items()
@@ -382,6 +387,13 @@ def test_invariant_matrix_release_gate_has_required_coverage() -> None:
         assert any(s.expected_passed for s in coverage.scenarios), f"{invariant_id.value} has no pass scenario"
         if coverage.supports_stop:
             assert any(not s.expected_passed for s in coverage.scenarios), f"{invariant_id.value} has no stop scenario"
+
+
+def test_invariant_matrix_has_explicit_pass_stop_scenarios_per_invariant() -> None:
+    for invariant_id, scenario_names in MATRIX_SCENARIO_NAMES_BY_INVARIANT.items():
+        assert scenario_names == ("pass", "stop"), (
+            f"{invariant_id.value} must define deterministic pass/stop scenarios; got {scenario_names}"
+        )
 
 
 def test_invariant_matrix_guard_fails_when_registry_gains_uncovered_invariant() -> None:
@@ -520,6 +532,15 @@ def test_gate_decisions_and_artifacts_are_deterministic_by_invariant(
     assert first_artifact["artifact_kind"] == "invariant_outcomes"
     assert second_artifact["artifact_kind"] == "invariant_outcomes"
     assert first_artifact["invariant_checks"] == second_artifact["invariant_checks"]
+    assert first_artifact["invariant_context"] == second_artifact["invariant_context"]
+
+    flow_decisions = [check["passed"] for check in first_artifact["invariant_checks"]]
+    if just_written_prediction is None:
+        assert flow_decisions == ([False, True] if expect_halt else [True])
+    elif expect_halt:
+        assert flow_decisions == [True, False, True]
+    else:
+        assert flow_decisions == [True, True]
 
     if expect_halt:
         assert isinstance(first, HaltRecord)
@@ -528,13 +549,37 @@ def test_gate_decisions_and_artifacts_are_deterministic_by_invariant(
         assert second.invariant_id == invariant_id.value
         assert first.halt_id == second.halt_id
         assert first_artifact["kind"] == "halt"
-        assert any(check["invariant_id"] == InvariantId.EXPLAINABLE_HALT_PAYLOAD.value for check in first_artifact["invariant_checks"])
+        assert set(first_artifact["halt"]) == set(HaltRecord.required_payload_fields())
+        if just_written_prediction is None:
+            assert [check["passed"] for check in first_artifact["invariant_checks"]] == [False, True]
+            assert [check["invariant_id"] for check in first_artifact["invariant_checks"]] == [
+                InvariantId.PREDICTION_AVAILABILITY.value,
+                InvariantId.EXPLAINABLE_HALT_PAYLOAD.value,
+            ]
+        else:
+            assert [check["passed"] for check in first_artifact["invariant_checks"]] == [True, False, True]
+            assert [check["invariant_id"] for check in first_artifact["invariant_checks"]] == [
+                InvariantId.PREDICTION_AVAILABILITY.value,
+                InvariantId.EVIDENCE_LINK_COMPLETENESS.value,
+                InvariantId.EXPLAINABLE_HALT_PAYLOAD.value,
+            ]
     else:
         assert isinstance(first, Success)
         assert isinstance(second, Success)
         assert [out.code for out in first.artifact.combined] == [out.code for out in second.artifact.combined]
         assert first_artifact["kind"] == "prediction"
-        assert any(check["invariant_id"] == invariant_id.value for check in first_artifact["invariant_checks"])
+        if just_written_prediction is None:
+            assert [out.flow for out in first.artifact.combined] == [Flow.CONTINUE]
+            assert [check["invariant_id"] for check in first_artifact["invariant_checks"]] == [
+                InvariantId.PREDICTION_AVAILABILITY.value,
+            ]
+        else:
+            assert [out.flow for out in first.artifact.combined] == [Flow.CONTINUE, Flow.CONTINUE]
+            assert [check["passed"] for check in first_artifact["invariant_checks"]] == [True, True]
+            assert [check["invariant_id"] for check in first_artifact["invariant_checks"]] == [
+                InvariantId.PREDICTION_AVAILABILITY.value,
+                InvariantId.EVIDENCE_LINK_COMPLETENESS.value,
+            ]
 
 
 @pytest.mark.parametrize(

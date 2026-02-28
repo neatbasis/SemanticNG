@@ -22,7 +22,7 @@ Maturity levels:
 
 ## Milestone: Next
 
-_No contracts currently staged in `Next`._
+_No contracts currently staged in `Next`; Observer authorization promotion is complete under Milestone `Now`._
 
 ## Maturity update protocol (apply each milestone review)
 
@@ -44,6 +44,7 @@ Reference convention:
 
 - 2026-02-28 (Now): Replay projection analytics contract in_progress -> operational; replay reconstruction/determinism/restart and append-only replay suites now serve as the baseline evidence set, aligned with manifest transition to `done`. https://github.com/<org>/<repo>/actions/runs/<run_id>
 - 2026-02-28 (Now): Observer authorization contract prototype -> operational; authorization scope gating and invariant allowlist behavior are now validated in default runtime contract and gate suites. https://github.com/<org>/<repo>/actions/runs/<run_id>
+- 2026-02-28 (Now): Observer authorization contract prototype -> operational; milestone grouping updated to keep the contract in `Now` as a completed dependency for governance sequencing. https://github.com/<org>/<repo>/actions/runs/<run_id>
 - 2026-02-28 (Now): Halt normalization contract operational -> proven; merged gate + halt hardening enforces canonical halt payloads end-to-end across mission-loop, persistence, and replay/restart validation. https://github.com/<org>/<repo>/actions/runs/<run_id>
 - 2026-02-28 (Now): Prediction append contract operational -> proven; deterministic persistence and gate-consumption behavior is repeatedly validated in baseline and invariant/gate regressions. https://github.com/<org>/<repo>/actions/runs/<run_id>
 - 2026-02-28 (Next): Halt normalization contract prototype -> operational; deterministic invariant-matrix coverage added explicit non-applicable markers and registry guard assertions. https://github.com/<org>/<repo>/actions/runs/<run_id>

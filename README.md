@@ -124,6 +124,29 @@ export GITHUB_EVENT_PATH=<path_to_pull_request_event_payload_json>
 python .github/scripts/validate_milestone_docs.py
 ```
 
+### pre-commit guardrails (recommended)
+
+Install pre-commit and activate hooks locally:
+
+```bash
+python -m pip install pre-commit
+pre-commit install
+pre-commit install --hook-type pre-push
+```
+
+Run all guardrails on demand:
+
+```bash
+pre-commit run --all-files
+```
+
+The repository hook set is defined in `.pre-commit-config.yaml` and includes:
+
+- hygiene checks (`pre-commit-hooks`)
+- `ruff` lint + format
+- `mypy` type checks (configured from `pyproject.toml`)
+- a fast `pytest` smoke hook on `pre-push`
+
 ## Running tests
 
 ### pytest

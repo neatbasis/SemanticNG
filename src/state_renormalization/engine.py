@@ -31,6 +31,7 @@ from state_renormalization.contracts import (
     ProjectionReplayResult,
     PredictionOutcome,
     PredictionRecord,
+    HaltPayloadValidationError,
     HaltRecord,
     EvidenceRef,
     SchemaSelection,
@@ -234,33 +235,45 @@ def _stable_halt_id(*, stage: str, outcome: InvariantOutcome) -> str:
 
 
 def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltRecord:
+    if outcome.details is None or outcome.evidence is None:
+        raise HaltPayloadValidationError("halt payload is malformed or incomplete")
+
     reason = outcome.reason
-    return HaltRecord(
-        halt_id=_stable_halt_id(stage=stage, outcome=outcome),
-        stage=stage,
-        invariant_id=outcome.invariant_id.value,
-        reason=reason,
-        details=dict(outcome.details),
-        evidence=[_as_evidence_ref(_to_dict(item)) for item in outcome.evidence],
-        timestamp=_now_iso(),
-        retryability=bool(outcome.action_hints),
+    return HaltRecord.from_payload(
+        {
+            "halt_id": _stable_halt_id(stage=stage, outcome=outcome),
+            "stage": stage,
+            "invariant_id": outcome.invariant_id.value,
+            "reason": reason,
+            "details": dict(outcome.details),
+            "evidence": [_as_evidence_ref(_to_dict(item)).model_dump(mode="json") for item in outcome.evidence],
+            "timestamp": _now_iso(),
+            "retryability": bool(outcome.action_hints),
+        }
     )
 
 
 def _authorization_halt_record(*, stage: str, reason: str, context: Mapping[str, Any]) -> HaltRecord:
-    evidence = [
-        EvidenceRef(kind="authorization_scope", ref=f"action:{context.get('action', 'unknown')}"),
-        EvidenceRef(kind="required_capability", ref=str(context.get("required_capability") or "unknown")),
-    ]
-    return HaltRecord(
-        halt_id=f"halt:{sha1_text(f'{stage}|authorization.scope.v1|{reason}|{_to_dict(context)}')}",
-        stage=stage,
-        invariant_id="authorization.scope.v1",
-        reason=reason,
-        details={"authorization_context": _to_dict(context)},
-        evidence=evidence,
-        timestamp=_now_iso(),
-        retryability=True,
+    return HaltRecord.from_payload(
+        {
+            "halt_id": f"halt:{sha1_text(f'{stage}|authorization.scope.v1|{reason}|{_to_dict(context)}')}",
+            "stage": stage,
+            "invariant_id": "authorization.scope.v1",
+            "reason": reason,
+            "details": {"authorization_context": _to_dict(context)},
+            "evidence": [
+                {
+                    "kind": "authorization_scope",
+                    "ref": f"action:{context.get('action', 'unknown')}",
+                },
+                {
+                    "kind": "required_capability",
+                    "ref": str(context.get("required_capability") or "unknown"),
+                },
+            ],
+            "timestamp": _now_iso(),
+            "retryability": True,
+        }
     )
 
 

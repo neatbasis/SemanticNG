@@ -62,13 +62,13 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 
 ## Capability status alignment (manifest source-of-truth sync)
 
-- `done`: `prediction_persistence_baseline`, `channel_agnostic_pending_obligation`, `schema_selection_ambiguity_baseline`, `gate_halt_unification`, `invariant_matrix_coverage`.
-- `in_progress`: `replay_projection_analytics`.
+- `done`: `prediction_persistence_baseline`, `channel_agnostic_pending_obligation`, `schema_selection_ambiguity_baseline`, `gate_halt_unification`, `invariant_matrix_coverage`, `replay_projection_analytics`.
+- `in_progress`: _none_.
 - `planned`: `observer_authorization_contract`, `capability_invocation_governance`, `repair_aware_projection_evolution`.
 
 ## Later (larger architecture goals)
 
-### 1) Replay projection analytics contract (replay-grade projection engine and longitudinal correction analytics; `status: in_progress`)
+### 1) Replay projection analytics contract (replay-grade projection engine and longitudinal correction analytics; `status: done`)
 - **Owner area/module:** Engine + Persistence + Correction artifacts (`src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`)
 - **Success criteria (test outcomes):**
   - New replay tests pass, proving `ProjectionState` reconstructed from append-only logs is deterministic across repeated runs and independent process restarts.
@@ -105,7 +105,7 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 
 ## Backlog dependency tags
 
-- `Later` item 1 (Replay projection analytics contract): `in_progress` with no `Next` dependency blocker currently recorded in manifest governance files.
+- `Later` item 1 (Replay projection analytics contract): `done`; deterministic replay + audit + HITL regression commands and convergence reporting contract are now part of the required evidence set.
 - `Later` item 2 (Capability-invocation governance): `planned`; sequence after observer authorization contract to keep authorization semantics stable before external side-effect policy gating.
 - `Later` item 3 (Repair-aware projection evolution): `planned`; sequence after replay analytics baselines are stable to preserve auditable repair-event lineage.
 
@@ -166,7 +166,7 @@ Use this short table at each planning checkpoint to pick exactly one next PR sco
 
 | Capability ID | Dependency status (met/blocked) | Governance readiness (manifest+roadmap+contract-map aligned) | Test evidence completeness | Risk-reduction score | Recommended next action |
 | --- | --- | --- | --- | --- | --- |
-| `replay_projection_analytics` | met (`status=in_progress`) | partial | partial | 3/5 | Continue focused in-progress replay PRs while preserving append-only and explainable-halt contracts. |
+| `replay_projection_analytics` | met (`status=done`) | complete | complete | 4/5 | Keep the convergence report + replay/HITL evidence commands green and treat regressions as release blockers. |
 | `observer_authorization_contract` | met (`status=planned`) | partial | partial | 4/5 | Prioritize the next PR to land runtime authorization gating + persisted explainable halt coverage. |
 | `capability_invocation_governance` | blocked (sequence after observer authorization) | blocked | missing | 5/5 | Keep design/doc prep only; defer merge work until observer authorization is done. |
 | `repair_aware_projection_evolution` | blocked (sequence after replay analytics hardening) | blocked | missing | 3/5 | Draft explicit auditable repair-event contract tests while keeping strict halt-only behavior as default. |

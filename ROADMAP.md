@@ -118,6 +118,17 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 - Track any allocation exception explicitly in cadence logs (date, scope, reason, approver, and timeboxed re-entry to `Next`).
 - Reconfirm dependency tags and sequencing gate status at each planning checkpoint before accepting `Later` scope.
 
+### Planning checkpoint capability table
+
+Use this short table at each planning checkpoint to pick exactly one next PR scope.
+
+| Capability ID | Dependency status (met/blocked) | Governance readiness (manifest+roadmap+contract-map aligned) | Test evidence completeness | Risk-reduction score | Recommended next action |
+| --- | --- | --- | --- | --- | --- |
+| `replay_projection_analytics` | blocked (`gate_halt_unification`, `invariant matrix complete`) | blocked | partial | 3/5 | Finish remaining `Next` gate/halt and invariant matrix work; reassess after CI is fully green. |
+| `observer_authorization` | met | partial | partial | 4/5 | Prioritize a focused PR that lands authorization allowlist/runtime gating with persisted explainable halt coverage. |
+| `capability_invocation_governance` | blocked (`gate_halt_unification`, `invariant matrix complete`) | blocked | missing | 5/5 | Keep design/doc prep only; defer merge work until sequencing gate dependencies are marked met. |
+| `repair_aware_projection` | blocked (`gate_halt_unification`, `invariant matrix complete`) | blocked | missing | 3/5 | Draft explicit auditable repair-event contract tests while keeping strict halt-only behavior as default. |
+
 ## Guardrails (unchanged until Next milestones are complete)
 
 - Keep JSONL append-only persistence as the reference storage contract until gate/halt unification and invariant matrix completion are green in CI.

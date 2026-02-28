@@ -43,8 +43,12 @@ def test_capability_invocation_allows_side_effect_after_policy_checks(make_episo
 
     assert isinstance(result, dict)
     rows = [row for _, row in read_jsonl(log_path)]
-    assert len(rows) == 1
-    assert rows[0]["prediction_id"] == pred.prediction_id
+    assert len(rows) == 2
+    assert rows[0]["event_kind"] == "prediction"
+    assert rows[1]["event_kind"] == "prediction_record"
+    assert rows[1]["prediction_id"] == pred.prediction_id
+    evidence_refs = rows[1].get("evidence_refs", [])
+    assert any(ref.get("ref") == "test-capability-allow.jsonl@1" for ref in evidence_refs)
     assert not halt_path.exists()
 
 

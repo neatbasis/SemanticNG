@@ -121,6 +121,14 @@ Run the pytest suite:
 pytest
 ```
 
+Run tests with coverage (requires `pytest-cov` from `.[test]`):
+
+```bash
+make test-cov
+# or directly:
+pytest --cov=state_renormalization --cov-report=term-missing --cov-report=xml
+```
+
 Run type checks (optional):
 
 ```bash

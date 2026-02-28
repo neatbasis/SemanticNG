@@ -35,7 +35,11 @@ Maturity levels:
 1. Validate contract behavior against milestone pytest commands from `docs/dod_manifest.json`.
 2. Promote `prototype` → `operational` once default-path runtime + gate behavior are covered in CI.
 3. Promote `operational` → `proven` once replay and halt/audit paths are repeatedly validated across milestone regressions.
-4. Keep a short changelog entry in this file when a maturity value changes (date + milestone + rationale).
+4. Keep a changelog entry in this file whenever a maturity value changes, using `- YYYY-MM-DD (Milestone): <contract> <from> -> <to>; rationale.`
+
+### Changelog format
+
+- Required entry style: `- YYYY-MM-DD (Milestone): <contract> <from> -> <to>; rationale.`
 
 ### Changelog
 

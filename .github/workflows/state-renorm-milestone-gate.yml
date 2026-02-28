@@ -9,6 +9,7 @@ on:
       - 'ROADMAP.md'
       - '.github/pull_request_template.md'
       - '.github/scripts/validate_milestone_docs.py'
+      - '.github/scripts/capability_parity_report.py'
       - '.github/workflows/state-renorm-milestone-gate.yml'
   merge_group:
     paths:
@@ -18,6 +19,7 @@ on:
       - 'ROADMAP.md'
       - '.github/pull_request_template.md'
       - '.github/scripts/validate_milestone_docs.py'
+      - '.github/scripts/capability_parity_report.py'
       - '.github/workflows/state-renorm-milestone-gate.yml'
 
 jobs:
@@ -46,6 +48,16 @@ jobs:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: python .github/scripts/validate_milestone_docs.py
+
+      - name: Generate capability parity report
+        run: python .github/scripts/capability_parity_report.py
+
+      - name: Upload capability parity report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: capability-parity-report
+          path: artifacts/capability_parity_report.txt
+          if-no-files-found: error
 
       - name: Run milestone pytest commands for relevant changes
         env:

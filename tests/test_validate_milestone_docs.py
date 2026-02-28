@@ -40,16 +40,16 @@ def test_commands_missing_evidence_rejects_unsupported_evidence_format() -> None
     assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == [command]
 
 
-def test_commands_missing_evidence_reports_missing_when_no_immediate_evidence_line() -> None:
+def test_commands_missing_evidence_accepts_markdown_list_and_inline_code_command() -> None:
     command = "pytest tests/test_invariants.py"
     pr_body = "\n".join(
         [
-            f"- {command}",
-            "Evidence: https://ci.example/runs/200",
+            f"- `{command}`",
+            "- Evidence: https://ci.example/runs/200",
         ]
     )
 
-    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == [command]
+    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == []
 
 
 def test_commands_missing_evidence_reports_missing_when_evidence_not_next_line() -> None:

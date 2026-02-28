@@ -350,18 +350,28 @@ def _ci_evidence_links_command_mismatches(head_manifest: dict, transitioned_cap_
     return mismatches
 
 
+def _normalize_markdown_line(raw_line: str) -> str:
+    line = raw_line.strip()
+    if line.startswith("- "):
+        line = line[2:].strip()
+    if len(line) >= 2 and line.startswith("`") and line.endswith("`"):
+        line = line[1:-1].strip()
+    return line
+
+
 def _commands_missing_evidence(pr_body: str, commands: list[str]) -> list[str]:
     lines = pr_body.splitlines()
+    normalized_lines = [_normalize_markdown_line(line) for line in lines]
     invalid: list[str] = []
     evidence_line_pattern = re.compile(r"^(Evidence:\s+)?https?://\S+$")
     for command in commands:
         found_valid_pair = False
-        for idx, line in enumerate(lines):
-            if line.strip() != command:
+        for idx, normalized_line in enumerate(normalized_lines):
+            if normalized_line != command:
                 continue
-            if idx + 1 >= len(lines):
+            if idx + 1 >= len(normalized_lines):
                 continue
-            evidence_line = lines[idx + 1].strip()
+            evidence_line = normalized_lines[idx + 1]
             if evidence_line_pattern.match(evidence_line):
                 found_valid_pair = True
                 break

@@ -66,3 +66,10 @@ def test_roadmap_status_transition_sync_passes_when_updated() -> None:
     )
 
     assert validate_milestone_docs._roadmap_status_transition_mismatches(transitions, roadmap_text) == []
+
+
+def test_markdown_formatted_command_and_evidence_lines_pass() -> None:
+    command = "pytest tests/test_schema_selector.py tests/test_capture_outcome_states.py"
+    pr_body = "\n".join([f"- `{command}`", "- Evidence: https://github.com/org/repo/actions/runs/44"])
+
+    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == []

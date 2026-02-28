@@ -11,6 +11,16 @@ on:
       - '.github/scripts/validate_milestone_docs.py'
       - '.github/scripts/capability_parity_report.py'
       - '.github/workflows/state-renorm-milestone-gate.yml'
+  pull_request_target:
+    paths:
+      - 'src/state_renormalization/**'
+      - 'docs/dod_manifest.json'
+      - 'docs/system_contract_map.md'
+      - 'ROADMAP.md'
+      - '.github/pull_request_template.md'
+      - '.github/scripts/validate_milestone_docs.py'
+      - '.github/scripts/capability_parity_report.py'
+      - '.github/workflows/state-renorm-milestone-gate.yml'
   merge_group:
     paths:
       - 'src/state_renormalization/**'

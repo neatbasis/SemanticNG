@@ -1,0 +1,13 @@
+<!-- transition-evidence:start -->
+### Transition evidence (copy into PR description)
+
+Replace each placeholder URL with the corresponding CI/test evidence URL.
+
+#### observer_authorization_contract
+pytest tests/test_observer_frame.py
+Evidence: https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
+
+pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py
+Evidence: https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
+
+<!-- transition-evidence:end -->

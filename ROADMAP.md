@@ -89,6 +89,24 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
   - Files: `src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py`
   - Tests: existing `tests/test_predictions_contracts_and_gates.py` plus new repair-mode tests.
 
+## Sequencing gate (enforced branch merge policy)
+
+- No `Later` feature branch merges are allowed until all `Next` capability tests are green in CI.
+- Green means every test command listed in the `Next` section completes successfully with no skipped required assertions for gate/halt behavior.
+- Any emergency exception must be documented in planning cadence notes with explicit rationale, owner, and rollback/follow-up date.
+
+## Backlog dependency tags
+
+- `Later` item 1 (Replay-grade projection engine and longitudinal correction analytics): `requires gate_halt_unification`, `requires invariant matrix complete`
+- `Later` item 2 (Capability-invocation governance): `requires gate_halt_unification`, `requires invariant matrix complete`
+- `Later` item 3 (Repair-aware projection evolution): `requires gate_halt_unification`, `requires invariant matrix complete`
+
+## Planning cadence
+
+- Reserve majority sprint/iteration capacity for `Next` milestones until all `Next` items are complete and green in CI.
+- Track any allocation exception explicitly in cadence logs (date, scope, reason, approver, and timeboxed re-entry to `Next`).
+- Reconfirm dependency tags and sequencing gate status at each planning checkpoint before accepting `Later` scope.
+
 ## Guardrails (unchanged until Next milestones are complete)
 
 - Keep JSONL append-only persistence as the reference storage contract until gate/halt unification and invariant matrix completion are green in CI.

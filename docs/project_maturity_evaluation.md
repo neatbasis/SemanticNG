@@ -78,3 +78,11 @@ Why this is most timely:
 - Promote halt normalization from `prototype` to `operational` after durable halt persistence assertions are complete.
 - Keep a changelog note in `docs/system_contract_map.md` for any maturity promotion.
 - Recompute capability completion and confirm all `Next` tests pass in CI before prioritizing `Later` features.
+
+## Next milestone checkpoints
+
+| Next milestone | Target date | Owner area | Pass criteria |
+| --- | --- | --- | --- |
+| Unified gate pipeline parity | 2026-03-15 | Engine + Invariants | `tests/test_predictions_contracts_and_gates.py` is green with explicit `Flow.CONTINUE` and `Flow.STOP` assertions for core gate scenarios. |
+| Durable explainable halt persistence | 2026-03-22 | Invariants + Contracts + Persistence | `tests/test_predictions_contracts_and_gates.py` and `tests/test_persistence_jsonl.py` are green with halt `details`, `evidence`, and invariant identity persisted/replayable. |
+| Invariant matrix completion | 2026-03-29 | Invariants + Test harness | `tests/test_predictions_contracts_and_gates.py` is green with parameterized coverage across all registered `InvariantId` pass/stop branches. |

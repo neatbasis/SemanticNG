@@ -56,7 +56,12 @@ def test_transitioned_capability_commands_filters_to_transitioned_and_non_empty_
     }
 
 
-def test_render_block_includes_expected_markers_and_evidence_lines() -> None:
+def test_render_block_includes_expected_markers_and_evidence_lines(monkeypatch) -> None:
+    monkeypatch.delenv("MILESTONE_EVIDENCE_URL", raising=False)
+    monkeypatch.delenv("GITHUB_SERVER_URL", raising=False)
+    monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
+    monkeypatch.delenv("GITHUB_RUN_ID", raising=False)
+
     block = render_transition_evidence._render_block(
         {
             "cap_a": ["pytest tests/test_alpha.py"],
@@ -69,6 +74,14 @@ def test_render_block_includes_expected_markers_and_evidence_lines() -> None:
     assert "#### cap_a" in block
     assert "pytest tests/test_alpha.py" in block
     assert "Evidence: https://github.com/<org>/<repo>/actions/runs/<run_id>#capability-cap_a-1" in block
+
+
+def test_render_block_uses_explicit_evidence_url_override(monkeypatch) -> None:
+    monkeypatch.setenv("MILESTONE_EVIDENCE_URL", "https://example.test/runs/123")
+
+    block = render_transition_evidence._render_block({"cap_a": ["pytest tests/test_alpha.py"]})
+
+    assert "Evidence: https://example.test/runs/123#capability-cap_a-1" in block
 
 
 def test_render_block_reports_no_transitions_message_when_empty() -> None:

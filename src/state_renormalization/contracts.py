@@ -7,6 +7,10 @@ from typing import Any, ClassVar, Dict, List, Mapping, Optional
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
+
+class HaltPayloadValidationError(ValueError):
+    """Raised when a halt payload cannot be normalized into canonical halt fields."""
+
 # ------------------------------------------------------------------------------
 # Shared BaseModel config helpers
 # ------------------------------------------------------------------------------
@@ -369,7 +373,10 @@ class HaltRecord(BaseModel):
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "HaltRecord":
         raw = dict(payload)
-        cls._validate_alias_consistency(raw)
+        try:
+            cls._validate_alias_consistency(raw)
+        except ValueError as exc:
+            raise HaltPayloadValidationError(str(exc)) from exc
         canonical_candidate = {
             "halt_id": raw.get("halt_id", raw.get("stable_halt_id")),
             "stage": raw.get("stage"),
@@ -380,7 +387,10 @@ class HaltRecord(BaseModel):
             "retryability": raw.get("retryability", raw.get("retryable")),
             "timestamp": raw.get("timestamp", raw.get("timestamp_iso")),
         }
-        return cls.model_validate(canonical_candidate)
+        try:
+            return cls.model_validate(canonical_candidate)
+        except Exception as exc:
+            raise HaltPayloadValidationError("halt payload is malformed or incomplete") from exc
 
     @property
     def stable_halt_id(self) -> str:

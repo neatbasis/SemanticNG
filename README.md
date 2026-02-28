@@ -58,18 +58,19 @@ Validate this inventory in tests:
 pytest tests/test_dod_manifest.py
 ```
 
-### Mandatory milestone commands before PR submission
+### Contributor milestone policy for `src/state_renormalization/` PRs
 
-When your PR touches `src/state_renormalization/`, you must run and pass every `pytest_commands` entry for capabilities marked `in_progress` in `docs/dod_manifest.json`.
+When your PR touches `src/state_renormalization/`, include milestone test evidence in the PR description (or linked CI run) for every relevant `pytest_commands` entry defined in `docs/dod_manifest.json`:
 
-Current mandatory command set:
+- Capabilities with `status: in_progress` whose `code_paths` overlap your changed files.
+- Any capability moved from `in_progress` to `done` in the same PR.
 
-```bash
-pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py
-pytest tests/test_replay_projection_analytics.py tests/test_prediction_outcome_binding.py
-```
+Status transitions from `in_progress` to `done` must include all of the following:
 
-These commands are enforced in CI for PRs/merge queues that touch `src/state_renormalization/`.
+1. Passing evidence for that capability's manifest-listed `pytest_commands`.
+2. Documentation updates in `README.md` and/or `docs/*.md` beyond `docs/dod_manifest.json`.
+
+CI enforces these milestone rules for PRs and merge queues that touch `src/state_renormalization/`, `docs/dod_manifest.json`, or the milestone gate workflow.
 
 ## Running tests
 

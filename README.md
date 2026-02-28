@@ -89,6 +89,9 @@ When promoting a capability status (for example `planned` -> `in_progress` or `i
 - [ ] Update `docs/system_contract_map.md` relevant contract milestone/maturity rows and add/update the changelog entry if maturity changed.
 - [ ] Regenerate PR template autogen content (`python .github/scripts/render_transition_evidence.py --regenerate-pr-template`).
 - [ ] Paste a transition evidence block with real CI URLs (no placeholders), including command/evidence pairs for transitioned capabilities.
+- [ ] Include a PR dependency impact statement (upstream dependencies, downstream unlocks, and cross-capability regression risk).
+- [ ] Declare no-regression budget impact for all affected `done` capabilities; if waived, include owner and rollback-by date.
+- [ ] For governance/maturity PRs, update documentation freshness metadata and sprint handoff artifacts.
 
 ### Local one-step promotion checks
 

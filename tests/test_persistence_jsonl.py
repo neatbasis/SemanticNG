@@ -305,3 +305,33 @@ def test_halt_reprojection_fails_closed_for_malformed_payload(tmp_path: Path) ->
     (_, malformed), = list(read_jsonl(p))
     with pytest.raises(Exception):
         HaltRecord.from_payload(malformed)
+
+
+def test_append_halt_round_trip_preserves_all_canonical_and_stable_id_fields(tmp_path: Path) -> None:
+    p = tmp_path / "halts.jsonl"
+
+    payload = {
+        "feature_id": "feat_1",
+        "scenario_id": "scn_1",
+        "step_id": "stp_1",
+        "stable_halt_id": "halt:stable",
+        "stage": "pre-decision:post_write",
+        "violated_invariant_id": "evidence_link_completeness.v1",
+        "reason": "stable roundtrip",
+        "details": {"message": "stable roundtrip", "attempt": 3},
+        "evidence_refs": [{"kind": "scope", "ref": "scope:test"}],
+        "retryable": False,
+        "timestamp_iso": "2026-02-13T00:00:03+00:00",
+    }
+
+    append_halt(p, payload)
+
+    (_, rec), = list(read_jsonl(p))
+    canonical = HaltRecord.from_payload(payload).to_canonical_payload()
+
+    assert rec == {
+        "feature_id": "feat_1",
+        "scenario_id": "scn_1",
+        "step_id": "stp_1",
+        **canonical,
+    }

@@ -371,6 +371,20 @@ class HaltRecord(BaseModel):
         return cls.REQUIRED_PAYLOAD_FIELDS
 
     @classmethod
+    def canonical_payload_schema(cls) -> Dict[str, str]:
+        """Field map for the canonical halt payload used by STOP emitters."""
+        return {
+            "halt_id": "str",
+            "stage": "str",
+            "invariant_id": "str",
+            "reason": "str",
+            "details": "dict",
+            "evidence": "list",
+            "retryability": "bool",
+            "timestamp": "str",
+        }
+
+    @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "HaltRecord":
         raw = dict(payload)
         try:

@@ -164,7 +164,10 @@ def main() -> int:
             invalid_format_commands = _commands_with_invalid_evidence_format(pr_body, sorted(set(required_commands)))
             if invalid_format_commands:
                 print("PR description must use deterministic command/evidence pairs for milestone commands.")
-                print("Immediately follow each exact command line with one 'Evidence: https://...' URL line.")
+                print(
+                    "Immediately follow each exact command line with one 'Evidence: http(s)://...' URL line;"
+                )
+                print("only http:// or https:// URLs are accepted.")
                 for command in invalid_format_commands:
                     print(f"  - Missing deterministic evidence line for command: {command}")
                 return 1

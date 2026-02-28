@@ -329,6 +329,7 @@ class HaltRecord(BaseModel):
         "stage",
         "invariant_id",
         "reason",
+        "details",
         "evidence",
         "retryability",
         "timestamp",
@@ -338,6 +339,7 @@ class HaltRecord(BaseModel):
     stage: str = Field(min_length=1)
     invariant_id: str = Field(min_length=1, validation_alias=AliasChoices("invariant_id", "violated_invariant_id"))
     reason: str = Field(min_length=1)
+    details: Dict[str, Any]
     evidence: List[EvidenceRef] = Field(default_factory=list, validation_alias=AliasChoices("evidence", "evidence_refs"))
     retryability: bool = Field(validation_alias=AliasChoices("retryability", "retryable"))
     timestamp: str = Field(min_length=1, validation_alias=AliasChoices("timestamp", "timestamp_iso"))
@@ -373,6 +375,7 @@ class HaltRecord(BaseModel):
             "stage": raw.get("stage"),
             "invariant_id": raw.get("invariant_id", raw.get("violated_invariant_id")),
             "reason": raw.get("reason"),
+            "details": raw.get("details"),
             "evidence": raw.get("evidence", raw.get("evidence_refs", [])),
             "retryability": raw.get("retryability", raw.get("retryable")),
             "timestamp": raw.get("timestamp", raw.get("timestamp_iso")),

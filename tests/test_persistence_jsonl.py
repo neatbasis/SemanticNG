@@ -34,6 +34,7 @@ def test_append_halt_jsonl_roundtrip_and_evidence_ref_format(tmp_path: Path) -> 
         stage="post_write",
         invariant_id="evidence_link_completeness.v1",
         reason="x",
+        details={"message": "x", "context": {"gate": "post_write"}},
         evidence=[{"kind": "scope", "ref": "scope:test"}],
         retryability=True,
         timestamp="2026-02-13T00:00:00+00:00",
@@ -46,6 +47,7 @@ def test_append_halt_jsonl_roundtrip_and_evidence_ref_format(tmp_path: Path) -> 
     assert rec["stable_halt_id"] == "halt:1"
     assert rec["invariant_id"] == "evidence_link_completeness.v1"
     assert rec["violated_invariant_id"] == "evidence_link_completeness.v1"
+    assert rec["details"] == {"message": "x", "context": {"gate": "post_write"}}
     assert rec["evidence"] == [{"kind": "scope", "ref": "scope:test"}]
     assert rec["evidence_refs"] == [{"kind": "scope", "ref": "scope:test"}]
     assert rec["retryability"] is True
@@ -135,6 +137,7 @@ def test_append_halt_preserves_existing_halt_payload_fields_exactly(tmp_path: Pa
         "invariant_id": "evidence_link_completeness.v1",
         "violated_invariant_id": "evidence_link_completeness.v1",
         "reason": "missing evidence",
+        "details": {"message": "missing evidence", "contract": "halt"},
         "evidence": [{"kind": "scope", "ref": "scope:test"}],
         "evidence_refs": [{"kind": "scope", "ref": "scope:test"}],
         "retryability": True,
@@ -160,6 +163,7 @@ def test_append_halt_rejects_incomplete_payloads(tmp_path: Path) -> None:
                 "stage": "pre-decision",
                 "invariant_id": "prediction_availability.v1",
                 "reason": "missing timestamp",
+                "details": {"message": "missing timestamp"},
                 "evidence": [{"kind": "scope", "ref": "scope:test"}],
                 "retryability": True,
             },
@@ -178,6 +182,7 @@ def test_append_halt_rejects_conflicting_alias_fields(tmp_path: Path) -> None:
                 "stage": "pre-decision",
                 "invariant_id": "prediction_availability.v1",
                 "reason": "mismatch",
+                "details": {"message": "mismatch"},
                 "evidence": [{"kind": "scope", "ref": "scope:test"}],
                 "retryability": True,
                 "timestamp": "2026-02-13T00:00:00+00:00",
@@ -193,6 +198,7 @@ def test_append_halt_flow_parity_across_stop_and_continue_artifacts(tmp_path: Pa
         "stage": "pre-decision:post_write",
         "invariant_id": "evidence_link_completeness.v1",
         "reason": "stop branch",
+        "details": {"message": "stop branch", "flow": "stop"},
         "evidence": [{"kind": "scope", "ref": "scope:test"}],
         "retryability": True,
         "timestamp": "2026-02-13T00:00:00+00:00",
@@ -204,6 +210,7 @@ def test_append_halt_flow_parity_across_stop_and_continue_artifacts(tmp_path: Pa
         "invariant_id": "prediction_availability.v1",
         "violated_invariant_id": "prediction_availability.v1",
         "reason": "continue parity",
+        "details": {"message": "continue parity", "flow": "continue"},
         "evidence": [{"kind": "scope", "ref": "scope:test"}],
         "evidence_refs": [{"kind": "scope", "ref": "scope:test"}],
         "retryability": False,
@@ -222,8 +229,52 @@ def test_append_halt_flow_parity_across_stop_and_continue_artifacts(tmp_path: Pa
     for rec in (stop_rec, continue_rec):
         assert rec["stable_halt_id"] == rec["halt_id"]
         assert rec["violated_invariant_id"] == rec["invariant_id"]
+        assert isinstance(rec["details"], dict)
         assert rec["evidence_refs"] == rec["evidence"]
         assert rec["retryable"] == rec["retryability"]
         assert rec["timestamp_iso"] == rec["timestamp"]
 
     assert continue_rec["flow"] == "continue"
+
+
+def test_append_halt_roundtrip_reprojects_required_fields_without_mutation(tmp_path: Path) -> None:
+    p = tmp_path / "halts.jsonl"
+
+    payload = {
+        "halt_id": "halt:roundtrip",
+        "stage": "pre-decision:pre_consume",
+        "invariant_id": "prediction_availability.v1",
+        "reason": "roundtrip",
+        "details": {"message": "roundtrip", "attempt": 1},
+        "evidence": [{"kind": "scope", "ref": "scope:test"}],
+        "retryability": False,
+        "timestamp": "2026-02-13T00:00:00+00:00",
+    }
+
+    append_halt(p, payload)
+    (_, persisted), = list(read_jsonl(p))
+    reprojected = HaltRecord.from_payload(persisted).to_canonical_payload()
+
+    assert reprojected["invariant_id"] == payload["invariant_id"]
+    assert reprojected["details"] == payload["details"]
+    assert reprojected["evidence"] == payload["evidence"]
+
+
+def test_halt_reprojection_fails_closed_for_malformed_payload(tmp_path: Path) -> None:
+    p = tmp_path / "halts.jsonl"
+
+    append_jsonl(
+        p,
+        {
+            "halt_id": "halt:bad",
+            "stage": "pre-decision:pre_consume",
+            "reason": "missing invariant and details",
+            "evidence": [{"kind": "scope", "ref": "scope:test"}],
+            "retryability": True,
+            "timestamp": "2026-02-13T00:00:00+00:00",
+        },
+    )
+
+    (_, malformed), = list(read_jsonl(p))
+    with pytest.raises(Exception):
+        HaltRecord.from_payload(malformed)

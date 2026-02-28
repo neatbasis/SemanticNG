@@ -76,9 +76,9 @@ def test_explainable_halt_completeness_invariant_pass_and_fail() -> None:
         reason="bad halt",
         flow=Flow.STOP,
         validity=Validity.INVALID,
-        code="missing_evidence",
-        evidence=(),
-        details={},
+        code="missing_fields",
+        evidence=None,  # type: ignore[arg-type]
+        details=None,  # type: ignore[arg-type]
     )
     failing = check_explainable_halt_payload(
         default_check_context(

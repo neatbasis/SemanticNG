@@ -164,6 +164,9 @@ jobs:
       - name: Generate capability parity report
         run: python .github/scripts/capability_parity_report.py
 
+      - name: Run deterministic capability parity pytest coverage
+        run: pytest tests/test_capability_parity_report.py
+
       - name: Upload capability parity report artifact
         uses: actions/upload-artifact@v4
         with:

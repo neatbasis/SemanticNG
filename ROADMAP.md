@@ -49,6 +49,17 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
   - Files: `src/state_renormalization/invariants.py`, `tests/test_predictions_contracts_and_gates.py`
   - Tests: `tests/test_predictions_contracts_and_gates.py`
 
+### 6) Replay projection analytics contract (replay-grade projection engine and longitudinal correction analytics; `status: done`)
+- **Owner area/module:** Engine + Persistence + Correction artifacts (`src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`)
+- **Success criteria (test outcomes):**
+  - Replay tests pass, proving `ProjectionState` reconstructed from append-only logs is deterministic across repeated runs and independent process restarts.
+  - Multi-episode replay tests pass, demonstrating correction/cost attribution can be computed from persisted lineage without side channels.
+  - Scope remains read-only: analytics are derived from persisted prediction/halt/correction lineage only (no side effects, no external integrations).
+  - No policy changes to gating behavior and no online cost accounting mutations during mission execution in this completed phase.
+- **Related files/tests:**
+  - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`
+  - Tests: `tests/test_predictions_contracts_and_gates.py`, `tests/test_persistence_jsonl.py`, `tests/test_replay_projection_analytics.py`, `tests/test_replay_projection_determinism.py`, `tests/test_replay_projection_restart_contracts.py`, `tests/test_prediction_outcome_binding.py`, `tests/replay_projection_analytics/test_append_only_replay.py`
+
 ## Next (planned capabilities)
 
 ### 1) Observer authorization contract (`status: planned`)
@@ -62,24 +73,13 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 
 ## Capability status alignment (manifest source-of-truth sync)
 
-- `done`: `prediction_persistence_baseline`, `channel_agnostic_pending_obligation`, `schema_selection_ambiguity_baseline`, `gate_halt_unification`, `invariant_matrix_coverage`.
-- `in_progress`: `replay_projection_analytics`.
+- `done`: `prediction_persistence_baseline`, `channel_agnostic_pending_obligation`, `schema_selection_ambiguity_baseline`, `gate_halt_unification`, `invariant_matrix_coverage`, `replay_projection_analytics`.
+- `in_progress`: _none currently recorded_.
 - `planned`: `observer_authorization_contract`, `capability_invocation_governance`, `repair_aware_projection_evolution`.
 
 ## Later (larger architecture goals)
 
-### 1) Replay projection analytics contract (replay-grade projection engine and longitudinal correction analytics; `status: in_progress`)
-- **Owner area/module:** Engine + Persistence + Correction artifacts (`src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`)
-- **Success criteria (test outcomes):**
-  - New replay tests pass, proving `ProjectionState` reconstructed from append-only logs is deterministic across repeated runs and independent process restarts.
-  - Multi-episode tests pass, demonstrating correction/cost attribution can be computed from persisted lineage without side channels.
-  - Phase scope remains read-only: analytics are derived from persisted prediction/halt/correction lineage only (no side effects, no external integrations).
-  - Non-goal for this phase: no policy changes to gating behavior and no online cost accounting mutations during mission execution.
-- **Related files/tests:**
-  - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`
-  - Tests: extend `tests/test_predictions_contracts_and_gates.py`; add replay/correction-focused tests under `tests/`.
-
-### 2) Capability-invocation governance (policy-aware external actions; `status: planned`)
+### 1) Capability-invocation governance (policy-aware external actions; `status: planned`)
 - **Owner area/module:** Engine + Contracts + Capability adapters (`src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, adapter modules under `src/state_renormalization/adapters/`)
 - **Success criteria (test outcomes):**
   - New capability-gating tests pass, showing no externally consequential action executes without a current valid prediction and explicit gate pass.
@@ -88,7 +88,7 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
   - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, capability adapter files (as added)
   - Tests: add capability governance suites under `tests/` (prediction + halt + side-effect guards).
 
-### 3) Evolution path toward repair-aware projection (without silent mutation; `status: planned`)
+### 2) Evolution path toward repair-aware projection (without silent mutation; `status: planned`)
 - **Owner area/module:** Invariants + Engine (`src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py`)
 - **Success criteria (test outcomes):**
   - Prototype repair-mode tests pass where repair proposals are emitted as explicit auditable events (never implicit state mutation).
@@ -105,7 +105,7 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 
 ## Backlog dependency tags
 
-- `Later` item 1 (Replay projection analytics contract): `in_progress` with no `Next` dependency blocker currently recorded in manifest governance files.
+- `Later` item 1 (Replay projection analytics contract): `done`; maintain replay analytics suites as non-regression gates while sequencing `Next` governance contracts.
 - `Later` item 2 (Capability-invocation governance): `planned`; sequence after observer authorization contract to keep authorization semantics stable before external side-effect policy gating.
 - `Later` item 3 (Repair-aware projection evolution): `planned`; sequence after replay analytics baselines are stable to preserve auditable repair-event lineage.
 
@@ -126,7 +126,7 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 | capability_id | invariant_id | failures (7d) | recurrence rank | mapped roadmap section | owner | action |
 | --- | --- | --- | --- | --- | --- | --- |
 | `observer_authorization_contract` | `observer_not_authorized` | 6 | 1 | `Next` | contracts/engine | land authorization gating + explainable halt persistence follow-up |
-| `replay_projection_analytics` | `prediction_missing_for_effect` | 2 | 4 | `Later` | engine/persistence | keep design prep only until sequencing gate dependencies are met |
+| `replay_projection_analytics` | `prediction_missing_for_effect` | 2 | 4 | `Later` | engine/persistence | maintain deterministic replay analytics regressions as a stability baseline while `Next` items are prioritized |
 
 #### Recurring-cause tracking and roadmap mapping
 
@@ -166,7 +166,7 @@ Use this short table at each planning checkpoint to pick exactly one next PR sco
 
 | Capability ID | Dependency status (met/blocked) | Governance readiness (manifest+roadmap+contract-map aligned) | Test evidence completeness | Risk-reduction score | Recommended next action |
 | --- | --- | --- | --- | --- | --- |
-| `replay_projection_analytics` | met (`status=in_progress`) | partial | partial | 3/5 | Continue focused in-progress replay PRs while preserving append-only and explainable-halt contracts. |
+| `replay_projection_analytics` | met (`status=done`) | aligned | complete | 2/5 | Keep replay analytics tests green as non-regression guardrails; prioritize `observer_authorization_contract` for next implementation PRs. |
 | `observer_authorization_contract` | met (`status=planned`) | partial | partial | 4/5 | Prioritize the next PR to land runtime authorization gating + persisted explainable halt coverage. |
 | `capability_invocation_governance` | blocked (sequence after observer authorization) | blocked | missing | 5/5 | Keep design/doc prep only; defer merge work until observer authorization is done. |
 | `repair_aware_projection_evolution` | blocked (sequence after replay analytics hardening) | blocked | missing | 3/5 | Draft explicit auditable repair-event contract tests while keeping strict halt-only behavior as default. |

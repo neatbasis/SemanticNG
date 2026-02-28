@@ -1,6 +1,10 @@
 # state_renormalization/contracts.py
 from __future__ import annotations
 
+# Temporary integration merge-freeze marker:
+# during stabilization of integration/pr-conflict-resolution, merge changes to this
+# module only via the ordered integration stack documented in docs/integration_notes.md.
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, ClassVar, Dict, List, Mapping, Optional

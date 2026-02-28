@@ -30,6 +30,13 @@ Do not merge milestone or maturity update PRs until all conditions are met:
 2. PR checklist includes command-by-command evidence links for all status transitions.
 3. `ROADMAP.md`, `docs/dod_manifest.json`, and `docs/system_contract_map.md` remain internally consistent after the update.
 
+## Integration branch stabilization controls (temporary)
+
+- [ ] **Merge freeze applied for touched files:** `src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, and governance docs are frozen for direct parallel merges during stabilization.
+- [ ] **Stack merged serially in defined order:** Integration merges were landed one-by-one (not in parallel) with immediate follow-up rebases between merges.
+- [ ] **Post-merge validation run after each landed PR:** Conflict-prone suites and governance validation both passed before moving to the next PR.
+- [ ] **Superseded PRs closed with `merged-via-integration` notes:** Every superseded PR includes links to preserving integration commits and a feature-retention summary.
+
 ## Integration PR feature-retention checklist
 
 When preparing an integration PR that reconciles multiple incoming branches, include a feature-retention section in the PR body that enumerates each still-open PR and the exact preserved behavior(s).

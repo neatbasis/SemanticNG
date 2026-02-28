@@ -15,14 +15,14 @@
 
 ## Milestone pytest commands + CI evidence links (required for capability status transitions)
 
-For each transitioned capability, copy each `pytest` command exactly as written in `docs/dod_manifest.json` and include CI evidence nearby using this pattern:
+For each transitioned capability, copy each `pytest` command exactly as written in `docs/dod_manifest.json` and use deterministic two-line pairs:
 
 ```text
 <exact command string>
 Evidence: https://...
 ```
 
-`Evidence: https://...` must appear on line 2 or within the next 3 lines after each command.
+The evidence line must be immediately after the command and must contain exactly one URL on that line.
 
 Example layout:
 

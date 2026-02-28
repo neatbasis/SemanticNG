@@ -89,22 +89,24 @@ def _added_changelog_entries(base_sha: str, head_sha: str) -> list[str]:
     return entries
 
 
-def _commands_missing_evidence(pr_body: str, commands: list[str]) -> list[str]:
+def _commands_with_invalid_evidence_format(pr_body: str, commands: list[str]) -> list[str]:
     lines = pr_body.splitlines()
-    missing: list[str] = []
-    evidence_pattern = re.compile(r"(?:https?://|artifact://|attached:)")
+    invalid: list[str] = []
+    evidence_line_pattern = re.compile(r"^Evidence:\s+(https?://\S+)$")
     for command in commands:
-        found_with_evidence = False
+        found_valid_pair = False
         for idx, line in enumerate(lines):
-            if command not in line:
+            if line.strip() != command:
                 continue
-            window = "\n".join(lines[idx : idx + 4])
-            if evidence_pattern.search(window):
-                found_with_evidence = True
+            if idx + 1 >= len(lines):
+                continue
+            evidence_line = lines[idx + 1].strip()
+            if evidence_line_pattern.match(evidence_line):
+                found_valid_pair = True
                 break
-        if not found_with_evidence:
-            missing.append(command)
-    return missing
+        if not found_valid_pair:
+            invalid.append(command)
+    return invalid
 
 
 def _load_pr_body() -> str:
@@ -159,12 +161,12 @@ def main() -> int:
                     print(f"  - Missing command in PR body: {command}")
                 return 1
 
-            missing_evidence = _commands_missing_evidence(pr_body, sorted(set(required_commands)))
-            if missing_evidence:
-                print("PR description must link passing CI evidence near each milestone pytest command.")
-                print("Include workflow/job URL(s) or attached output for every command.")
-                for command in missing_evidence:
-                    print(f"  - Missing evidence link near command: {command}")
+            invalid_format_commands = _commands_with_invalid_evidence_format(pr_body, sorted(set(required_commands)))
+            if invalid_format_commands:
+                print("PR description must use deterministic command/evidence pairs for milestone commands.")
+                print("Immediately follow each exact command line with one 'Evidence: https://...' URL line.")
+                for command in invalid_format_commands:
+                    print(f"  - Missing deterministic evidence line for command: {command}")
                 return 1
 
     head_map_text = Path("docs/system_contract_map.md").read_text(encoding="utf-8")

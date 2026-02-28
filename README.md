@@ -82,6 +82,25 @@ PRs that change capability status in `docs/dod_manifest.json` or contract maturi
 
 CI enforces these milestone rules for PRs and merge queues that touch `src/state_renormalization/`, `docs/dod_manifest.json`, or the milestone gate workflow.
 
+
+### Pre-submit milestone docs check (local)
+
+Before pushing a PR that changes milestone docs or status transitions, run:
+
+```bash
+python .github/scripts/validate_milestone_docs.py
+```
+
+Set required environment variables first:
+
+```bash
+export BASE_SHA=<base_commit_sha>
+export HEAD_SHA=<head_commit_sha>
+export GITHUB_EVENT_NAME=pull_request
+export GITHUB_EVENT_PATH=<path_to_pull_request_event_payload_json>
+python .github/scripts/validate_milestone_docs.py
+```
+
 ## Running tests
 
 Run the pytest suite:

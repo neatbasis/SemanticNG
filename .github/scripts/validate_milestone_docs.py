@@ -217,10 +217,10 @@ def _maturity_promotion_evidence_mismatches(
     return promotion_mismatches
 
 
-def _commands_with_invalid_evidence_format(pr_body: str, commands: list[str]) -> list[str]:
+def _commands_missing_evidence(pr_body: str, commands: list[str]) -> list[str]:
     lines = pr_body.splitlines()
     invalid: list[str] = []
-    evidence_line_pattern = re.compile(r"^Evidence:\s+(https?://\S+)$")
+    evidence_line_pattern = re.compile(r"^Evidence:\s+(https?://\S+|artifact://\S+)$")
     for command in commands:
         found_valid_pair = False
         for idx, line in enumerate(lines):
@@ -235,6 +235,11 @@ def _commands_with_invalid_evidence_format(pr_body: str, commands: list[str]) ->
         if not found_valid_pair:
             invalid.append(command)
     return invalid
+
+
+def _commands_with_invalid_evidence_format(pr_body: str, commands: list[str]) -> list[str]:
+    """Backward-compatible alias for older tests/callers."""
+    return _commands_missing_evidence(pr_body, commands)
 
 
 def _load_pr_body() -> str:
@@ -289,13 +294,14 @@ def main() -> int:
                     print(f"  - Missing command in PR body: {command}")
                 return 1
 
-            invalid_format_commands = _commands_with_invalid_evidence_format(pr_body, sorted(set(required_commands)))
+            invalid_format_commands = _commands_missing_evidence(pr_body, sorted(set(required_commands)))
             if invalid_format_commands:
                 print("PR description must use deterministic command/evidence pairs for milestone commands.")
                 print(
-                    "Immediately follow each exact command line with one 'Evidence: http(s)://...' URL line;"
+                    "Immediately follow each exact command line with one evidence line in either "
+                    "'Evidence: http(s)://...' or 'Evidence: artifact://...' format;"
                 )
-                print("only http:// or https:// URLs are accepted.")
+                print("accepted evidence tokens: http://..., https://..., or artifact://...")
                 for command in invalid_format_commands:
                     print(f"  - Missing deterministic evidence line for command: {command}")
                 return 1

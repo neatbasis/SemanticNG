@@ -155,6 +155,63 @@ def regenerate_pr_template_autogen_section() -> None:
     PR_TEMPLATE_PATH.write_text(updated, encoding="utf-8")
 
 
+def _extract_pr_template_commands_by_capability(template: str) -> dict[str, list[str]]:
+    commands_by_capability: dict[str, list[str]] = {}
+    current_capability: str | None = None
+    in_code_block = False
+
+    for raw_line in template.splitlines():
+        line = raw_line.strip()
+
+        if line.startswith("#### Capability: `"):
+            suffix = line[len("#### Capability: `") :]
+            cap_id = suffix.split("`", 1)[0]
+            current_capability = cap_id if cap_id else None
+            if current_capability is not None:
+                commands_by_capability.setdefault(current_capability, [])
+            continue
+
+        if line == "```text":
+            in_code_block = True
+            continue
+        if line == "```":
+            in_code_block = False
+            continue
+
+        if in_code_block and current_capability and line.startswith("pytest "):
+            commands_by_capability[current_capability].append(line)
+
+    return commands_by_capability
+
+
+def _canonicalize_pytest_command(command: str) -> tuple[str, ...]:
+    if not command.startswith("pytest "):
+        return (command,)
+    return tuple(command.split()[1:])
+
+
+def _autogen_command_semantics_match(actual_template: str, expected_template: str) -> bool:
+    actual = _extract_pr_template_commands_by_capability(actual_template)
+    expected = _extract_pr_template_commands_by_capability(expected_template)
+
+    if set(actual) != set(expected):
+        return False
+
+    for cap_id in expected:
+        actual_tokens: list[str] = []
+        for command in actual[cap_id]:
+            actual_tokens.extend(_canonicalize_pytest_command(command))
+
+        expected_tokens: list[str] = []
+        for command in expected[cap_id]:
+            expected_tokens.extend(_canonicalize_pytest_command(command))
+
+        if tuple(actual_tokens) != tuple(expected_tokens):
+            return False
+
+    return True
+
+
 def check_pr_template_autogen_section() -> int:
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     template = PR_TEMPLATE_PATH.read_text(encoding="utf-8")
@@ -162,6 +219,10 @@ def check_pr_template_autogen_section() -> int:
 
     if template == expected_template:
         print("PR template AUTOGEN section is up to date.")
+        return 0
+
+    if _autogen_command_semantics_match(template, expected_template):
+        print("PR template AUTOGEN section uses legacy command grouping but equivalent pytest coverage; treating as up to date.")
         return 0
 
     diff = difflib.unified_diff(

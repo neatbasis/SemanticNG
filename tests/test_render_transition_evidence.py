@@ -182,3 +182,49 @@ def test_main_emits_deterministic_block_for_same_base_and_head(monkeypatch, caps
     second = capsys.readouterr().out
 
     assert first == second
+
+
+def test_check_pr_template_autogen_section_accepts_legacy_equivalent_command_grouping(monkeypatch, tmp_path) -> None:
+    manifest_path = tmp_path / "dod_manifest.json"
+    template_path = tmp_path / "pull_request_template.md"
+
+    manifest = {
+        "capabilities": [
+            {
+                "id": "cap_a",
+                "status": "planned",
+                "pytest_commands": [
+                    "pytest tests/test_one.py tests/test_two.py tests/test_three.py"
+                ],
+            }
+        ]
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    template_path.write_text(
+        "\n".join(
+            [
+                render_transition_evidence.AUTOGEN_BEGIN,
+                "## AUTOGEN milestone command/evidence pairs (do not edit by hand)",
+                "",
+                "### Capability command/evidence blocks (generated from `docs/dod_manifest.json`)",
+                "",
+                "#### Capability: `cap_a` (status: `planned`)",
+                "```text",
+                "pytest tests/test_one.py tests/test_two.py",
+                "https://github.com/<org>/<repo>/actions/runs/<run_id>",
+                "",
+                "pytest tests/test_three.py",
+                "https://github.com/<org>/<repo>/actions/runs/<run_id>",
+                "",
+                "```",
+                render_transition_evidence.AUTOGEN_END,
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(render_transition_evidence, "MANIFEST_PATH", manifest_path)
+    monkeypatch.setattr(render_transition_evidence, "PR_TEMPLATE_PATH", template_path)
+
+    assert render_transition_evidence.check_pr_template_autogen_section() == 0

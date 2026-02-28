@@ -7,6 +7,7 @@ from typing import Iterable
 MANIFEST_PATH = Path("docs/dod_manifest.json")
 ROADMAP_PATH = Path("ROADMAP.md")
 CONTRACT_MAP_PATH = Path("docs/system_contract_map.md")
+PROJECT_MATURITY_PATH = Path("docs/project_maturity_evaluation.md")
 DEFAULT_OUTPUT_PATH = Path("artifacts/capability_parity_report.txt")
 
 
@@ -142,6 +143,184 @@ def _manifest_capabilities() -> list[dict]:
     return json.loads(MANIFEST_PATH.read_text(encoding="utf-8")).get("capabilities", [])
 
 
+def _manifest_status_index(capabilities: Iterable[dict]) -> dict[str, set[str]]:
+    by_status: dict[str, set[str]] = {}
+    for capability in capabilities:
+        status = capability.get("status")
+        cap_id = capability.get("id")
+        if not isinstance(status, str) or not isinstance(cap_id, str):
+            continue
+        by_status.setdefault(status, set()).add(cap_id)
+    return by_status
+
+
+def _extract_roadmap_status_alignment(text: str) -> dict[str, set[str]]:
+    alignment: dict[str, set[str]] = {}
+    in_alignment_section = False
+    bullet_pattern = re.compile(r"^- `([^`]+)`: (.+)\.$")
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line.startswith("## Capability status alignment"):
+            in_alignment_section = True
+            continue
+        if in_alignment_section and line.startswith("## "):
+            break
+        if not in_alignment_section:
+            continue
+
+        match = bullet_pattern.match(line)
+        if not match:
+            continue
+
+        status = match.group(1)
+        capability_ids = {cap_id for cap_id in re.findall(r"`([^`]+)`", match.group(2))}
+        alignment[status] = capability_ids
+
+    return alignment
+
+
+def roadmap_alignment_mismatches(capabilities: list[dict], roadmap_text: str) -> list[str]:
+    mismatches: list[str] = []
+    manifest_by_status = _manifest_status_index(capabilities)
+    roadmap_alignment = _extract_roadmap_status_alignment(roadmap_text)
+
+    for status in sorted(set(manifest_by_status) | set(roadmap_alignment)):
+        manifest_caps = manifest_by_status.get(status, set())
+        roadmap_caps = roadmap_alignment.get(status, set())
+        missing = sorted(manifest_caps - roadmap_caps)
+        extras = sorted(roadmap_caps - manifest_caps)
+        if missing:
+            mismatches.append(
+                f"ROADMAP status alignment missing capabilities under '{status}': {', '.join(missing)}."
+            )
+        if extras:
+            mismatches.append(
+                f"ROADMAP status alignment includes capabilities not in manifest under '{status}': {', '.join(extras)}."
+            )
+
+    return mismatches
+
+
+def _extract_changelog_lines(markdown_text: str) -> list[str]:
+    lines = markdown_text.splitlines()
+    capture = False
+    entries: list[str] = []
+    for raw_line in lines:
+        line = raw_line.rstrip()
+        if line.strip() == "### Changelog":
+            capture = True
+            continue
+        if capture and re.match(r"^###\s+", line):
+            break
+        if capture and line.strip().startswith("- "):
+            entries.append(line.strip())
+    return entries
+
+
+def contract_maturity_evidence_mismatches(contract_map_text: str) -> list[str]:
+    maturity_rank = {"in_progress": 0, "prototype": 1, "operational": 2, "proven": 3}
+    mismatches: list[str] = []
+    contract_rows = {row.name: row for row in _extract_contract_rows(contract_map_text)}
+    transition_pattern = re.compile(r"-\s+\d{4}-\d{2}-\d{2}\s+\([^)]+\):\s+(.+?)\s+(\w+)\s+->\s+(\w+)")
+
+    for line in _extract_changelog_lines(contract_map_text):
+        if "->" not in line:
+            continue
+
+        if "https://" not in line:
+            mismatches.append(f"Contract map changelog transition missing https evidence URL: {line}")
+
+        transition_match = transition_pattern.match(line)
+        if not transition_match:
+            mismatches.append(
+                "Contract map changelog transition does not match required format '- YYYY-MM-DD (Milestone): <contract> <from> -> <to>; ...'. "
+                f"Line: {line}"
+            )
+            continue
+
+        contract_name, before, after = transition_match.groups()
+        row = contract_rows.get(contract_name)
+        if row is None:
+            mismatches.append(f"Contract map changelog references unknown contract '{contract_name}'.")
+            continue
+
+        before_rank = maturity_rank.get(before)
+        after_rank = maturity_rank.get(after)
+        current_rank = maturity_rank.get(row.maturity)
+        if before_rank is None or after_rank is None or current_rank is None:
+            mismatches.append(
+                f"Contract map changelog contains unknown maturity values for '{contract_name}': {before} -> {after}."
+            )
+            continue
+
+        if before_rank >= after_rank:
+            mismatches.append(
+                f"Contract map changelog transition for '{contract_name}' must be a forward maturity move: {before} -> {after}."
+            )
+        if after_rank > current_rank:
+            mismatches.append(
+                f"Contract map changelog transition for '{contract_name}' overshoots current maturity '{row.maturity}': {before} -> {after}."
+            )
+
+    return mismatches
+
+
+def project_maturity_mismatches(capabilities: list[dict], project_maturity_text: str) -> list[str]:
+    mismatches: list[str] = []
+    status_counts = {
+        "done": sum(1 for cap in capabilities if cap.get("status") == "done"),
+        "in_progress": sum(1 for cap in capabilities if cap.get("status") == "in_progress"),
+        "planned": sum(1 for cap in capabilities if cap.get("status") == "planned"),
+    }
+    total = len(capabilities)
+
+    bullet_patterns = {
+        "done": re.compile(r"^-\s+\*\*Done:\*\*\s+(\d+)\s*$", re.MULTILINE),
+        "in_progress": re.compile(r"^-\s+\*\*In progress:\*\*\s+(\d+)\s*$", re.MULTILINE),
+        "planned": re.compile(r"^-\s+\*\*Planned:\*\*\s+(\d+)\s*$", re.MULTILINE),
+    }
+    for status, pattern in bullet_patterns.items():
+        match = pattern.search(project_maturity_text)
+        if match and int(match.group(1)) != status_counts[status]:
+            mismatches.append(
+                f"Project maturity bullet for {status} is {match.group(1)} but manifest count is {status_counts[status]}."
+            )
+
+    ratio_match = re.search(r"\(`(\d+)/(\d+)`\)", project_maturity_text)
+    if ratio_match:
+        done_value = int(ratio_match.group(1))
+        total_value = int(ratio_match.group(2))
+        if done_value != status_counts["done"] or total_value != total:
+            mismatches.append(
+                f"Project maturity completion ratio reports {done_value}/{total_value} but manifest is {status_counts['done']}/{total}."
+            )
+
+    manifest_by_id = {
+        capability.get("id"): capability.get("status")
+        for capability in capabilities
+        if isinstance(capability.get("id"), str)
+    }
+    for cap_id, status in re.findall(
+        r"`([a-z0-9_]+)`[^\n]*?\(`(done|in_progress|planned)`\)", project_maturity_text
+    ):
+        manifest_status = manifest_by_id.get(cap_id)
+        if manifest_status and manifest_status != status:
+            mismatches.append(
+                f"Project maturity status mention for '{cap_id}' says '{status}' but manifest status is '{manifest_status}'."
+            )
+
+    if "only capability currently marked `in_progress`" in project_maturity_text:
+        in_progress_caps = sorted(cap_id for cap_id, status in manifest_by_id.items() if status == "in_progress")
+        if len(in_progress_caps) != 1:
+            mismatches.append(
+                "Project maturity text claims there is only one in_progress capability, but manifest currently has "
+                f"{len(in_progress_caps)} ({', '.join(in_progress_caps) if in_progress_caps else 'none'})."
+            )
+
+    return mismatches
+
+
 def _capability_test_files(capability: dict) -> set[str]:
     files: set[str] = set()
     for command in capability.get("pytest_commands", []):
@@ -182,7 +361,10 @@ def _match_titles(roadmap_titles: Iterable[str], manifest_titles: Iterable[str])
 def build_report() -> str:
     capabilities = _manifest_capabilities()
     roadmap_items = _extract_roadmap_items(ROADMAP_PATH.read_text(encoding="utf-8"))
-    contract_rows = _extract_contract_rows(CONTRACT_MAP_PATH.read_text(encoding="utf-8"))
+    contract_map_text = CONTRACT_MAP_PATH.read_text(encoding="utf-8")
+    contract_rows = _extract_contract_rows(contract_map_text)
+    roadmap_text = ROADMAP_PATH.read_text(encoding="utf-8")
+    project_maturity_text = PROJECT_MATURITY_PATH.read_text(encoding="utf-8")
 
     roadmap_titles = sorted(item.title for item in roadmap_items)
     manifest_titles = sorted(cap.get("title", "") for cap in capabilities)
@@ -236,6 +418,10 @@ def build_report() -> str:
             cap_ids = ", ".join(sorted(cap.get("id", "") for cap in referencing_caps))
             prototype_operational_candidates.append(f"{row.name} (refs: {cap_ids})")
 
+    roadmap_status_mismatches = roadmap_alignment_mismatches(capabilities, roadmap_text)
+    contract_maturity_mismatches = contract_maturity_evidence_mismatches(contract_map_text)
+    project_maturity_status_mismatches = project_maturity_mismatches(capabilities, project_maturity_text)
+
     lines = [
         "Capability Parity Report",
         "========================",
@@ -278,7 +464,36 @@ def build_report() -> str:
     if not prototype_operational_candidates:
         lines.append("- none")
 
+    lines.extend(["", "5) Deterministic parity checks (manifest as canonical source)"])
+    lines.append("5a) ROADMAP capability-status alignment mismatches")
+    lines.extend(f"- {item}" for item in roadmap_status_mismatches)
+    if not roadmap_status_mismatches:
+        lines.append("- none")
+
+    lines.append("5b) Contract-map maturity transition evidence mismatches")
+    lines.extend(f"- {item}" for item in contract_maturity_mismatches)
+    if not contract_maturity_mismatches:
+        lines.append("- none")
+
+    lines.append("5c) Project maturity document status mismatches")
+    lines.extend(f"- {item}" for item in project_maturity_status_mismatches)
+    if not project_maturity_status_mismatches:
+        lines.append("- none")
+
     return "\n".join(lines) + "\n"
+
+
+def deterministic_parity_mismatches() -> list[str]:
+    capabilities = _manifest_capabilities()
+    roadmap_text = ROADMAP_PATH.read_text(encoding="utf-8")
+    contract_map_text = CONTRACT_MAP_PATH.read_text(encoding="utf-8")
+    project_maturity_text = PROJECT_MATURITY_PATH.read_text(encoding="utf-8")
+
+    return [
+        *roadmap_alignment_mismatches(capabilities, roadmap_text),
+        *contract_maturity_evidence_mismatches(contract_map_text),
+        *project_maturity_mismatches(capabilities, project_maturity_text),
+    ]
 
 
 def main() -> int:
@@ -287,6 +502,10 @@ def main() -> int:
     DEFAULT_OUTPUT_PATH.write_text(report, encoding="utf-8")
     print(report, end="")
     print(f"Wrote report to {DEFAULT_OUTPUT_PATH}")
+
+    if deterministic_parity_mismatches():
+        print("Deterministic capability parity checks failed.")
+        return 1
     return 0
 
 

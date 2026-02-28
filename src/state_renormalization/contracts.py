@@ -442,6 +442,9 @@ class PredictionRecord(BaseModel):
     prediction_error: Optional[float] = None
     absolute_error: Optional[float] = None
     was_corrected: bool = False
+    correction_parent_prediction_id: Optional[str] = None
+    correction_root_prediction_id: Optional[str] = None
+    correction_revision: int = 0
 
     issued_at_iso: str
     observed_at_iso: Optional[str] = None
@@ -494,6 +497,13 @@ class ProjectionState(BaseModel):
     @property
     def has_current_predictions(self) -> bool:
         return bool(self.current_predictions)
+
+
+class ProjectionReplayResult(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    projection_state: ProjectionState
+    records_processed: int = 0
 
 
 class PredictionOutcome(BaseModel):

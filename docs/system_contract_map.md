@@ -28,7 +28,7 @@ Maturity levels:
 
 | Contract name | Source file / class | Invariant IDs | Producing stage | Consuming stage | Test coverage reference | Maturity |
 |---|---|---|---|---|---|---|
-| Replay projection analytics contract | `src/state_renormalization/contracts.py` (`ProjectionState`, `PredictionRecord`) | `prediction_availability.v1`, `evidence_link_completeness.v1`, `explainable_halt_payload.v1` | replay-grade projection/correction pipeline (planned) | analytics, correction metrics, and historical audit consumers (planned) | _planned: add replay/projection analytics pytest module_ | prototype |
+| Replay projection analytics contract | `src/state_renormalization/contracts.py` (`ProjectionState`, `PredictionRecord`, `ProjectionReplayResult`) | `prediction_availability.v1`, `evidence_link_completeness.v1`, `explainable_halt_payload.v1` | replay-grade projection/correction pipeline | analytics, correction metrics, and historical audit consumers | `tests/test_replay_projection_analytics.py` | in_progress |
 
 ## Maturity update protocol (apply each milestone review)
 

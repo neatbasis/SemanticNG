@@ -29,6 +29,9 @@ from state_renormalization.contracts import (
     Episode,
     EpisodeOutputs,
     Observation,
+    ObservationFreshnessDecision,
+    ObservationFreshnessDecisionOutcome,
+    ObservationFreshnessPolicyContract,
     ObservationType,
     ObserverFrame,
     ProjectionState,
@@ -70,6 +73,7 @@ from state_renormalization.adapters.persistence import (
     append_jsonl,
 )
 from state_renormalization.adapters.ask_outbox import AskOutboxAdapter
+from state_renormalization.adapters.observation_freshness import ObservationFreshnessPolicyAdapter
 from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.invariants import (
     Flow as InvariantFlow,
@@ -157,6 +161,145 @@ class InterventionLifecycleHook(Protocol):
         projection_state: ProjectionState,
     ) -> InterventionDecision | Mapping[str, Any] | None:
         ...
+
+
+def _parse_iso8601(value: str) -> Optional[datetime]:
+    txt = (value or "").strip()
+    if not txt:
+        return None
+    if txt.endswith("Z"):
+        txt = txt[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(txt)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _observation_matches_scope(*, observation: Observation, scope: str) -> bool:
+    normalized_scope = scope.strip().lower()
+    return observation.type.value.lower() == normalized_scope or (observation.source or "").strip().lower() == normalized_scope
+
+
+def evaluate_observation_freshness(
+    *,
+    ep: Episode,
+    belief: BeliefState,
+    projection_state: ProjectionState,
+    policy_adapter: ObservationFreshnessPolicyAdapter,
+    ask_outbox_adapter: Optional[AskOutboxAdapter] = None,
+) -> ObservationFreshnessDecision:
+    raw_contract = policy_adapter.get_contract(episode=ep, belief=belief, projection_state=projection_state)
+    if raw_contract is None:
+        return ObservationFreshnessDecision(
+            scope="none",
+            outcome=ObservationFreshnessDecisionOutcome.CONTINUE,
+            reason="freshness policy adapter returned no contract",
+            stale_after_seconds=0,
+        )
+
+    contract = raw_contract if isinstance(raw_contract, ObservationFreshnessPolicyContract) else ObservationFreshnessPolicyContract.model_validate(raw_contract)
+
+    matched = [obs for obs in ep.observations if _observation_matches_scope(observation=obs, scope=contract.scope)]
+    latest_observation = max(matched, key=lambda item: item.t_observed_iso, default=None)
+    last_observed_at = latest_observation.t_observed_iso if latest_observation is not None else contract.observed_at_iso
+    last_observed_value = latest_observation.text if latest_observation is not None else None
+
+    reason = "observation freshness contract satisfied"
+    outcome = ObservationFreshnessDecisionOutcome.CONTINUE
+    evidence = {
+        "reason": reason,
+        "last_observed_at": last_observed_at,
+        "last_observed_value": last_observed_value,
+        "policy_threshold_seconds": contract.stale_after_seconds,
+    }
+
+    if not last_observed_at:
+        reason = "no observation available for freshness scope"
+        outcome = ObservationFreshnessDecisionOutcome.ASK_REQUEST
+    else:
+        observed_dt = _parse_iso8601(last_observed_at)
+        now_dt = _parse_iso8601(_now_iso())
+        if observed_dt is None or now_dt is None:
+            reason = "observation freshness timestamp invalid"
+            outcome = ObservationFreshnessDecisionOutcome.ASK_REQUEST
+        else:
+            age_seconds = max(0.0, (now_dt - observed_dt).total_seconds())
+            evidence["observation_age_seconds"] = age_seconds
+            if age_seconds > contract.stale_after_seconds:
+                reason = "observation is stale for freshness policy"
+                outcome = ObservationFreshnessDecisionOutcome.ASK_REQUEST
+
+    outstanding_request_id = None
+    if outcome == ObservationFreshnessDecisionOutcome.ASK_REQUEST:
+        has_outstanding = getattr(policy_adapter, "has_outstanding_request", None)
+        if callable(has_outstanding):
+            outstanding_request_id = has_outstanding(scope=contract.scope)
+        if outstanding_request_id:
+            outcome = ObservationFreshnessDecisionOutcome.HOLD
+            reason = "freshness request already outstanding for scope"
+
+    evidence.update(
+        {
+            "reason": reason,
+            "last_observed_at": last_observed_at,
+            "last_observed_value": last_observed_value,
+            "policy_threshold_seconds": contract.stale_after_seconds,
+            "scope": contract.scope,
+        }
+    )
+    if outstanding_request_id:
+        evidence["outstanding_request_id"] = outstanding_request_id
+
+    decision = ObservationFreshnessDecision(
+        scope=contract.scope,
+        outcome=outcome,
+        reason=reason,
+        stale_after_seconds=contract.stale_after_seconds,
+        observed_at_iso=contract.observed_at_iso,
+        last_observed_at_iso=last_observed_at,
+        last_observed_value=last_observed_value,
+        evidence=evidence,
+    )
+
+    artifact_payload = {
+        "artifact_kind": "observation_freshness_decision",
+        "decision": decision.model_dump(mode="json"),
+        "reason": decision.reason,
+        "last_observed_at": decision.last_observed_at_iso,
+        "last_observed_value": decision.last_observed_value,
+        "policy_threshold_seconds": decision.stale_after_seconds,
+    }
+    _append_episode_artifact(ep, artifact_payload)
+
+    if decision.outcome == ObservationFreshnessDecisionOutcome.ASK_REQUEST and ask_outbox_adapter is not None:
+        title = f"Freshness check required: {decision.scope}"
+        question = f"Please provide a fresh observation for scope '{decision.scope}'."
+        context = {
+            "scope": decision.scope,
+            "reason": decision.reason,
+            "last_observed_at": decision.last_observed_at_iso,
+            "last_observed_value": decision.last_observed_value,
+            "policy_threshold_seconds": decision.stale_after_seconds,
+        }
+        request_id = ask_outbox_adapter.create_request(title, question, context)
+        _append_episode_artifact(
+            ep,
+            {
+                "artifact_kind": "observation_freshness_ask_request",
+                "action": ObservationFreshnessDecisionOutcome.ASK_REQUEST.value,
+                "request_id": request_id,
+                "scope": decision.scope,
+                "reason": decision.reason,
+                "last_observed_at": decision.last_observed_at_iso,
+                "last_observed_value": decision.last_observed_value,
+                "policy_threshold_seconds": decision.stale_after_seconds,
+            },
+        )
+
+    return decision
 
 
 def _first_halt_from_evaluations(
@@ -1544,6 +1687,7 @@ def run_mission_loop(
     prediction_log_path: str | Path = "artifacts/predictions.jsonl",
     intervention_hook: Optional[InterventionLifecycleHook] = None,
     ask_outbox_adapter: Optional[AskOutboxAdapter] = None,
+    observation_freshness_policy_adapter: Optional[ObservationFreshnessPolicyAdapter] = None,
     invariant_handling_mode: InvariantHandlingMode = InvariantHandlingMode.STRICT_HALT,
     halt_log_path: str | Path = "halts.jsonl",
 ) -> tuple[Episode, BeliefState, ProjectionState]:
@@ -1564,6 +1708,15 @@ def run_mission_loop(
     )
     if not should_continue:
         return ep, belief, updated_projection
+
+    if observation_freshness_policy_adapter is not None:
+        evaluate_observation_freshness(
+            ep=ep,
+            belief=belief,
+            projection_state=updated_projection,
+            policy_adapter=observation_freshness_policy_adapter,
+            ask_outbox_adapter=ask_outbox_adapter,
+        )
 
     turn_prediction = _emit_turn_prediction(ep)
     turn_prediction_ref = append_prediction_record(

@@ -261,6 +261,41 @@ class Observation(BaseModel):
     source: str = "unknown"
 
 
+class ObservationFreshnessPolicyContract(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    scope: str
+    observed_at_iso: Optional[str] = Field(default=None, validation_alias=AliasChoices("observed_at_iso", "observed_at"))
+    stale_after_seconds: float = Field(ge=0)
+
+    @property
+    def observed_at(self) -> Optional[str]:
+        return self.observed_at_iso
+
+
+class ObservationFreshnessDecisionOutcome(str, Enum):
+    CONTINUE = "continue"
+    ASK_REQUEST = "ask_request"
+    HOLD = "hold"
+
+
+class ObservationFreshnessDecision(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    scope: str
+    outcome: ObservationFreshnessDecisionOutcome
+    reason: str
+    stale_after_seconds: float = Field(ge=0)
+    observed_at_iso: Optional[str] = Field(default=None, validation_alias=AliasChoices("observed_at_iso", "observed_at"))
+    last_observed_at_iso: Optional[str] = None
+    last_observed_value: Optional[str] = None
+    evidence: Dict[str, Any] = Field(default_factory=dict)
+
+    @property
+    def observed_at(self) -> Optional[str]:
+        return self.observed_at_iso
+
+
 class OutputRenderingArtifact(BaseModel):
     model_config = _CONTRACT_CONFIG
     kind: str

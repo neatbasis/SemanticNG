@@ -15,6 +15,16 @@ This document is the canonical source for active release/integration workflow ex
 - [ ] **Status transition commands captured in manifest:** Each transitioned capability has complete `pytest_commands` and synchronized `ci_evidence_links.command` entries in manifest order.
 - [ ] **Milestone gate pass links recorded:** CI run links are captured in manifest `ci_evidence_links` and/or release notes as needed (PR-body duplication is optional).
 
+
+## Governance enforcement requirements
+
+- [ ] **No-regression budget respected:** All `done` capability command packs remain green with zero unapproved failures.
+- [ ] **Regression waiver timeboxed:** Any waiver includes owner, rationale, rollback-by date, and mitigation command packs.
+- [ ] **Dependency impact statements present:** Every merged PR includes upstream/downstream impact and cross-capability risk statements.
+- [ ] **Capability maturity gates enforced:** `planned -> in_progress -> done` transitions are validated by CI entry/exit gate checks.
+- [ ] **Documentation freshness SLO met:** Governed docs are within freshness threshold and include current regeneration metadata.
+- [ ] **Sprint handoff minimum artifacts attached:** Sprint-close report includes exit table, open-risk register, and next-sprint preload list.
+
 ## Copy/paste evidence block (validator-compatible)
 
 Generate the PR-template block from `docs/dod_manifest.json` instead of maintaining command examples here:

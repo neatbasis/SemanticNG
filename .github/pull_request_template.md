@@ -2,6 +2,24 @@
 
 - Describe the change.
 
+## Dependency impact statement (mandatory)
+
+- Upstream capabilities/contracts consumed:
+- Downstream capabilities/contracts affected or unlocked:
+- Cross-capability risk if this change regresses:
+
+## No-regression budget and rollback plan (mandatory)
+
+- Done-capability command packs impacted (if none, write `none`):
+- Regression budget impact (`none` / `waiver_requested`):
+- If waiver requested, include owner + rollback-by date + mitigation command packs:
+
+## Documentation freshness and sprint handoff artifacts (mandatory for governance/maturity PRs)
+
+- Governed docs updated with fresh regeneration metadata (`yes`/`no`/`not_applicable`):
+- Sprint handoff artifact updates included (`yes`/`no`/`not_applicable`):
+- If `no`, provide timeboxed follow-up issue/PR and owner:
+
 ## Testing
 
 - List tests/checks run for this PR.

@@ -65,7 +65,7 @@
       "id": "replay_projection_analytics",
       "title": "Replay-grade projection and correction analytics",
       "status": "in_progress",
-      "roadmap_section": "Next",
+      "roadmap_section": "Later",
       "code_paths": [
         "src/state_renormalization/engine.py",
         "src/state_renormalization/adapters/persistence.py",

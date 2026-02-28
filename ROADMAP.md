@@ -62,7 +62,7 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 
 ## Later (larger architecture goals)
 
-### 1) Replay-grade projection engine and longitudinal correction analytics
+### 1) Replay projection analytics contract (replay-grade projection engine and longitudinal correction analytics)
 - **Owner area/module:** Engine + Persistence + Correction artifacts (`src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`)
 - **Success criteria (test outcomes):**
   - New replay tests pass, proving `ProjectionState` reconstructed from append-only logs is deterministic across repeated runs and independent process restarts.
@@ -99,7 +99,7 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 
 ## Backlog dependency tags
 
-- `Later` item 1 (Replay-grade projection engine and longitudinal correction analytics): `requires gate_halt_unification`, `requires invariant matrix complete`
+- `Later` item 1 (Replay projection analytics contract): `requires gate_halt_unification`, `requires invariant matrix complete`
 - `Later` item 2 (Capability-invocation governance): `requires gate_halt_unification`, `requires invariant matrix complete`
 - `Later` item 3 (Repair-aware projection evolution): `requires gate_halt_unification`, `requires invariant matrix complete`
 

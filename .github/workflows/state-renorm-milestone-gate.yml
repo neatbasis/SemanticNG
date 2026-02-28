@@ -25,6 +25,10 @@ on:
 jobs:
   milestone-pytest:
     runs-on: self-hosted
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -41,13 +45,104 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[test]"
 
-      - name: Validate milestone documentation governance
+      - name: Compute diff SHAs
+        id: shas
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          base_sha="${PR_BASE_SHA:-${MERGE_GROUP_BASE_SHA:-}}"
+          head_sha="${PR_HEAD_SHA:-${MERGE_GROUP_HEAD_SHA:-}}"
+
+          if [[ -z "$base_sha" || -z "$head_sha" ]]; then
+            echo "Unable to determine BASE_SHA/HEAD_SHA from event context."
+            exit 1
+          fi
+
+          echo "BASE_SHA=$base_sha" >> "$GITHUB_ENV"
+          echo "HEAD_SHA=$head_sha" >> "$GITHUB_ENV"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Render transition evidence block
+        run: |
+          mkdir -p artifacts
+          python .github/scripts/render_transition_evidence.py \
+            --base "$BASE_SHA" \
+            --head "$HEAD_SHA" | tee artifacts/transition_evidence_block.md
+
+      - name: Add transition evidence block to job summary
+        run: |
+          {
+            echo "## Transition Evidence Block"
+            echo
+            cat artifacts/transition_evidence_block.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload transition evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: transition-evidence-block
+          path: artifacts/transition_evidence_block.md
+          if-no-files-found: error
+
+      - name: Validate milestone documentation governance
+        id: validate_milestone
+        env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
-        run: python .github/scripts/validate_milestone_docs.py
+        run: |
+          set -euo pipefail
+
+          python .github/scripts/validate_milestone_docs.py 2>&1 | tee artifacts/validate_milestone_docs.log
+          validator_status=${PIPESTATUS[0]}
+          echo "VALIDATOR_MISSING_EVIDENCE=false" >> "$GITHUB_ENV"
+
+          if [[ $validator_status -ne 0 ]]; then
+            if grep -Fq "PR description must include adjacency evidence" artifacts/validate_milestone_docs.log; then
+              echo "VALIDATOR_MISSING_EVIDENCE=true" >> "$GITHUB_ENV"
+            fi
+
+            echo
+            echo "Copy this exact block into PR description"
+            cat artifacts/transition_evidence_block.md
+            exit "$validator_status"
+          fi
+
+      - name: Comment transition evidence block on PR when validation fails
+        if: ${{ failure() && github.event_name == 'pull_request' && env.VALIDATOR_MISSING_EVIDENCE == 'true' }}
+        continue-on-error: true
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "### Transition Evidence Block"
+            echo
+            echo "Validation failed due to missing transition evidence."
+            echo "Copy this exact block into the PR description:"
+            echo
+            cat artifacts/transition_evidence_block.md
+          } > artifacts/transition_evidence_comment.md
+
+      - name: Post transition evidence comment using GitHub API
+        if: ${{ failure() && github.event_name == 'pull_request' && env.VALIDATOR_MISSING_EVIDENCE == 'true' }}
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('artifacts/transition_evidence_comment.md', 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(process.env.PR_NUMBER),
+              body,
+            });
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
 
       - name: Generate capability parity report
         run: python .github/scripts/capability_parity_report.py
@@ -60,9 +155,6 @@ jobs:
           if-no-files-found: error
 
       - name: Run milestone pytest commands for relevant changes
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
         run: |
           python - <<'PY'
           import json

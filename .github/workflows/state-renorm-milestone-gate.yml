@@ -80,6 +80,7 @@ jobs:
         run: python .github/scripts/render_transition_evidence.py --check-pr-template-autogen
 
       - name: Render transition evidence block
+        id: render_transition_evidence
         run: |
           mkdir -p artifacts
           python .github/scripts/render_transition_evidence.py \
@@ -93,13 +94,15 @@ jobs:
             echo
             echo "Paste this exact block into the PR description when milestone validation requests it."
             echo
+            echo '```markdown'
             cat artifacts/transition-evidence.txt
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload transition evidence artifact
         uses: actions/upload-artifact@v4
         with:
-          name: transition-evidence-block
+          name: transition-evidence.txt
           path: artifacts/transition-evidence.txt
           if-no-files-found: error
 
@@ -123,9 +126,11 @@ jobs:
             fi
 
             echo
-            echo "Milestone validation failed due to missing transitioned-capability evidence in the PR description."
-            echo "Contributors: paste the generated transition evidence block below into the PR description and re-run checks."
-            cat artifacts/transition-evidence.txt
+            echo "Milestone validation failed: missing transitioned-capability evidence block in the PR description."
+            echo "Remediation:"
+            echo "  1) Copy the generated block from the 'Transitioned Capability Evidence' section in this job summary."
+            echo "  2) Or download artifact 'transition-evidence.txt' and paste its contents into the PR description."
+            echo "  3) Keep the block formatting unchanged, then re-run checks."
             exit "$validator_status"
           fi
 

@@ -2,12 +2,12 @@
 
 ## Executive assessment
 
-SemanticNG is in an **early operational maturity** state:
+SemanticNG is in an **operational hardening** state:
 
 - Core baseline capabilities are implemented and tested (`5/9` manifest capabilities are `done`).
 - The entire current pytest suite is passing locally.
 - The architecture has clear milestone framing (`Now` / `Next` / `Later`) and contract-level maturity tracking.
-- The most critical unfinished work is concentrated in replay-grade projection analytics and downstream governance expansion.
+- The most critical unfinished work is now concentrated in replay-grade projection analytics and downstream governance expansion.
 
 ## Evidence snapshot
 
@@ -19,15 +19,16 @@ SemanticNG is in an **early operational maturity** state:
 
 Completion ratio (done / total): **55.6%** (`5/9`).
 
-Current bottleneck capability: **`replay_projection_analytics`** (`in_progress`), because it is the only active delivery item and gates replay-grade audit/analytics hardening before broader Later-scope expansion.
+Current bottleneck capability: **`replay_projection_analytics`** (`in_progress`), because halt/gate unification hardening is now completed and replay-grade audit/analytics is the highest-priority unresolved dependency for Later milestone confidence.
 
-This indicates the project is beyond prototype discovery, but not yet at system hardening completeness.
+This indicates the project is beyond baseline contract hardening and entering replay/analytics completion work.
 
 ### Quality and validation signals
 
 - Test suite currently passes (`pytest -q`).
 - Roadmap items are linked to concrete test commands.
 - Contract map defines explicit maturity labels (`prototype`, `operational`, `proven`) and promotion protocol.
+- Halt normalization behavior is enforced through gate, mission-loop, persistence, and halt contract tests.
 
 ### Lifecycle/process signals
 
@@ -36,18 +37,18 @@ This indicates the project is beyond prototype discovery, but not yet at system 
 
 ## Maturity conclusion
 
-**Current stage: Operational foundation / pre-hardening**
+**Current stage: Operational foundation / hardening in progress**
 
 The project has:
 
 - Strong foundational contracts and deterministic behavior coverage.
 - A disciplined test-driven roadmap.
-- Active evolution in governance and halt semantics.
+- Hardened and explainable halt normalization behavior across unified gate paths.
 
 It does **not yet** have:
 
-- Fully unified gate/halt behavior persisted and replay-validated across all invariant branches.
 - Replay-grade longitudinal analytics maturity.
+- Observer authorization and capability-governance contracts promoted beyond planned/prototype stages.
 
 ## Most timely development (priority recommendation)
 
@@ -58,7 +59,7 @@ It does **not yet** have:
 Why this is most timely:
 
 1. It is the only capability currently marked `in_progress` in the DoD manifest.
-2. It de-risks replay and restart correctness by formalizing deterministic reconstruction from persisted records.
+2. Halt/gate contract hardening is already merged, so replay determinism is now the dominant risk reducer.
 3. It is a prerequisite for credible correction metrics and auditability claims in governance-heavy future features.
 
 ### #2 Concrete near-term execution sequence
@@ -72,7 +73,8 @@ Why this is most timely:
 
 ### #3 Defer until #1 is green
 
-- Replay-grade projection/correction analytics.
+- Observer authorization expansion (`observer_authorization_contract`).
+- Capability invocation governance.
 
 Current analytics phase scope (read-only):
 - Define minimal analytics contracts for correction counts/cost attribution.
@@ -85,9 +87,13 @@ Non-goals in this phase:
 
 ## Suggested maturity targets for next review
 
-- Promote halt normalization from `prototype` to `operational` after durable halt persistence assertions are complete.
-- Keep a changelog note in `docs/system_contract_map.md` for any maturity promotion.
-- Recompute capability completion and confirm all `Next` tests pass in CI before prioritizing `Later` features.
+- Promote replay projection analytics from `in_progress` capability to `done` once replay determinism tests are stable in CI.
+- Keep a dated changelog note in maturity docs for capability or contract maturity transitions.
+- Recompute capability completion and confirm replay + observer tests pass in CI before promoting additional Later features.
+
+## Maturity changelog
+
+- 2026-02-28: Updated maturity narrative from pre-hardening bottleneck to replay/analytics bottleneck after merged milestone-gate and halt/gate hardening outcomes; halt normalization is now treated as hardened/proven and no longer the principal blocker.
 
 ## Maturity review protocol
 
@@ -107,7 +113,7 @@ For each review, execute this update sequence:
 
 ### Review command pack (next-step execution anchors)
 
-- `pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py`
+- `pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py`
 - `pytest tests/test_replay_projection_analytics.py tests/test_replay_projection_determinism.py tests/test_replay_projection_restart_contracts.py tests/test_prediction_outcome_binding.py`
 - `pytest tests/test_observer_frame.py`
 
@@ -115,6 +121,6 @@ For each review, execute this update sequence:
 
 | Next milestone | Target date | Owner area | Pass criteria |
 | --- | --- | --- | --- |
-| Unified gate pipeline parity | 2026-03-15 | Engine + Invariants | `tests/test_predictions_contracts_and_gates.py` is green with explicit `Flow.CONTINUE` and `Flow.STOP` assertions for core gate scenarios. |
-| Durable explainable halt persistence | 2026-03-22 | Invariants + Contracts + Persistence | `tests/test_predictions_contracts_and_gates.py` and `tests/test_persistence_jsonl.py` are green with halt `details`, `evidence`, and invariant identity persisted/replayable. |
-| Invariant matrix completion | 2026-03-29 | Invariants + Test harness | `tests/test_predictions_contracts_and_gates.py` is green with parameterized coverage across all registered `InvariantId` pass/stop branches. |
+| Replay projection analytics completion | 2026-03-15 | Engine + Persistence + Contracts | `tests/test_replay_projection_analytics.py`, `tests/test_replay_projection_determinism.py`, and `tests/test_replay_projection_restart_contracts.py` are green with deterministic replay/restart parity. |
+| Observer authorization contract activation | 2026-03-22 | Engine + Invariants | `tests/test_observer_frame.py` is green with authorization-scope enforcement in default mission-loop paths. |
+| Capability governance contract baseline | 2026-03-29 | Engine + Contracts | Governance tests pass with policy-aware capability invocation and no regression in prediction/halt contracts. |

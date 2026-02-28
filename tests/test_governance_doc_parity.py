@@ -8,12 +8,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "docs" / "dod_manifest.json"
 ROADMAP_PATH = ROOT / "ROADMAP.md"
+SYSTEM_CONTRACT_MAP_PATH = ROOT / "docs" / "system_contract_map.md"
 PROJECT_MATURITY_PATH = ROOT / "docs" / "project_maturity_evaluation.md"
 VALID_STATUSES = {"done", "in_progress", "planned"}
+ALLOWED_DONE_MILESTONES = {"Now"}
+ALLOWED_DONE_MATURITY = {"operational", "proven"}
+
+
+def _load_manifest() -> dict:
+    return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
 
 def _load_manifest_status_map() -> dict[str, str]:
-    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    manifest = _load_manifest()
     capabilities = manifest.get("capabilities", [])
     return {
         cap["id"]: cap["status"]
@@ -31,9 +38,8 @@ def _manifest_status_buckets(manifest_status: dict[str, str]) -> dict[str, set[s
     return buckets
 
 
-def _extract_roadmap_status_buckets(roadmap_text: str) -> tuple[dict[str, set[str]], dict[str, str]]:
-    buckets: dict[str, set[str]] = {}
-    context_by_status: dict[str, str] = {}
+def _extract_roadmap_status_buckets(roadmap_text: str) -> dict[str, set[str]]:
+    buckets: dict[str, set[str]] = {status: set() for status in VALID_STATUSES}
     in_alignment = False
     bullet_pattern = re.compile(r"^- `([^`]+)`: (.+)\.$")
 
@@ -53,10 +59,39 @@ def _extract_roadmap_status_buckets(roadmap_text: str) -> tuple[dict[str, set[st
 
         status = match.group(1)
         payload = match.group(2)
-        buckets[status] = set(re.findall(r"`([^`]+)`", payload))
-        context_by_status[status] = stripped
+        if status in buckets:
+            buckets[status] = set(re.findall(r"`([^`]+)`", payload))
 
-    return buckets, context_by_status
+    return buckets
+
+
+def _extract_contract_maturity_rows(text: str) -> dict[str, tuple[str, str]]:
+    contract_rows: dict[str, tuple[str, str]] = {}
+    current_milestone: str | None = None
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        milestone_match = re.match(r"## Milestone: (.+)$", stripped)
+        if milestone_match:
+            current_milestone = milestone_match.group(1).strip()
+            continue
+
+        if not current_milestone or not stripped.startswith("|"):
+            continue
+        if stripped.startswith("|---"):
+            continue
+
+        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        if len(cells) != 7:
+            continue
+        if cells[0] == "Contract name":
+            continue
+
+        contract_name = cells[0]
+        maturity = cells[6].strip("`").strip().lower()
+        contract_rows[contract_name] = (current_milestone, maturity)
+
+    return contract_rows
 
 
 def _extract_project_maturity_status_mentions(text: str) -> list[tuple[str, str, str]]:
@@ -116,30 +151,58 @@ def test_roadmap_capability_status_alignment_matches_manifest() -> None:
     manifest_buckets = _manifest_status_buckets(manifest_status)
 
     roadmap_text = ROADMAP_PATH.read_text(encoding="utf-8")
-    roadmap_buckets, roadmap_context = _extract_roadmap_status_buckets(roadmap_text)
+    roadmap_buckets = _extract_roadmap_status_buckets(roadmap_text)
 
     mismatches: list[str] = []
 
-    all_statuses = sorted(set(manifest_buckets) | set(roadmap_buckets))
-    for status in all_statuses:
-        manifest_caps = manifest_buckets.get(status, set())
-        roadmap_caps = roadmap_buckets.get(status, set())
-
-        for capability_id in sorted(manifest_caps - roadmap_caps):
+    for status in sorted(VALID_STATUSES):
+        expected = manifest_buckets.get(status, set())
+        found = roadmap_buckets.get(status, set())
+        if expected != found:
+            missing = sorted(expected - found)
+            extra = sorted(found - expected)
             mismatches.append(
                 "ROADMAP capability-status alignment mismatch: "
-                f"expected capability_id='{capability_id}' in status bucket='{status}' based on docs/dod_manifest.json, "
-                f"but ROADMAP bucket is missing it. Found bucket line: {roadmap_context.get(status, '<missing status bucket line>')}"
+                f"status='{status}' expected_capability_ids={sorted(expected)} found_capability_ids={sorted(found)} "
+                f"missing={missing} extra={extra}"
             )
 
-        for capability_id in sorted(roadmap_caps - manifest_caps):
-            expected_status = manifest_status.get(capability_id, "<missing in manifest>")
-            mismatches.append(
-                "ROADMAP capability-status alignment mismatch: "
-                f"found capability_id='{capability_id}' in roadmap status bucket='{status}', "
-                f"expected status bucket='{expected_status}' from docs/dod_manifest.json. "
-                f"Found bucket line: {roadmap_context.get(status, '<missing status bucket line>')}"
-            )
+    assert not mismatches, "\n".join(mismatches)
+
+
+def test_done_capabilities_only_reference_allowed_contract_maturity_rows() -> None:
+    manifest = _load_manifest()
+    capabilities = manifest.get("capabilities", [])
+    contract_map = _extract_contract_maturity_rows(SYSTEM_CONTRACT_MAP_PATH.read_text(encoding="utf-8"))
+
+    mismatches: list[str] = []
+
+    for capability in capabilities:
+        if capability.get("status") != "done":
+            continue
+
+        capability_id = capability.get("id", "<missing capability id>")
+        refs = capability.get("contract_map_refs", [])
+
+        for ref in refs:
+            row = contract_map.get(ref)
+            if row is None:
+                mismatches.append(
+                    "System contract-map parity mismatch: "
+                    f"done capability_id='{capability_id}' references contract='{ref}', "
+                    "but no matching contract row exists in docs/system_contract_map.md"
+                )
+                continue
+
+            milestone, maturity = row
+            if milestone not in ALLOWED_DONE_MILESTONES or maturity not in ALLOWED_DONE_MATURITY:
+                mismatches.append(
+                    "System contract-map maturity mismatch: "
+                    f"done capability_id='{capability_id}' references contract='{ref}' with "
+                    f"milestone='{milestone}', maturity='{maturity}'. "
+                    f"Allowed milestone={sorted(ALLOWED_DONE_MILESTONES)} "
+                    f"allowed maturity={sorted(ALLOWED_DONE_MATURITY)}"
+                )
 
     assert not mismatches, "\n".join(mismatches)
 
@@ -161,8 +224,8 @@ def test_project_maturity_status_claims_do_not_contradict_manifest() -> None:
         if found_count != expected:
             mismatches.append(
                 "Project maturity status-count claim mismatch: "
-                f"status='{status}' expected_count='{expected}' from docs/dod_manifest.json, "
-                f"found_count='{found_count}' in line: '{source_line}'"
+                f"status='{status}' expected_count='{expected}' found_count='{found_count}' "
+                f"source='{source_line}'"
             )
 
     expected_done = expected_counts["done"]
@@ -171,8 +234,8 @@ def test_project_maturity_status_claims_do_not_contradict_manifest() -> None:
         if (found_done, found_total) != (expected_done, expected_total):
             mismatches.append(
                 "Project maturity completion-ratio claim mismatch: "
-                f"expected_ratio='`{expected_done}/{expected_total}`' from docs/dod_manifest.json, "
-                f"found_ratio='`{found_done}/{found_total}`' in line: '{source_line}'"
+                f"expected_ratio='`{expected_done}/{expected_total}`' found_ratio='`{found_done}/{found_total}`' "
+                f"source='{source_line}'"
             )
 
     for cap_id, declared_status, source_line in _extract_project_maturity_status_mentions(maturity_text):
@@ -180,18 +243,26 @@ def test_project_maturity_status_claims_do_not_contradict_manifest() -> None:
         if expected_status is None:
             mismatches.append(
                 "Project maturity capability-status claim mismatch: "
-                f"capability_id='{cap_id}' is referenced with status='{declared_status}', "
-                "but the capability_id does not exist in docs/dod_manifest.json. "
-                f"Source line: '{source_line}'"
+                f"capability_id='{cap_id}' declared_status='{declared_status}' but capability_id missing from manifest. "
+                f"Known_manifest_capability_ids={sorted(manifest_status)} source='{source_line}'"
             )
             continue
 
         if declared_status != expected_status:
             mismatches.append(
                 "Project maturity capability-status claim mismatch: "
-                f"capability_id='{cap_id}' expected_status='{expected_status}' from docs/dod_manifest.json, "
-                f"found_status='{declared_status}' in line: '{source_line}'"
+                f"capability_id='{cap_id}' expected_status='{expected_status}' found_status='{declared_status}' "
+                f"source='{source_line}'"
             )
+
+    no_in_progress_claimed = bool(re.search(r"no\*\* `in_progress` capabilities", maturity_text))
+    if no_in_progress_claimed and expected_counts["in_progress"] != 0:
+        mismatches.append(
+            "Project maturity in-progress claim mismatch: "
+            "document claims no in_progress capabilities, "
+            f"but manifest in_progress_capability_ids="
+            f"{sorted([cap_id for cap_id, st in manifest_status.items() if st == 'in_progress'])}"
+        )
 
     assert not mismatches, "\n".join(mismatches)
 
@@ -211,13 +282,12 @@ def test_project_maturity_bottleneck_claim_is_non_done_manifest_capability() -> 
 
     assert status is not None, (
         "Project maturity bottleneck claim mismatch: "
-        f"capability_id='{capability_id}' was declared as the bottleneck in docs/project_maturity_evaluation.md, "
-        "but this capability_id is missing from docs/dod_manifest.json"
+        f"capability_id='{capability_id}' missing from manifest. "
+        f"Known_manifest_capability_ids={sorted(manifest_status)}"
     )
 
     assert status != "done", (
         "Project maturity bottleneck claim mismatch: "
-        f"capability_id='{capability_id}' is marked as current bottleneck, "
-        "but docs/dod_manifest.json marks it as status='done'. "
-        "Update either the bottleneck claim or the manifest status."
+        f"capability_id='{capability_id}' declared_bottleneck_status='done'. "
+        f"Expected bottleneck in non-done set={sorted([k for k, v in manifest_status.items() if v != 'done'])}"
     )

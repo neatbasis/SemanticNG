@@ -173,3 +173,32 @@ def test_restart_branch_replay_remains_deterministic_with_mixed_lineage_noise(tm
     assert replay_a.model_dump(mode="json") == replay_b.model_dump(mode="json")
     assert replay_a.records_processed == 1
     assert replay_a.analytics_snapshot.halt_count == 1
+
+
+def test_restart_contract_replay_keeps_request_views_deterministic_for_identical_logs(tmp_path: Path) -> None:
+    seed_log = tmp_path / "seed-ask.jsonl"
+    append_jsonl(
+        seed_log,
+        {
+            "event_kind": "ask_outbox_request",
+            "request_id": "ask:pending",
+            "scope": "after_invariants",
+            "reason": "human recruitment requested by intervention lifecycle",
+            "evidence_refs": [{"kind": "intervention_request", "ref": "hitl:pending"}],
+            "created_at_iso": "2026-02-13T00:00:00+00:00",
+            "metadata": {},
+        },
+    )
+
+    log_a = tmp_path / "seed-ask.a.jsonl"
+    log_b = tmp_path / "seed-ask.b.jsonl"
+    payload = seed_log.read_text(encoding="utf-8")
+    log_a.write_text(payload, encoding="utf-8")
+    log_b.write_text(payload, encoding="utf-8")
+
+    replay_a = replay_projection_analytics(log_a)
+    replay_b = replay_projection_analytics(log_b)
+
+    assert replay_a.model_dump(mode="json") == replay_b.model_dump(mode="json")
+    assert set(replay_a.analytics_snapshot.outstanding_human_requests.keys()) == {"ask:pending"}
+    assert replay_a.analytics_snapshot.resolved_human_requests == {}

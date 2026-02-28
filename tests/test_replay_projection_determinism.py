@@ -188,3 +188,47 @@ def test_replay_analytics_snapshot_matches_across_consumer_paths_for_same_log(tm
     assert analytics_consumer.model_dump(mode="json") == projected_analytics.model_dump(mode="json")
     assert projection_consumer.current_predictions["turn:1"].correction_revision == 1
     assert analytics_consumer.correction_cost_attribution["pred:base"].correction_count == 1
+
+
+def test_replay_projection_snapshot_remains_identical_for_identical_logs_with_human_requests(tmp_path: Path) -> None:
+    seed_log = tmp_path / "with-ask.jsonl"
+    append_jsonl(
+        seed_log,
+        {
+            "event_kind": "ask_outbox_request",
+            "request_id": "ask:1",
+            "scope": "after_invariants",
+            "reason": "human recruitment requested by intervention lifecycle",
+            "evidence_refs": [{"kind": "intervention_request", "ref": "hitl:1"}],
+            "created_at_iso": "2026-02-14T00:00:00+00:00",
+            "metadata": {"conversation_id": "conv:det"},
+        },
+    )
+    append_jsonl(
+        seed_log,
+        {
+            "event_kind": "ask_outbox_response",
+            "request_id": "ask:1",
+            "scope": "after_invariants",
+            "reason": "intervention decision recorded",
+            "evidence_refs": [{"kind": "intervention_request", "ref": "hitl:1"}],
+            "created_at_iso": "2026-02-14T00:00:00+00:00",
+            "responded_at_iso": "2026-02-14T00:00:03+00:00",
+            "status": "resume",
+            "escalation": False,
+            "metadata": {},
+        },
+    )
+
+    restart_a = tmp_path / "restart-a.jsonl"
+    restart_b = tmp_path / "restart-b.jsonl"
+    payload = seed_log.read_text(encoding="utf-8")
+    restart_a.write_text(payload, encoding="utf-8")
+    restart_b.write_text(payload, encoding="utf-8")
+
+    replay_a = replay_projection_analytics(restart_a)
+    replay_b = replay_projection_analytics(restart_b)
+
+    assert replay_a.model_dump(mode="json") == replay_b.model_dump(mode="json")
+    assert replay_a.analytics_snapshot.request_outcome_linkage == {"ask:1": "resume"}
+    assert replay_a.analytics_snapshot.outstanding_human_requests == {}

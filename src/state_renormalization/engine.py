@@ -1388,6 +1388,7 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
     fields = set(PredictionRecord.model_fields)
     records_processed = 0
     lineage_rows: list[Mapping[str, Any]] = []
+    seen_prediction_fingerprints: set[tuple[Any, ...]] = set()
 
     for raw in iter_projection_lineage_records(path):
         lineage_rows.append(raw)
@@ -1395,6 +1396,18 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
         if kind in {"prediction_record", "prediction"}:
             payload = {k: v for k, v in raw.items() if k in fields}
             pred = PredictionRecord.model_validate(payload)
+            fingerprint = (
+                pred.prediction_id,
+                pred.correction_revision,
+                pred.compared_at_iso,
+                pred.corrected_at_iso,
+                pred.was_corrected,
+                pred.absolute_error,
+                pred.expectation,
+            )
+            if fingerprint in seen_prediction_fingerprints:
+                continue
+            seen_prediction_fingerprints.add(fingerprint)
             event_time = pred.corrected_at_iso or pred.compared_at_iso or pred.issued_at_iso
             projection = _project_current_at(pred, projection, updated_at_iso=event_time)
             records_processed += 1
@@ -1402,8 +1415,24 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
 
         if kind == "repair_resolution":
             resolution = RepairResolutionEvent.model_validate(raw)
-            projection = _apply_accepted_repair_event(projection, resolution_event=resolution)
-            if resolution.decision == RepairResolution.ACCEPTED:
+            accepted = resolution.accepted_prediction
+            if (
+                resolution.decision == RepairResolution.ACCEPTED
+                and accepted is not None
+            ):
+                accepted_fingerprint = (
+                    accepted.prediction_id,
+                    accepted.correction_revision,
+                    accepted.compared_at_iso,
+                    accepted.corrected_at_iso,
+                    accepted.was_corrected,
+                    accepted.absolute_error,
+                    accepted.expectation,
+                )
+                if accepted_fingerprint in seen_prediction_fingerprints:
+                    continue
+                seen_prediction_fingerprints.add(accepted_fingerprint)
+                projection = _apply_accepted_repair_event(projection, resolution_event=resolution)
                 records_processed += 1
 
     analytics = derive_projection_analytics_from_lineage(lineage_rows)
@@ -1447,6 +1476,10 @@ def derive_projection_analytics_from_lineage(
     halt_count = 0
     correction_cost_total = 0.0
     attribution: Dict[str, CorrectionCostAttribution] = {}
+    outstanding_requests: Dict[str, AskOutboxRequestArtifact] = {}
+    resolved_requests: Dict[str, AskOutboxResponseArtifact] = {}
+    request_outcome_linkage: Dict[str, str] = {}
+    seen_corrected_prediction_fingerprints: set[tuple[Any, ...]] = set()
 
     for raw in records:
         kind = raw.get("event_kind")
@@ -1458,10 +1491,30 @@ def derive_projection_analytics_from_lineage(
             resolution = RepairResolutionEvent.model_validate(raw)
             if resolution.decision == RepairResolution.ACCEPTED and resolution.accepted_prediction is not None:
                 pred = resolution.accepted_prediction
+        elif kind == "ask_outbox_request":
+            request = AskOutboxRequestArtifact.model_validate(raw)
+            outstanding_requests[request.request_id] = request
+            continue
+        elif kind == "ask_outbox_response":
+            response = AskOutboxResponseArtifact.model_validate(raw)
+            resolved_requests[response.request_id] = response
+            request_outcome_linkage[response.request_id] = response.status
+            outstanding_requests.pop(response.request_id, None)
+            continue
 
         if pred is not None:
             if not pred.was_corrected or pred.absolute_error is None:
                 continue
+            corrected_fingerprint = (
+                pred.prediction_id,
+                pred.correction_revision,
+                pred.compared_at_iso,
+                pred.corrected_at_iso,
+                pred.absolute_error,
+            )
+            if corrected_fingerprint in seen_corrected_prediction_fingerprints:
+                continue
+            seen_corrected_prediction_fingerprints.add(corrected_fingerprint)
             correction_count += 1
             correction_cost_total += float(pred.absolute_error)
             root_id = pred.correction_root_prediction_id or pred.prediction_id
@@ -1488,6 +1541,9 @@ def derive_projection_analytics_from_lineage(
         halt_count=halt_count,
         correction_cost_total=correction_cost_total,
         correction_cost_attribution=attribution,
+        outstanding_human_requests=outstanding_requests,
+        resolved_human_requests=resolved_requests,
+        request_outcome_linkage=request_outcome_linkage,
     )
 
 

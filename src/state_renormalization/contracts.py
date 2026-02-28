@@ -857,6 +857,9 @@ class ProjectionAnalyticsSnapshot(BaseModel):
     halt_count: int = 0
     correction_cost_total: float = 0.0
     correction_cost_attribution: Dict[str, CorrectionCostAttribution] = Field(default_factory=dict)
+    outstanding_human_requests: Dict[str, AskOutboxRequestArtifact] = Field(default_factory=dict)
+    resolved_human_requests: Dict[str, AskOutboxResponseArtifact] = Field(default_factory=dict)
+    request_outcome_linkage: Dict[str, str] = Field(default_factory=dict)
 
     @property
     def correction_cost_mean(self) -> float:

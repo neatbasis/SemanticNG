@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Any, Dict, Mapping, Optional, Sequence
+from typing import Any, Dict, Mapping, Optional, Protocol, Sequence
 from pydantic import BaseModel
 from enum import Enum
 from gherkin.parser import Parser
@@ -31,6 +31,9 @@ from state_renormalization.contracts import (
     ProjectionReplayResult,
     ProjectionAnalyticsSnapshot,
     CorrectionCostAttribution,
+    InterventionAction,
+    InterventionDecision,
+    InvariantAuditResult,
     PredictionOutcome,
     PredictionRecord,
     HaltPayloadValidationError,
@@ -115,6 +118,18 @@ class GateInvariantCheck:
 class GateInvariantEvaluation:
     phase: str
     outcome: InvariantOutcome
+
+
+class InterventionLifecycleHook(Protocol):
+    def __call__(
+        self,
+        *,
+        phase: str,
+        episode: Episode,
+        belief: BeliefState,
+        projection_state: ProjectionState,
+    ) -> InterventionDecision | Mapping[str, Any] | None:
+        ...
 
 
 def _first_halt_from_evaluations(
@@ -539,6 +554,50 @@ def _run_invariant(invariant_id: InvariantId, *, ctx) -> InvariantOutcome:
     return outcome
 
 
+def _normalize_intervention_decision(decision: InterventionDecision | Mapping[str, Any] | None) -> InterventionDecision:
+    if decision is None:
+        return InterventionDecision(action=InterventionAction.NONE)
+    if isinstance(decision, InterventionDecision):
+        return decision
+    return InterventionDecision.model_validate(decision)
+
+
+def _apply_intervention_hook(
+    *,
+    ep: Episode,
+    belief: BeliefState,
+    projection_state: ProjectionState,
+    phase: str,
+    intervention_hook: Optional[InterventionLifecycleHook],
+) -> tuple[bool, InterventionDecision]:
+    if intervention_hook is None:
+        return True, InterventionDecision(action=InterventionAction.NONE)
+
+    decision = _normalize_intervention_decision(
+        intervention_hook(
+            phase=phase,
+            episode=ep,
+            belief=belief,
+            projection_state=projection_state,
+        )
+    )
+    _append_episode_artifact(
+        ep,
+        {
+            "artifact_kind": "intervention_lifecycle",
+            "phase": phase,
+            "action": decision.action.value,
+            "reason": decision.reason,
+            "metadata": _to_dict(decision.metadata),
+        },
+    )
+    if decision.action in {InterventionAction.PAUSE, InterventionAction.TIMEOUT}:
+        append_turn_summary(ep)
+        return False, decision
+
+    return True, decision
+
+
 def evaluate_invariant_gates(
     *,
     ep: Optional[Episode],
@@ -590,6 +649,7 @@ def evaluate_invariant_gates(
         gate_point=gate_point,
     )
     gate_checks: list[GateInvariantCheck] = []
+    invariant_audit: list[InvariantAuditResult] = []
 
     outcome_bundle = result.artifact if isinstance(result, Success) else GatePredictionOutcome(
         pre_consume=tuple(ev.outcome for ev in evaluations if ev.phase == "pre_consume"),
@@ -597,10 +657,20 @@ def evaluate_invariant_gates(
     )
 
     for evaluation in evaluations:
+        normalized = normalize_outcome(evaluation.outcome, gate=gate_point)
         gate_checks.append(
             GateInvariantCheck(
                 gate_point=f"{gate_point}:{evaluation.phase}",
-                output=normalize_outcome(evaluation.outcome, gate=gate_point),
+                output=normalized,
+            )
+        )
+        invariant_audit.append(
+            InvariantAuditResult(
+                gate_point=f"{gate_point}:{evaluation.phase}",
+                invariant_id=normalized.invariant_id,
+                passed=normalized.passed,
+                reason=normalized.reason,
+                evidence=[_to_dict(item) for item in normalized.evidence],
             )
         )
 
@@ -669,6 +739,7 @@ def evaluate_invariant_gates(
                     }
                     for check in gate_checks
                 ],
+                "invariant_audit": [item.model_dump(mode="json") for item in invariant_audit],
                 "kind": result_kind,
                 "prediction": _to_dict(result.artifact) if isinstance(result, Success) else None,
                 "halt": _halt_payload(result) if isinstance(result, HaltRecord) else None,
@@ -996,11 +1067,22 @@ def run_mission_loop(
     *,
     pending_predictions: Sequence[PredictionRecord | Mapping[str, Any]] = (),
     prediction_log_path: str | Path = "artifacts/predictions.jsonl",
+    intervention_hook: Optional[InterventionLifecycleHook] = None,
 ) -> tuple[Episode, BeliefState, ProjectionState]:
     """
     Mission-loop helper: materialize prediction updates before decision stages.
     """
     updated_projection = projection_state
+
+    should_continue, _ = _apply_intervention_hook(
+        ep=ep,
+        belief=belief,
+        projection_state=updated_projection,
+        phase="mission_loop:start",
+        intervention_hook=intervention_hook,
+    )
+    if not should_continue:
+        return ep, belief, updated_projection
 
     turn_prediction = _emit_turn_prediction(ep)
     turn_prediction_ref = append_prediction_record(
@@ -1060,6 +1142,16 @@ def run_mission_loop(
         append_turn_summary(ep)
         return ep, belief, updated_projection
 
+    should_continue, _ = _apply_intervention_hook(
+        ep=ep,
+        belief=belief,
+        projection_state=updated_projection,
+        phase="mission_loop:post_pre_decision_gate",
+        intervention_hook=intervention_hook,
+    )
+    if not should_continue:
+        return ep, belief, updated_projection
+
     ep = ingest_observation(ep)
     updated_projection = _reconcile_predictions(ep, updated_projection, prediction_log_path=prediction_log_path)
 
@@ -1075,6 +1167,16 @@ def run_mission_loop(
         append_turn_summary(ep)
         return ep, belief, updated_projection
 
+    should_continue, _ = _apply_intervention_hook(
+        ep=ep,
+        belief=belief,
+        projection_state=updated_projection,
+        phase="mission_loop:post_observation_gate",
+        intervention_hook=intervention_hook,
+    )
+    if not should_continue:
+        return ep, belief, updated_projection
+
     pre_output_gate = evaluate_invariant_gates(
         ep=ep,
         scope=active_scope,
@@ -1086,6 +1188,16 @@ def run_mission_loop(
     )
     if isinstance(pre_output_gate, HaltRecord):
         append_turn_summary(ep)
+        return ep, belief, updated_projection
+
+    should_continue, _ = _apply_intervention_hook(
+        ep=ep,
+        belief=belief,
+        projection_state=updated_projection,
+        phase="mission_loop:post_pre_output_gate",
+        intervention_hook=intervention_hook,
+    )
+    if not should_continue:
         return ep, belief, updated_projection
 
     ep, belief = apply_utterance_interpretation(ep, belief)

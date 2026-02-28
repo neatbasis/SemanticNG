@@ -114,3 +114,33 @@ def test_append_turn_summary_includes_halts_for_operator_handoff(
     assert summary["halt_count"] == 1
     assert summary["halts"][0]["halt_id"] == "halt:abc"
     assert summary["operator_action"] == "review_halts_then_resume_next_turn"
+
+
+def test_run_mission_loop_timeout_intervention_short_circuits(
+    belief: BeliefState,
+    make_episode: Callable[..., Episode],
+    make_policy_decision: Callable[..., VerbosityDecision],
+    make_ask_result: Callable[..., AskResult],
+) -> None:
+    ep = make_episode(
+        decision=make_policy_decision(),
+        ask=make_ask_result(sentence="turn on the kitchen light"),
+    )
+    projection = ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00")
+
+    def intervention_hook(**_kwargs):
+        return {"action": "timeout", "reason": "operator timeout"}
+
+    ep_out, _, projection_out = run_mission_loop(
+        ep,
+        belief,
+        projection,
+        intervention_hook=intervention_hook,
+    )
+
+    assert projection_out.current_predictions == {}
+    assert any(
+        a.get("artifact_kind") == "intervention_lifecycle" and a.get("action") == "timeout"
+        for a in ep_out.artifacts
+    )
+    assert any(a.get("artifact_kind") == "turn_summary" for a in ep_out.artifacts)

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, ClassVar, Dict, List, Mapping, Optional
+from typing import Any, ClassVar, Dict, List, Literal, Mapping, Optional
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
@@ -23,6 +23,12 @@ _CONTRACT_CONFIG = ConfigDict(
     extra="forbid",
     validate_assignment=True,
     use_enum_values=False,  # keep enums as enums in Python
+)
+
+_IMMUTABLE_CONTRACT_CONFIG = ConfigDict(
+    extra="forbid",
+    use_enum_values=False,
+    frozen=True,
 )
 
 # ------------------------------------------------------------------------------
@@ -709,6 +715,60 @@ class ProjectionReplayResult(BaseModel):
     projection_state: ProjectionState
     analytics_snapshot: ProjectionAnalyticsSnapshot = Field(default_factory=lambda: ProjectionAnalyticsSnapshot())
     records_processed: int = 0
+
+
+class RepairResolution(str, Enum):
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+
+
+class RepairLineageRef(BaseModel):
+    model_config = _IMMUTABLE_CONTRACT_CONFIG
+
+    conversation_id: Optional[str] = None
+    episode_id: Optional[str] = None
+    turn_index: Optional[int] = None
+    scope_key: str
+    prediction_id: str
+    correction_root_prediction_id: str
+
+
+class RepairProposalEvent(BaseModel):
+    """Immutable append-only proposal describing a candidate prediction repair."""
+
+    model_config = _IMMUTABLE_CONTRACT_CONFIG
+
+    event_kind: Literal["repair_proposal"] = "repair_proposal"
+    repair_id: str
+    proposed_at_iso: str
+    reason: str
+    invariant_id: str
+    lineage_ref: RepairLineageRef
+    proposed_prediction: PredictionRecord
+    prediction_outcome: PredictionOutcome
+
+
+class RepairResolutionEvent(BaseModel):
+    """Immutable append-only decision record for a previously proposed repair."""
+
+    model_config = _IMMUTABLE_CONTRACT_CONFIG
+
+    event_kind: Literal["repair_resolution"] = "repair_resolution"
+    repair_id: str
+    proposal_event_kind: Literal["repair_proposal"] = "repair_proposal"
+    decision: RepairResolution
+    resolved_at_iso: str
+    lineage_ref: RepairLineageRef
+    accepted_prediction: Optional[PredictionRecord] = None
+    rejection_reason: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _validate_decision_payload(self) -> "RepairResolutionEvent":
+        if self.decision == RepairResolution.ACCEPTED and self.accepted_prediction is None:
+            raise ValueError("accepted repair resolution requires accepted_prediction")
+        if self.decision == RepairResolution.REJECTED and not self.rejection_reason:
+            raise ValueError("rejected repair resolution requires rejection_reason")
+        return self
 
 
 class CorrectionCostAttribution(BaseModel):

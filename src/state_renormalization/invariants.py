@@ -18,6 +18,11 @@ class Flow(str, Enum):
     STOP = "stop"
 
 
+class InvariantHandlingMode(str, Enum):
+    STRICT_HALT = "strict_halt"
+    REPAIR_EVENTS = "repair_events"
+
+
 class Validity(str, Enum):
     VALID = "valid"
     DEGRADED = "degraded"
@@ -318,6 +323,10 @@ def normalize_outcome(outcome: InvariantOutcome, *, gate: str = "") -> CheckerRe
         details=_normalize_mapping(outcome.details),
         action_hints=tuple(_normalize_mapping(item) for item in (outcome.action_hints or ())),
     )
+
+
+def repair_mode_enabled(mode: InvariantHandlingMode | str = InvariantHandlingMode.STRICT_HALT) -> bool:
+    return InvariantHandlingMode(mode) == InvariantHandlingMode.REPAIR_EVENTS
 
 
 def _normalize_evidence_item(item: Mapping[str, Any]) -> Mapping[str, Any]:

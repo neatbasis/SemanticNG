@@ -239,3 +239,89 @@ Upgrade qualifying contracts from `operational` to `proven` using repeated evide
 - [ ] `docs/dod_manifest.json` pytest packs and contract refs align with executed evidence.
 - [ ] `docs/system_contract_map.md` maturity values and changelog entries reflect all approved promotions.
 - [ ] Governance closure artifacts are linked and auditable from sprint close notes.
+
+## Forward-looking extension — Next five sprints (Sprints 6–10)
+
+This extension proposes the next five sprint goals after the baseline 5x plan closes. It keeps the same governance pattern: capability-ID-first scope, manifest parity, contract-map maturity evidence, and fail-closed execution.
+
+### Sprint 6 — Reliability hardening + CI signal quality
+
+**Objective**
+- Reduce flaky signal and improve confidence in existing `done` capabilities before opening larger surface expansion.
+
+**Primary scope**
+- Reliability pass across existing command packs in `docs/dod_manifest.json`.
+- Stabilize deterministic replay/restart evidence collection and reporting.
+
+**Measurable exits**
+- Flaky-test rate trend is explicitly tracked for core command packs and reduced sprint-over-sprint.
+- CI evidence artifacts include a compact reliability summary per capability ID.
+- No maturity downgrades in `docs/system_contract_map.md`.
+
+### Sprint 7 — Capability observability and decision explainability UX
+
+**Objective**
+- Improve operator-facing traceability for prediction/gate/halt decisions without changing contract semantics.
+
+**Primary scope**
+- Strengthen observability outputs from persisted lineage (prediction, decision/effect, halt, correction).
+- Improve explainability documentation and evidence linkage in handoff artifacts.
+
+**Measurable exits**
+- Every sprint-close handoff includes capability-ID keyed decision traces.
+- Replay lineage can be navigated from artifact to contract-map maturity entry with no missing links.
+- Explainability output remains deterministic across repeated replay runs.
+
+### Sprint 8 — Performance and scale envelope characterization
+
+**Objective**
+- Establish performance baselines and safe operating envelopes for replay/projection workflows.
+
+**Primary scope**
+- Introduce benchmark-style checks for append/read/replay workloads.
+- Define capacity thresholds and alerting recommendations for growth scenarios.
+
+**Measurable exits**
+- Baseline throughput/latency numbers are documented with reproducible commands.
+- Envelope limits and degradation modes are recorded with mitigation guidance.
+- No contract regressions while performance checks are added.
+
+### Sprint 9 — Integration-readiness and external adapter contract hardening
+
+**Objective**
+- Prepare interfaces for controlled external integrations while preserving strict fail-closed policy behavior.
+
+**Primary scope**
+- Harden adapter boundaries (`schema_selector`, `schemaorg_suggester`, `ask_outbox`, persistence edge behavior).
+- Expand negative-path and policy-guard coverage for integration-facing contracts.
+
+**Measurable exits**
+- Adapter contract tests cover malformed input, timeout/error bubbling, and policy-denied paths.
+- Integration notes provide explicit compatibility/rollback guidance.
+- Governance parity validators continue to fail closed on ID/name/status mismatch.
+
+### Sprint 10 — Release candidate validation and operational readiness
+
+**Objective**
+- Produce a release-candidate-quality validation package across governance, quality, reliability, and runtime readiness.
+
+**Primary scope**
+- Full command-pack sweep from `docs/dod_manifest.json` with release evidence collation.
+- Final DoD/roadmap/contract-map parity confirmation and operational checklist sign-off.
+
+**Measurable exits**
+- Release evidence bundle includes test matrix, risk register, and rollback playbook.
+- All canonical docs remain aligned (`ROADMAP.md`, `docs/dod_manifest.json`, `docs/system_contract_map.md`).
+- Go/no-go decision is recorded with owner, date, and explicit unresolved risks.
+
+### Cross-sprint controls for Sprints 6–10
+
+- Continue weekly failure-concentration planning from `ROADMAP.md` as the default prioritization signal.
+- Maintain no-regression budget enforcement and doc freshness SLOs as hard gates.
+- Keep capability status authority in `docs/dod_manifest.json`; execution notes may summarize but not redefine status.
+- Require sprint handoff artifacts to include evidence links for every claimed transition or closure.
+
+### Canonical dependency statements (capability-ID only)
+
+- `capability_invocation_governance` depends on: `observer_authorization_contract`, `invariant_matrix_coverage`, `channel_agnostic_pending_obligation`.
+- `repair_aware_projection_evolution` depends on: `capability_invocation_governance`, `replay_projection_analytics`.

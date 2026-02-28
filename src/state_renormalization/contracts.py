@@ -321,27 +321,31 @@ class HaltRecord(BaseModel):
 
     halt_id: str = Field(validation_alias=AliasChoices("halt_id", "stable_halt_id"))
     stage: str
-    violated_invariant_id: str = Field(validation_alias=AliasChoices("violated_invariant_id", "invariant_id"))
+    invariant_id: str = Field(validation_alias=AliasChoices("invariant_id", "violated_invariant_id"))
     reason: str
-    evidence_refs: List[EvidenceRef] = Field(default_factory=list)
-    timestamp_iso: str = Field(validation_alias=AliasChoices("timestamp_iso", "timestamp"))
-    retryable: bool = Field(validation_alias=AliasChoices("retryable", "retryability"))
+    evidence: List[EvidenceRef] = Field(default_factory=list, validation_alias=AliasChoices("evidence", "evidence_refs"))
+    retryability: bool = Field(validation_alias=AliasChoices("retryability", "retryable"))
+    timestamp: str = Field(validation_alias=AliasChoices("timestamp", "timestamp_iso"))
 
     @property
     def stable_halt_id(self) -> str:
         return self.halt_id
 
     @property
-    def invariant_id(self) -> str:
-        return self.violated_invariant_id
+    def violated_invariant_id(self) -> str:
+        return self.invariant_id
 
     @property
-    def timestamp(self) -> str:
-        return self.timestamp_iso
+    def evidence_refs(self) -> List[EvidenceRef]:
+        return self.evidence
 
     @property
-    def retryability(self) -> bool:
-        return self.retryable
+    def retryable(self) -> bool:
+        return self.retryability
+
+    @property
+    def timestamp_iso(self) -> str:
+        return self.timestamp
 
 
 class PredictionRecord(BaseModel):

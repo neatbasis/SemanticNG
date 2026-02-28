@@ -85,16 +85,19 @@ class PredictionOutcome:
 
 
 @dataclass(frozen=True)
-class GateSuccessOutcome:
+class Success:
     artifact: PredictionOutcome
+
+
+GateDecision = Success | HaltRecord
+
+# Backward-compatible names retained for older callers/tests.
+GateSuccessOutcome = Success
 
 
 @dataclass(frozen=True)
 class GateHaltOutcome:
     artifact: HaltRecord
-
-
-GateDecision = GateSuccessOutcome | GateHaltOutcome
 
 
 @dataclass(frozen=True)
@@ -152,11 +155,40 @@ def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltR
     return HaltRecord(
         halt_id=_stable_halt_id(stage=stage, outcome=outcome),
         stage=stage,
-        violated_invariant_id=outcome.invariant_id.value,
+        invariant_id=outcome.invariant_id.value,
         reason=reason,
-        evidence_refs=[_as_evidence_ref(_to_dict(item)) for item in outcome.evidence],
-        timestamp_iso=_now_iso(),
-        retryable=bool(outcome.action_hints),
+        evidence=[_as_evidence_ref(_to_dict(item)) for item in outcome.evidence],
+        timestamp=_now_iso(),
+        retryability=bool(outcome.action_hints),
+    )
+
+
+def _turn_halt_summary(ep: Episode) -> list[dict[str, Any]]:
+    return [
+        {
+            "halt_id": artifact.get("halt_id"),
+            "stage": artifact.get("stage"),
+            "invariant_id": artifact.get("invariant_id") or artifact.get("violated_invariant_id"),
+            "reason": artifact.get("reason"),
+            "retryability": artifact.get("retryability") if "retryability" in artifact else artifact.get("retryable"),
+            "timestamp": artifact.get("timestamp") or artifact.get("timestamp_iso"),
+            "evidence_ref": artifact.get("halt_evidence_ref"),
+        }
+        for artifact in ep.artifacts
+        if isinstance(artifact, dict) and artifact.get("artifact_kind") == "halt_observation"
+    ]
+
+
+def append_turn_summary(ep: Episode) -> None:
+    _append_episode_artifact(
+        ep,
+        {
+            "artifact_kind": "turn_summary",
+            "turn_index": ep.turn_index,
+            "halt_count": len(_turn_halt_summary(ep)),
+            "halts": _turn_halt_summary(ep),
+            "operator_action": "review_halts_then_resume_next_turn" if _turn_halt_summary(ep) else None,
+        },
     )
 
 
@@ -404,17 +436,17 @@ def evaluate_invariant_gates(
 
     result_kind: str
     if halt_record is None:
-        result = GateSuccessOutcome(artifact=PredictionOutcome(pre_consume=pre_consume, post_write=post_write))
+        result = Success(artifact=PredictionOutcome(pre_consume=pre_consume, post_write=post_write))
         result_kind = "prediction"
     else:
-        result = GateHaltOutcome(artifact=halt_record)
+        result = halt_record
         result_kind = "halt"
 
     halt_evidence_ref: Optional[Dict[str, str]] = None
     stable_ids = _episode_stable_ids(ep) if ep is not None else {}
-    if isinstance(result, GateHaltOutcome):
+    if isinstance(result, HaltRecord):
         halt_evidence_ref = append_halt_record(
-            result.artifact,
+            result,
             halt_log_path=halt_log_path,
             stable_ids=stable_ids,
         )
@@ -453,20 +485,20 @@ def evaluate_invariant_gates(
                     for check in gate_checks
                 ],
                 "kind": result_kind,
-                "prediction": _to_dict(result.artifact) if isinstance(result, GateSuccessOutcome) else None,
-                "halt": _to_dict(result.artifact) if isinstance(result, GateHaltOutcome) else None,
+                "prediction": _to_dict(result.artifact) if isinstance(result, Success) else None,
+                "halt": _to_dict(result) if isinstance(result, HaltRecord) else None,
                 "halt_evidence_ref": halt_evidence_ref,
             },
         )
 
-        if isinstance(result, GateHaltOutcome):
-            halt = result.artifact
+        if isinstance(result, HaltRecord):
+            halt = result
             halt_observation = Observation(
                 observation_id=_new_id("obs:"),
                 t_observed_iso=_now_iso(),
                 type=ObservationType.HALT,
                 text=halt.reason,
-                source=f"invariant:{halt.violated_invariant_id}",
+                source=f"invariant:{halt.invariant_id}",
             )
             if not hasattr(ep, "observations") or getattr(ep, "observations") is None:
                 setattr(ep, "observations", [])
@@ -479,10 +511,11 @@ def evaluate_invariant_gates(
                     "observation_id": halt_observation.observation_id,
                     "halt_id": halt.halt_id,
                     "stage": halt.stage,
-                    "violated_invariant_id": halt.violated_invariant_id,
+                    "invariant_id": halt.invariant_id,
                     "reason": halt.reason,
-                    "retryable": halt.retryable,
-                    "evidence_refs": [_to_dict(e) for e in halt.evidence_refs],
+                    "retryability": halt.retryability,
+                    "timestamp": halt.timestamp,
+                    "evidence": [_to_dict(e) for e in halt.evidence],
                     "halt_evidence_ref": halt_evidence_ref,
                 },
             )
@@ -686,7 +719,8 @@ def run_mission_loop(
         prediction_log_available=True,
         gate_point="pre-decision",
     )
-    if isinstance(pre_decision_gate, GateHaltOutcome):
+    if isinstance(pre_decision_gate, HaltRecord):
+        append_turn_summary(ep)
         return ep, belief, updated_projection
 
     ep = ingest_observation(ep)
@@ -700,7 +734,8 @@ def run_mission_loop(
         prediction_log_available=True,
         gate_point="post-observation",
     )
-    if isinstance(post_observation_gate, GateHaltOutcome):
+    if isinstance(post_observation_gate, HaltRecord):
+        append_turn_summary(ep)
         return ep, belief, updated_projection
 
     pre_output_gate = evaluate_invariant_gates(
@@ -712,11 +747,13 @@ def run_mission_loop(
         gate_point="pre-output",
         just_written_prediction=last_written_prediction,
     )
-    if isinstance(pre_output_gate, GateHaltOutcome):
+    if isinstance(pre_output_gate, HaltRecord):
+        append_turn_summary(ep)
         return ep, belief, updated_projection
 
     ep, belief = apply_utterance_interpretation(ep, belief)
     ep, belief = apply_schema_bubbling(ep, belief)
+    append_turn_summary(ep)
     return ep, belief, updated_projection
 
 def build_episode(

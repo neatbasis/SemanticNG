@@ -5,15 +5,56 @@ import re
 import shlex
 import subprocess
 from pathlib import Path
-
+from typing import Any, TypedDict, cast
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "docs" / "dod_manifest.json"
 
 
+class CapabilityRecord(TypedDict):
+    id: str
+    status: str
+    roadmap_section: str
+    code_paths: list[str]
+    pytest_commands: list[str]
 
-def _load_manifest() -> dict:
-    return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+
+class ManifestDocument(TypedDict):
+    version: int
+    statuses: list[str]
+    capabilities: list[CapabilityRecord]
+
+
+def _parse_manifest(payload: str) -> ManifestDocument:
+    data = cast(dict[str, Any], json.loads(payload))
+    capabilities: list[CapabilityRecord] = []
+    raw_capabilities = data.get("capabilities", [])
+    assert isinstance(raw_capabilities, list), "manifest.capabilities must be a list"
+
+    for raw_cap in raw_capabilities:
+        assert isinstance(raw_cap, dict), "Each manifest capability must be an object"
+        capability: CapabilityRecord = {
+            "id": str(raw_cap.get("id", "")),
+            "status": str(raw_cap.get("status", "")),
+            "roadmap_section": str(raw_cap.get("roadmap_section", "")),
+            "code_paths": [str(path) for path in raw_cap.get("code_paths", []) if isinstance(path, str)],
+            "pytest_commands": [
+                str(command)
+                for command in raw_cap.get("pytest_commands", [])
+                if isinstance(command, str)
+            ],
+        }
+        capabilities.append(capability)
+
+    statuses = [status for status in data.get("statuses", []) if isinstance(status, str)]
+    version = data.get("version", 0)
+    assert isinstance(version, int), "manifest.version must be an integer"
+
+    return ManifestDocument(version=version, statuses=statuses, capabilities=capabilities)
+
+
+def _load_manifest() -> ManifestDocument:
+    return _parse_manifest(MANIFEST_PATH.read_text(encoding="utf-8"))
 
 
 def _assert_pytest_command_targets_existing_tests(command: str) -> None:
@@ -58,7 +99,7 @@ def _run_pytest_command(command: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def _load_previous_manifest_from_git() -> dict | None:
+def _load_previous_manifest_from_git() -> ManifestDocument | None:
     completed = subprocess.run(
         ["git", "show", "HEAD~1:docs/dod_manifest.json"],
         cwd=ROOT,
@@ -68,7 +109,7 @@ def _load_previous_manifest_from_git() -> dict | None:
     )
     if completed.returncode != 0:
         return None
-    return json.loads(completed.stdout)
+    return _parse_manifest(completed.stdout)
 
 
 def test_dod_manifest_exists_and_has_known_statuses() -> None:
@@ -99,7 +140,7 @@ def test_done_capabilities_define_pytest_commands_over_existing_tests() -> None:
         if cap["status"] != "done":
             continue
 
-        commands = cap.get("pytest_commands", [])
+        commands = cap["pytest_commands"]
         assert commands, f"Done capability {cap['id']} must define at least one pytest command"
 
         for command in commands:
@@ -113,7 +154,7 @@ def test_in_progress_capabilities_define_pytest_commands_over_existing_tests() -
         if cap["status"] != "in_progress":
             continue
 
-        commands = cap.get("pytest_commands", [])
+        commands = cap["pytest_commands"]
         assert commands, f"In-progress capability {cap['id']} must define at least one pytest command"
 
         for command in commands:
@@ -127,7 +168,7 @@ def test_in_progress_capabilities_have_executable_pytest_commands() -> None:
         if cap["status"] != "in_progress":
             continue
 
-        commands = cap.get("pytest_commands", [])
+        commands = cap["pytest_commands"]
 
         for command in commands:
             _assert_pytest_command_is_executable(command, cap["id"])
@@ -138,10 +179,7 @@ def test_done_status_transition_retains_at_least_one_passing_regression_command(
     if previous_manifest is None:
         return
 
-    previous_status_by_id = {
-        cap["id"]: cap["status"]
-        for cap in previous_manifest.get("capabilities", [])
-    }
+    previous_status_by_id = {cap["id"]: cap["status"] for cap in previous_manifest["capabilities"]}
 
     current_manifest = _load_manifest()
 
@@ -152,7 +190,7 @@ def test_done_status_transition_retains_at_least_one_passing_regression_command(
         if previous_status_by_id.get(cap["id"]) == "done":
             continue
 
-        commands = cap.get("pytest_commands", [])
+        commands = cap["pytest_commands"]
         assert commands, (
             f"Capability {cap['id']} transitioned to done and must retain at least one regression pytest command"
         )

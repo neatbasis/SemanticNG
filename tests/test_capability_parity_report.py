@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+from typing import TypedDict, cast
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / ".github" / "scripts" / "capability_parity_report.py"
@@ -14,8 +15,18 @@ capability_parity_report = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(capability_parity_report)
 
 
-def _load_manifest() -> dict:
-    return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+class CapabilityRecord(TypedDict, total=False):
+    id: str
+    status: str
+
+
+class ManifestDocument(TypedDict, total=False):
+    capabilities: list[CapabilityRecord]
+    canonical_source_of_truth: dict[str, str]
+
+
+def _load_manifest() -> ManifestDocument:
+    return cast(ManifestDocument, json.loads(MANIFEST_PATH.read_text(encoding="utf-8")))
 
 
 def test_manifest_declares_canonical_status_and_pytest_command_fields() -> None:

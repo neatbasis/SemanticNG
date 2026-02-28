@@ -87,18 +87,11 @@ jobs:
         id: render_transition_evidence
         if: ${{ always() }}
         run: |
+          set -euo pipefail
           mkdir -p artifacts
           python .github/scripts/render_transition_evidence.py \
             --base "$BASE_SHA" \
-            --head "$HEAD_SHA" | tee artifacts/transition_evidence.txt
-
-          {
-            echo "## Transitioned Capability Evidence"
-            echo
-            echo "Paste this exact block into the PR description when milestone validation requests it."
-            echo
-            cat artifacts/transition_evidence.txt
-          } >> "$GITHUB_STEP_SUMMARY"
+            --head "$HEAD_SHA" | tee artifacts/transition_evidence.txt >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload transition evidence artifact
         if: ${{ always() }}
@@ -127,10 +120,8 @@ jobs:
               echo "VALIDATOR_MISSING_EVIDENCE=true" >> "$GITHUB_ENV"
 
               echo
-              echo "Adjacency evidence validation failed because the PR description is missing the transition adjacency block."
-              echo "Remediation: copy the block from the 'Transitioned Capability Evidence' section in this job summary"
-              echo "or from the uploaded artifact 'transition_evidence.txt', then paste it into the PR description."
-              echo "Generated block:"
+              echo "Milestone validation failed: PR description is missing transitioned-capability evidence."
+              echo "Action required: paste the exact block below into the PR description (verbatim)."
               cat artifacts/transition_evidence.txt
             else
               echo

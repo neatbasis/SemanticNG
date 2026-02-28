@@ -46,6 +46,9 @@ def test_bind_prediction_outcome_updates_prediction_and_emits_contract() -> None
     assert updated.prediction_error == 0.25
     assert updated.absolute_error == 0.25
     assert updated.was_corrected is True
+    assert updated.correction_parent_prediction_id == pred.prediction_id
+    assert updated.correction_root_prediction_id == pred.prediction_id
+    assert updated.correction_revision == 1
 
     assert outcome.prediction_id == pred.prediction_id
     assert outcome.prediction_scope_key == pred.scope_key

@@ -28,6 +28,7 @@ from state_renormalization.contracts import (
     ObservationType,
     ObserverFrame,
     ProjectionState,
+    ProjectionReplayResult,
     PredictionOutcome,
     PredictionRecord,
     HaltRecord,
@@ -37,7 +38,7 @@ from state_renormalization.contracts import (
     default_observer_frame,
     project_ambiguity_state,
 )
-from state_renormalization.adapters.persistence import append_halt, append_prediction_record_event
+from state_renormalization.adapters.persistence import append_halt, append_prediction_record_event, read_jsonl
 from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.invariants import (
     Flow as InvariantFlow,
@@ -664,7 +665,12 @@ def append_halt_record(
     return append_halt(halt_log_path, payload)
 
 
-def project_current(pred: PredictionRecord, projection_state: ProjectionState) -> ProjectionState:
+def _project_current_at(
+    pred: PredictionRecord,
+    projection_state: ProjectionState,
+    *,
+    updated_at_iso: str,
+) -> ProjectionState:
     current = dict(projection_state.current_predictions)
     current[pred.scope_key] = pred
     history = [*projection_state.prediction_history, pred]
@@ -673,7 +679,60 @@ def project_current(pred: PredictionRecord, projection_state: ProjectionState) -
         prediction_history=history,
         correction_metrics=dict(projection_state.correction_metrics),
         last_comparison_at_iso=projection_state.last_comparison_at_iso,
-        updated_at_iso=_now_iso(),
+        updated_at_iso=updated_at_iso,
+    )
+
+
+def project_current(pred: PredictionRecord, projection_state: ProjectionState) -> ProjectionState:
+    return _project_current_at(pred, projection_state, updated_at_iso=_now_iso())
+
+
+def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionReplayResult:
+    path = Path(prediction_log_path)
+    if not path.exists():
+        return ProjectionReplayResult(
+            projection_state=ProjectionState(current_predictions={}, updated_at_iso="1970-01-01T00:00:00+00:00"),
+            records_processed=0,
+        )
+
+    projection = ProjectionState(current_predictions={}, updated_at_iso="1970-01-01T00:00:00+00:00")
+    comparisons = 0.0
+    absolute_error_total = 0.0
+    last_comparison_at_iso = None
+    fields = set(PredictionRecord.model_fields)
+    records_processed = 0
+
+    for _, raw in read_jsonl(path):
+        if raw.get("event_kind") not in {"prediction_record", "prediction"}:
+            continue
+
+        payload = {k: v for k, v in raw.items() if k in fields}
+        pred = PredictionRecord.model_validate(payload)
+        event_time = pred.corrected_at_iso or pred.compared_at_iso or pred.issued_at_iso
+        projection = _project_current_at(pred, projection, updated_at_iso=event_time)
+        records_processed += 1
+
+        if pred.was_corrected and pred.absolute_error is not None:
+            comparisons += 1.0
+            absolute_error_total += float(pred.absolute_error)
+            last_comparison_at_iso = pred.compared_at_iso or pred.corrected_at_iso or last_comparison_at_iso
+
+    metrics: Dict[str, float] = {}
+    if comparisons > 0:
+        metrics["comparisons"] = comparisons
+        metrics["absolute_error_total"] = absolute_error_total
+        metrics["mae"] = absolute_error_total / comparisons
+
+    projection = projection.model_copy(
+        update={
+            "correction_metrics": metrics,
+            "last_comparison_at_iso": last_comparison_at_iso,
+        }
+    )
+
+    return ProjectionReplayResult(
+        projection_state=projection,
+        records_processed=records_processed,
     )
 
 
@@ -789,6 +848,9 @@ def bind_prediction_outcome(
             "compared_at_iso": compared_at,
             "was_corrected": True,
             "corrected_at_iso": compared_at,
+            "correction_parent_prediction_id": pred.prediction_id,
+            "correction_root_prediction_id": pred.correction_root_prediction_id or pred.prediction_id,
+            "correction_revision": int(pred.correction_revision) + 1,
         }
     )
 

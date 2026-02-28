@@ -86,6 +86,7 @@ jobs:
 
       - name: Render transition evidence block
         id: render_transition_evidence
+        if: ${{ always() }}
         run: |
           mkdir -p artifacts
           python .github/scripts/render_transition_evidence.py \
@@ -101,6 +102,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload transition evidence artifact
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: transition_evidence.txt
@@ -126,8 +128,10 @@ jobs:
               echo "VALIDATOR_MISSING_EVIDENCE=true" >> "$GITHUB_ENV"
 
               echo
-              echo "Adjacency evidence validation failed."
-              echo "Copy this block into PR description:"
+              echo "Adjacency evidence validation failed because the PR description is missing the transition adjacency block."
+              echo "Remediation: copy the block from the 'Transitioned Capability Evidence' section in this job summary"
+              echo "or from the uploaded artifact 'transition_evidence.txt', then paste it into the PR description."
+              echo "Generated block:"
               cat artifacts/transition_evidence.txt
             else
               echo

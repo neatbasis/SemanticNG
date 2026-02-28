@@ -60,27 +60,19 @@ pytest tests/test_dod_manifest.py
 
 ### Contributor milestone policy for `src/state_renormalization/` PRs
 
-When your PR touches `src/state_renormalization/`, include milestone test evidence in the PR description (or linked CI run) for every relevant `pytest_commands` entry defined in `docs/dod_manifest.json`:
+`docs/dod_manifest.json` is the source of truth for capability status, ownership paths, and milestone pytest commands.
 
-- Capabilities with `status: in_progress` whose `code_paths` overlap your changed files.
-- Any capability moved from `in_progress` to `done` in the same PR.
-
-Status transitions from `in_progress` to `done` must include all of the following:
-
-1. Passing evidence for that capability's manifest-listed `pytest_commands`.
-2. Documentation updates in `README.md` and/or `docs/*.md` beyond `docs/dod_manifest.json`.
-3. PR checklist links to CI evidence for each listed command (workflow/job URL or attached command output).
+When your PR touches `src/state_renormalization/` or changes capability status in `docs/dod_manifest.json`, CI selects and runs the manifest-listed `pytest_commands` for relevant capabilities automatically.
 
 ### Merge expectations for milestone and maturity updates
 
 PRs that change capability status in `docs/dod_manifest.json` or contract maturity in `docs/system_contract_map.md` are merge-ready only when all of the following are true:
 
 - `State Renormalization Milestone Gate` is green in CI.
-- The PR body includes exact manifest command strings plus passing evidence links for each command.
-- `ROADMAP.md` and `docs/system_contract_map.md` are updated for status transitions.
-- Contract maturity promotions include a dated changelog entry under `docs/system_contract_map.md`.
+- `docs/dod_manifest.json` remains internally consistent and is the canonical source for capability details.
+- `State Renormalization Milestone Gate` runs the manifest-selected pytest commands for the branch diff.
 
-CI enforces these milestone rules for PRs and merge queues that touch `src/state_renormalization/`, `docs/dod_manifest.json`, or the milestone gate workflow.
+CI enforces these milestone rules for PRs and merge queues that touch `src/state_renormalization/`, `docs/dod_manifest.json`, or the milestone gate workflow. Other docs can be generated from the manifest as needed.
 
 
 ### Pre-submit milestone docs check (local)

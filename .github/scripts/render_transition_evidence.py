@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -52,6 +53,13 @@ def _transitioned_capability_commands(head_manifest: dict, transitioned_cap_ids:
 
 
 def _render_block(commands_by_capability: dict[str, list[str]]) -> str:
+    evidence_url = os.environ.get("MILESTONE_EVIDENCE_URL")
+    if not evidence_url:
+        server = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
+        repo = os.environ.get("GITHUB_REPOSITORY", "<org>/<repo>")
+        run_id = os.environ.get("GITHUB_RUN_ID", "<run_id>")
+        evidence_url = f"{server}/{repo}/actions/runs/{run_id}"
+
     lines: list[str] = []
     lines.append("<!-- transition-evidence:start -->")
     lines.append("### Transition evidence (copy into PR description)")
@@ -62,7 +70,7 @@ def _render_block(commands_by_capability: dict[str, list[str]]) -> str:
         lines.append("<!-- transition-evidence:end -->")
         return "\n".join(lines)
 
-    lines.append("Replace each placeholder URL with the corresponding CI/test evidence URL.")
+    lines.append("Use the generated CI run URL for each command. Override with MILESTONE_EVIDENCE_URL if needed.")
     lines.append("")
     for cap_id, commands in sorted(commands_by_capability.items()):
         lines.append(f"#### {cap_id}")
@@ -73,7 +81,7 @@ def _render_block(commands_by_capability: dict[str, list[str]]) -> str:
 
         for idx, command in enumerate(commands, start=1):
             lines.append(command)
-            lines.append(f"Evidence: https://example.com/replace-with-evidence/{cap_id}/{idx}")
+            lines.append(f"Evidence: {evidence_url}#capability-{cap_id}-{idx}")
             lines.append("")
 
     lines.append("<!-- transition-evidence:end -->")

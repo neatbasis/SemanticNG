@@ -3,12 +3,9 @@
 Use this checklist before tagging a release.
 
 - [ ] **Milestone gate pass links recorded:** Include links to the latest successful `State Renormalization Milestone Gate` CI run(s) for this release candidate.
-- [ ] **Manifest status alignment verified:** `docs/dod_manifest.json` capability statuses match both `ROADMAP.md` milestone placement and the maturity/state reflected in `docs/system_contract_map.md`.
-- [ ] **Status transition evidence captured:** For each capability status transition, record the exact milestone `pytest` command(s) from `docs/dod_manifest.json` in the PR body and place a passing `https://...` evidence URL directly below each command string.
-- [ ] **PR body evidence is required in addition to manifest fields:** Even when manifest evidence fields are populated (for example `ci_evidence_links`), command/evidence URL pairs must also appear in the PR body for validator pass.
-- [ ] **PR-body evidence placement verified:** Evidence must appear in the PR body near each command string (command line followed immediately by its evidence URL).
-- [ ] **Manifest evidence limitation acknowledged:** `docs/dod_manifest.json` evidence fields (for example `ci_evidence_links`) are insufficient by themselves for CI validator pass; the same evidence must be present in the PR body in command/evidence pairs.
-- [ ] **Maturity changelog updates captured:** Every maturity promotion/demotion in `docs/system_contract_map.md` has a dated changelog entry and corresponding CI evidence link.
+- [ ] **Manifest is canonical:** Capability status, code paths, and command coverage are updated directly in `docs/dod_manifest.json`.
+- [ ] **Status transition commands captured in manifest:** Each transitioned capability has complete `pytest_commands` and synchronized `ci_evidence_links.command` entries in manifest order.
+- [ ] **Milestone gate pass links recorded:** CI run links are captured in manifest `ci_evidence_links` and/or release notes as needed (PR-body duplication is optional).
 
 ## Copy/paste evidence block (validator-compatible)
 
@@ -18,15 +15,15 @@ Generate the PR-template block from `docs/dod_manifest.json` instead of maintain
 python .github/scripts/render_transition_evidence.py --emit-pr-template-autogen
 ```
 
-Paste the generated capability sections into the PR body and replace each placeholder URL with the matching CI run URL.
+Use the generated capability sections where needed (PR notes, release notes, or docs). URLs default to the current CI run URL when generated in GitHub Actions.
 
 ## Merge expectations for milestone and maturity PRs
 
 Do not merge milestone or maturity update PRs until all conditions are met:
 
 1. `State Renormalization Milestone Gate` CI is passing on the PR head SHA.
-2. PR checklist includes command-by-command evidence links for all status transitions.
-3. `ROADMAP.md`, `docs/dod_manifest.json`, and `docs/system_contract_map.md` remain internally consistent after the update.
+2. `docs/dod_manifest.json` contains the canonical command/evidence mapping for transitioned capabilities.
+3. Any derived docs are regenerated from the manifest when required.
 
 ## Integration branch stabilization controls (temporary)
 

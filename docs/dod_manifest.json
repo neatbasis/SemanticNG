@@ -104,8 +104,8 @@
     {
       "id": "observer_authorization_contract",
       "title": "Observer authorization contract",
-      "status": "planned",
-      "roadmap_section": "Next",
+      "status": "done",
+      "roadmap_section": "Now",
       "code_paths": [
         "src/state_renormalization/contracts.py",
         "src/state_renormalization/engine.py",
@@ -121,11 +121,11 @@
       "ci_evidence_links": [
         {
           "command": "pytest tests/test_observer_frame.py",
-          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+          "evidence": "docs/observer_authorization_evidence.md#command-1-pytest-teststest_observer_framepy"
         },
         {
           "command": "pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py",
-          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+          "evidence": "docs/observer_authorization_evidence.md#command-2-pytest-teststest_predictions_contracts_and_gatespy-teststest_invariantspy"
         }
       ]
     },

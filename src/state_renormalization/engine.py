@@ -280,27 +280,19 @@ def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltR
 
 
 def _authorization_halt_record(*, stage: str, reason: str, context: Mapping[str, Any]) -> HaltRecord:
-    return HaltRecord.from_payload(
-        HaltRecord.build_canonical_payload(
-            halt_id=f"halt:{sha1_text(f'{stage}|authorization.scope.v1|{reason}|{_to_dict(context)}')}",
-            stage=stage,
-            invariant_id="authorization.scope.v1",
-            reason=reason,
-            details={"authorization_context": _to_dict(context)},
-            evidence=[
-                {
-                    "kind": "authorization_scope",
-                    "ref": f"action:{context.get('action', 'unknown')}",
-                },
-                {
-                    "kind": "required_capability",
-                    "ref": str(context.get("required_capability") or "unknown"),
-                },
-            ],
-            timestamp=_now_iso(),
-            retryability=True,
-        )
+    authorization_outcome = _run_invariant(
+        InvariantId.AUTHORIZATION_SCOPE,
+        ctx=default_check_context(
+            scope="authorization",
+            prediction_key=None,
+            current_predictions={},
+            prediction_log_available=True,
+            authorization_context=_to_dict(context),
+        ),
     )
+    if authorization_outcome.flow != InvariantFlow.STOP:
+        raise HaltPayloadValidationError("authorization halt must STOP when unauthorized")
+    return _halt_record_from_outcome(stage=stage, outcome=authorization_outcome)
 
 
 def _evaluate_invariant_gate_pipeline(
@@ -695,13 +687,93 @@ def evaluate_invariant_gates(
         required_capability="baseline.invariant_evaluation",
     )
     if ep is not None and not is_authorized:
-        halt = _authorization_halt_record(
+        unauthorized_outcome = _run_invariant(
+            InvariantId.AUTHORIZATION_SCOPE,
+            ctx=default_check_context(
+                scope=scope,
+                prediction_key=prediction_key,
+                current_predictions={},
+                prediction_log_available=prediction_log_available,
+                authorization_context=auth_context,
+            ),
+        )
+        halt = _halt_record_from_outcome(
             stage=gate_point,
-            reason="observer is not authorized to evaluate invariant gates",
-            context=auth_context,
+            outcome=unauthorized_outcome,
+        )
+        auth_gate_check = normalize_outcome(unauthorized_outcome, gate=gate_point)
+        halt_validation = normalize_outcome(
+            REGISTRY[InvariantId.EXPLAINABLE_HALT_PAYLOAD](
+                default_check_context(
+                    scope=scope,
+                    prediction_key=prediction_key,
+                    current_predictions={},
+                    prediction_log_available=prediction_log_available,
+                    halt_candidate=unauthorized_outcome,
+                )
+            ),
+            gate=gate_point,
         )
         halt_evidence_ref = append_halt_record(halt, halt_log_path=halt_log_path, stable_ids=_episode_stable_ids(ep))
         _append_authorization_issue(ep, halt=halt, context=auth_context)
+        _append_episode_artifact(
+            ep,
+            {
+                "artifact_kind": "invariant_outcomes",
+                "observer": _to_dict(getattr(ep, "observer", None)),
+                "observer_enforcement": {
+                    "requested_evaluation_invariants": list(getattr(observer, "evaluation_invariants", []) or []),
+                    "enforced": bool(getattr(observer, "evaluation_invariants", []) or []),
+                    "observer_role": getattr(observer, "role", None),
+                    "authorization_level": getattr(observer, "authorization_level", None),
+                },
+                "scope": scope,
+                "prediction_key": prediction_key,
+                "invariant_context": {
+                    "has_current_predictions": projection_state.has_current_predictions,
+                    "current_predictions": {},
+                    "prediction_log_available": prediction_log_available,
+                    "just_written_prediction": _to_dict(just_written_prediction),
+                },
+                "pre_consume": [_to_dict(unauthorized_outcome)],
+                "post_write": [],
+                "invariant_results": [_to_dict(unauthorized_outcome)],
+                "invariant_checks": [
+                    {
+                        "gate_point": gate_point,
+                        "invariant_id": auth_gate_check.invariant_id,
+                        "passed": auth_gate_check.passed,
+                        "evidence": _to_dict(auth_gate_check.evidence),
+                        "reason": auth_gate_check.reason,
+                        "flow": auth_gate_check.flow,
+                        "validity": auth_gate_check.validity,
+                        "code": auth_gate_check.code,
+                        "details": _to_dict(auth_gate_check.details),
+                        "action_hints": _to_dict(auth_gate_check.action_hints),
+                    },
+                    {
+                        "gate_point": "halt_validation",
+                        "invariant_id": halt_validation.invariant_id,
+                        "passed": halt_validation.passed,
+                        "evidence": _to_dict(halt_validation.evidence),
+                        "reason": halt_validation.reason,
+                        "flow": halt_validation.flow,
+                        "validity": halt_validation.validity,
+                        "code": halt_validation.code,
+                        "details": _to_dict(halt_validation.details),
+                        "action_hints": _to_dict(halt_validation.action_hints),
+                    },
+                ],
+                "invariant_audit": [
+                    _invariant_audit_result_from_checker(gate_point, auth_gate_check).model_dump(mode="json"),
+                    _invariant_audit_result_from_checker("halt_validation", halt_validation).model_dump(mode="json"),
+                ],
+                "kind": "halt",
+                "prediction": None,
+                "halt": _halt_payload(halt),
+                "halt_evidence_ref": halt_evidence_ref,
+            },
+        )
         _append_episode_artifact(
             ep,
             {

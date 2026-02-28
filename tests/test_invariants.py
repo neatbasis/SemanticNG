@@ -5,6 +5,7 @@ from state_renormalization.invariants import (
     InvariantId,
     InvariantOutcome,
     Validity,
+    check_authorization_scope,
     check_explainable_halt_payload,
     check_prediction_availability,
     check_evidence_link_completeness,
@@ -140,6 +141,42 @@ def test_prediction_outcome_binding_invariant_fail_and_pass() -> None:
     )
     normalized = normalize_outcome(passing)
     assert normalized.invariant_id == "prediction_outcome_binding.v1"
+    assert normalized.passed is True
+
+
+def test_authorization_scope_invariant_fail_and_pass() -> None:
+    failing = check_authorization_scope(
+        default_check_context(
+            scope="scope:test",
+            prediction_key="scope:test",
+            current_predictions={},
+            prediction_log_available=True,
+            authorization_context={
+                "action": "evaluate_invariant_gates",
+                "required_capability": "baseline.invariant_evaluation",
+                "authorized": False,
+            },
+        )
+    )
+    assert failing.invariant_id is InvariantId.AUTHORIZATION_SCOPE
+    assert failing.passed is False
+    assert failing.flow is Flow.STOP
+
+    passing = check_authorization_scope(
+        default_check_context(
+            scope="scope:test",
+            prediction_key="scope:test",
+            current_predictions={},
+            prediction_log_available=True,
+            authorization_context={
+                "action": "evaluate_invariant_gates",
+                "required_capability": "baseline.invariant_evaluation",
+                "authorized": True,
+            },
+        )
+    )
+    normalized = normalize_outcome(passing)
+    assert normalized.invariant_id == "authorization.scope.v1"
     assert normalized.passed is True
 
 

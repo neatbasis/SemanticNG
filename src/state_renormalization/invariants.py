@@ -7,6 +7,7 @@ from typing import Any, Callable, Mapping, Optional, Protocol, Sequence
 
 
 class InvariantId(str, Enum):
+    AUTHORIZATION_SCOPE = "authorization.scope.v1"
     PREDICTION_AVAILABILITY = "prediction_availability.v1"
     EVIDENCE_LINK_COMPLETENESS = "evidence_link_completeness.v1"
     PREDICTION_OUTCOME_BINDING = "prediction_outcome_binding.v1"
@@ -66,6 +67,7 @@ class CheckContext(Protocol):
     just_written_prediction: Optional[Mapping[str, Any]]
     halt_candidate: Optional[InvariantOutcome]
     prediction_outcome: Optional[Mapping[str, Any]]
+    authorization_context: Optional[Mapping[str, Any]]
 
 
 @dataclass(frozen=True)
@@ -78,6 +80,7 @@ class InvariantCheckContext:
     just_written_prediction: Optional[Mapping[str, Any]] = None
     halt_candidate: Optional[InvariantOutcome] = None
     prediction_outcome: Optional[Mapping[str, Any]] = None
+    authorization_context: Optional[Mapping[str, Any]] = None
 
 
 Checker = Callable[[CheckContext], InvariantOutcome]
@@ -129,6 +132,45 @@ def check_prediction_availability(ctx: CheckContext) -> InvariantOutcome:
         )
 
     return _ok(InvariantId.PREDICTION_AVAILABILITY, "current_prediction_available", {"prediction_key": key})
+
+
+def check_authorization_scope(ctx: CheckContext) -> InvariantOutcome:
+    auth_context = dict(ctx.authorization_context or {})
+    if not auth_context:
+        return _ok(InvariantId.AUTHORIZATION_SCOPE, "authorization_check_not_applicable")
+
+    if bool(auth_context.get("authorized")):
+        return _ok(
+            InvariantId.AUTHORIZATION_SCOPE,
+            "authorization_scope_allowed",
+            {
+                "action": auth_context.get("action"),
+                "required_capability": auth_context.get("required_capability"),
+            },
+        )
+
+    return InvariantOutcome(
+        invariant_id=InvariantId.AUTHORIZATION_SCOPE,
+        passed=False,
+        reason="observer is not authorized to evaluate invariant gates",
+        flow=Flow.STOP,
+        validity=Validity.INVALID,
+        code="observer_scope_unauthorized",
+        evidence=(
+            {"kind": "authorization_scope", "value": f"action:{auth_context.get('action', 'unknown')}"},
+            {"kind": "required_capability", "value": str(auth_context.get("required_capability") or "unknown")},
+        ),
+        details={
+            "message": "observer is not authorized to evaluate invariant gates",
+            "authorization_context": auth_context,
+        },
+        action_hints=(
+            {
+                "kind": "request_capability",
+                "required_capability": str(auth_context.get("required_capability") or "unknown"),
+            },
+        ),
+    )
 
 
 def check_evidence_link_completeness(ctx: CheckContext) -> InvariantOutcome:
@@ -249,6 +291,7 @@ def check_explainable_halt_payload(ctx: CheckContext) -> InvariantOutcome:
 
 
 REGISTRY: dict[InvariantId, Checker] = {
+    InvariantId.AUTHORIZATION_SCOPE: check_authorization_scope,
     InvariantId.PREDICTION_AVAILABILITY: check_prediction_availability,
     InvariantId.EVIDENCE_LINK_COMPLETENESS: check_evidence_link_completeness,
     InvariantId.PREDICTION_OUTCOME_BINDING: check_prediction_outcome_binding,
@@ -260,6 +303,10 @@ REGISTERED_INVARIANT_IDS: tuple[str, ...] = tuple(invariant_id.value for invaria
 
 
 REGISTERED_INVARIANT_BRANCH_BEHAVIORS: dict[InvariantId, InvariantBranchBehavior] = {
+    InvariantId.AUTHORIZATION_SCOPE: InvariantBranchBehavior(
+        continue_behavior="Continue when authorization context is non-applicable or observer is authorized for the scoped action.",
+        stop_behavior="Stop when authorization context reports an unauthorized observer/capability mismatch.",
+    ),
     InvariantId.PREDICTION_AVAILABILITY: InvariantBranchBehavior(
         continue_behavior="Continue when at least one projected prediction exists and prediction_key resolves if provided.",
         stop_behavior="Stop when no projected predictions exist or requested prediction_key is absent from projections.",
@@ -288,6 +335,7 @@ def default_check_context(
     just_written_prediction: Optional[Mapping[str, Any]] = None,
     halt_candidate: Optional[InvariantOutcome] = None,
     prediction_outcome: Optional[Mapping[str, Any]] = None,
+    authorization_context: Optional[Mapping[str, Any]] = None,
 ) -> InvariantCheckContext:
     return InvariantCheckContext(
         now_iso=datetime.now(timezone.utc).isoformat(),
@@ -298,6 +346,7 @@ def default_check_context(
         just_written_prediction=just_written_prediction,
         halt_candidate=halt_candidate,
         prediction_outcome=prediction_outcome,
+        authorization_context=authorization_context,
     )
 
 

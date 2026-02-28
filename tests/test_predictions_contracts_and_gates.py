@@ -86,6 +86,34 @@ def _build_allow_context_for_prediction_availability() -> Any:
     )
 
 
+def _build_allow_context_for_authorization_scope() -> Any:
+    return default_check_context(
+        scope="scope:test",
+        prediction_key="scope:test",
+        current_predictions={},
+        prediction_log_available=True,
+        authorization_context={
+            "action": "evaluate_invariant_gates",
+            "required_capability": "baseline.invariant_evaluation",
+            "authorized": True,
+        },
+    )
+
+
+def _build_stop_context_for_authorization_scope() -> Any:
+    return default_check_context(
+        scope="scope:test",
+        prediction_key="scope:test",
+        current_predictions={},
+        prediction_log_available=True,
+        authorization_context={
+            "action": "evaluate_invariant_gates",
+            "required_capability": "baseline.invariant_evaluation",
+            "authorized": False,
+        },
+    )
+
+
 def _build_stop_context_for_prediction_availability() -> Any:
     return default_check_context(
         scope="scope:test",
@@ -176,6 +204,30 @@ def _build_stop_context_for_explainable_halt_payload() -> Any:
 
 
 INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
+    InvariantId.AUTHORIZATION_SCOPE: InvariantCoverage(
+        supports_stop=True,
+        scenarios=(
+            InvariantScenario(
+                name="pass",
+                build_context=_build_allow_context_for_authorization_scope,
+                expected_passed=True,
+                expected_flow=Flow.CONTINUE,
+                expected_code="authorization_scope_allowed",
+                rationale="Authorization context reports observer capability is allowed.",
+            ),
+            InvariantScenario(
+                name="stop",
+                build_context=_build_stop_context_for_authorization_scope,
+                expected_passed=False,
+                expected_flow=Flow.STOP,
+                expected_code="observer_scope_unauthorized",
+                rationale="Authorization context reports missing capability for scoped action.",
+            ),
+        ),
+        gate_non_applicable=NonApplicableGateCoverage(
+            rationale="This invariant is evaluated as an authorization pre-check and not as a regular pre/post consume gate phase.",
+        ),
+    ),
     InvariantId.PREDICTION_AVAILABILITY: InvariantCoverage(
         supports_stop=True,
         scenarios=(
@@ -873,6 +925,40 @@ def test_evaluate_invariant_gates_persists_halt_with_episode_stable_ids(tmp_path
     assert rec["feature_id"] == "feat_1"
     assert rec["scenario_id"] == "scn_1"
     assert rec["step_id"] == "stp_1"
+
+
+def test_evaluate_invariant_gates_persists_authorization_halt_with_episode_stable_ids(tmp_path: Path) -> None:
+    class DummyEpisode:
+        def __init__(self) -> None:
+            self.artifacts = [{"kind": "stable_ids", "feature_id": "feat_1", "scenario_id": "scn_1", "step_id": "stp_1"}]
+            self.observer = type(
+                "Observer",
+                (),
+                {
+                    "role": "assistant",
+                    "capabilities": ["baseline.dialog"],
+                    "authorization_level": "baseline",
+                    "evaluation_invariants": [],
+                },
+            )()
+            self.observations = []
+
+    gate = evaluate_invariant_gates(
+        ep=DummyEpisode(),
+        scope="scope:test",
+        prediction_key=None,
+        projection_state=ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+        prediction_log_available=True,
+        halt_log_path=tmp_path / "halts.jsonl",
+    )
+
+    assert isinstance(gate, HaltRecord)
+    assert gate.invariant_id == InvariantId.AUTHORIZATION_SCOPE.value
+    (_, rec), = list(read_jsonl(tmp_path / "halts.jsonl"))
+    assert rec["feature_id"] == "feat_1"
+    assert rec["scenario_id"] == "scn_1"
+    assert rec["step_id"] == "stp_1"
+    assert rec["invariant_id"] == InvariantId.AUTHORIZATION_SCOPE.value
 
 
 def test_gate_branch_parity_and_deterministic_halt_selection(tmp_path: Path) -> None:

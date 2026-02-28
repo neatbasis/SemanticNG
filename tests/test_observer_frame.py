@@ -234,6 +234,11 @@ def test_evaluate_invariant_gates_blocks_unauthorized_observer(make_episode, mak
     assert "retryable" not in halt_observation
     assert "timestamp_iso" not in halt_observation
 
+    invariant_outcomes = next(a for a in ep.artifacts if a.get("artifact_kind") == "invariant_outcomes")
+    assert invariant_outcomes["kind"] == "halt"
+    assert invariant_outcomes["invariant_results"][0].invariant_id.value == "authorization.scope.v1"
+    assert invariant_outcomes["invariant_checks"][1]["gate_point"] == "halt_validation"
+
 
 def test_policy_functions_block_unauthorized_actions(make_episode, make_ask_result, make_observer) -> None:
     observer = make_observer(capabilities=["baseline.invariant_evaluation"])

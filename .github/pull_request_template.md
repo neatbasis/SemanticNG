@@ -10,11 +10,11 @@
 
 For every status-transition capability in this PR, include the exact `pytest` command lines from `docs/dod_manifest.json` (verbatim) and place one adjacent `https://...` evidence URL directly below each command line.
 
+<!-- BEGIN AUTOGEN: milestone-command-evidence -->
 ## AUTOGEN milestone command/evidence pairs (do not edit by hand)
 
 <!-- AUTOGEN SECTION: milestone evidence pairs; source=docs/dod_manifest.json; generator=.github/scripts/render_transition_evidence.py -->
 
-<!-- BEGIN AUTOGEN: milestone-evidence -->
 ### Capability command/evidence blocks (generated from `docs/dod_manifest.json`)
 
 #### Capability: `capability_invocation_governance` (status: `planned`)
@@ -94,4 +94,4 @@ pytest tests/test_schema_selector.py tests/test_schema_bubbling_option_a.py test
 https://github.com/<org>/<repo>/actions/runs/<run_id>
 
 ```
-<!-- END AUTOGEN: milestone-evidence -->
+<!-- END AUTOGEN: milestone-command-evidence -->

@@ -85,7 +85,7 @@ jobs:
 
       - name: Run AUTOGEN parity pytest
         run: |
-          pytest tests/test_render_transition_evidence.py tests/test_dod_manifest.py -k pull_request_template_autogen_section_matches_manifest_commands
+          pytest tests/test_render_transition_evidence.py tests/test_pr_template_autogen_governance.py
 
       - name: Render transition evidence block
         id: render_transition_evidence

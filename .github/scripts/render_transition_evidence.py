@@ -14,8 +14,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_PATH = ROOT / "docs" / "dod_manifest.json"
 PR_TEMPLATE_PATH = ROOT / ".github" / "pull_request_template.md"
-AUTOGEN_BEGIN = "<!-- BEGIN AUTOGEN: milestone-evidence -->"
-AUTOGEN_END = "<!-- END AUTOGEN: milestone-evidence -->"
+AUTOGEN_BEGIN = "<!-- BEGIN AUTOGEN: milestone-command-evidence -->"
+AUTOGEN_END = "<!-- END AUTOGEN: milestone-command-evidence -->"
 
 
 def _load_manifest(rev: str) -> dict:
@@ -100,7 +100,14 @@ def _commands_for_pr_template_examples(manifest: dict) -> dict[str, dict[str, ob
 
 
 def _render_pr_template_examples(manifest: dict) -> str:
-    lines: list[str] = ["### Capability command/evidence blocks (generated from `docs/dod_manifest.json`)", ""]
+    lines: list[str] = [
+        "## AUTOGEN milestone command/evidence pairs (do not edit by hand)",
+        "",
+        "<!-- AUTOGEN SECTION: milestone evidence pairs; source=docs/dod_manifest.json; generator=.github/scripts/render_transition_evidence.py -->",
+        "",
+        "### Capability command/evidence blocks (generated from `docs/dod_manifest.json`)",
+        "",
+    ]
     commands_by_capability = _commands_for_pr_template_examples(manifest)
     for cap_id in sorted(commands_by_capability):
         capability = commands_by_capability[cap_id]

@@ -81,21 +81,23 @@ jobs:
           mkdir -p artifacts
           python .github/scripts/render_transition_evidence.py \
             --base "$BASE_SHA" \
-            --head "$HEAD_SHA" | tee artifacts/transition_evidence_block.md
+            --head "$HEAD_SHA" | tee artifacts/transition-evidence.txt
 
       - name: Add transition evidence block to job summary
         run: |
           {
-            echo "## Transition Evidence Block"
+            echo "## Transitioned Capability Evidence"
             echo
-            cat artifacts/transition_evidence_block.md
+            echo "Paste this exact block into the PR description when milestone validation requests it."
+            echo
+            cat artifacts/transition-evidence.txt
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload transition evidence artifact
         uses: actions/upload-artifact@v4
         with:
           name: transition-evidence-block
-          path: artifacts/transition_evidence_block.md
+          path: artifacts/transition-evidence.txt
           if-no-files-found: error
 
       - name: Validate milestone documentation governance
@@ -118,8 +120,9 @@ jobs:
             fi
 
             echo
-            echo "Copy this exact block into PR description"
-            cat artifacts/transition_evidence_block.md
+            echo "Milestone validation failed due to missing transitioned-capability evidence in the PR description."
+            echo "Contributors: paste the generated transition evidence block below into the PR description and re-run checks."
+            cat artifacts/transition-evidence.txt
             exit "$validator_status"
           fi
 
@@ -135,7 +138,7 @@ jobs:
             echo "Validation failed due to missing transition evidence."
             echo "Copy this exact block into the PR description:"
             echo
-            cat artifacts/transition_evidence_block.md
+            cat artifacts/transition-evidence.txt
           } > artifacts/transition_evidence_comment.md
 
       - name: Post transition evidence comment using GitHub API

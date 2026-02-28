@@ -186,6 +186,19 @@ def append_prediction_record_event(
 
     return append_prediction(path=path, record=event)
 
+def _canonicalize_halt_payload(record: Any) -> JsonObj:
+    if isinstance(record, HaltRecord):
+        return record.to_canonical_payload()
+    if isinstance(record, dict):
+        canonical = HaltRecord.from_payload(record).to_canonical_payload()
+        stable_ids = {
+            key: value
+            for key in ("feature_id", "scenario_id", "step_id")
+            if isinstance((value := record.get(key)), str)
+        }
+        return {**stable_ids, **canonical}
+    return _to_jsonable(record)
+
 
 def append_halt(path: PathLike, record: Any) -> JsonObj:
     p = Path(path)
@@ -193,17 +206,7 @@ def append_halt(path: PathLike, record: Any) -> JsonObj:
     if p.exists():
         next_offset = len(p.read_text(encoding="utf-8").splitlines()) + 1
 
-    payload = record
-    if isinstance(record, HaltRecord):
-        payload = record.to_canonical_payload()
-    elif isinstance(record, dict):
-        canonical = HaltRecord.from_payload(record).to_canonical_payload()
-        stable_ids = {
-            key: value
-            for key in ("feature_id", "scenario_id", "step_id")
-            if isinstance((value := record.get(key)), str)
-        }
-        payload = {**stable_ids, **canonical}
+    payload = _canonicalize_halt_payload(record)
 
     append_jsonl(p, payload)
     return {"kind": "jsonl", "ref": f"{p.name}@{next_offset}"}

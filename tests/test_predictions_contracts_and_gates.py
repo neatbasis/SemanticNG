@@ -259,6 +259,21 @@ def _assert_result_contract(result: GateDecision) -> None:
         assert result.reason
 
 
+def test_halt_payload_schema_is_canonical_for_stop_emitters() -> None:
+    expected_schema = {
+        "halt_id": "str",
+        "stage": "str",
+        "invariant_id": "str",
+        "reason": "str",
+        "details": "dict",
+        "evidence": "list",
+        "retryability": "bool",
+        "timestamp": "str",
+    }
+
+    assert HaltRecord.required_payload_fields() == tuple(expected_schema)
+    assert HaltRecord.canonical_payload_schema() == expected_schema
+
 def test_gate_flow_contract_parity_for_continue_and_stop(tmp_path: Path) -> None:
     scope = FIXED_PREDICTION["scope_key"]
     projected = project_current(
@@ -720,6 +735,8 @@ def test_gate_flow_parity_continue_and_stop_payloads(tmp_path: Path) -> None:
         },
     )
     assert isinstance(continue_gate, Success)
+    assert [out.flow for out in continue_gate.artifact.pre_consume] == [Flow.CONTINUE]
+    assert [out.flow for out in continue_gate.artifact.post_write] == [Flow.CONTINUE]
     assert [out.flow for out in continue_gate.artifact.combined] == [Flow.CONTINUE, Flow.CONTINUE]
 
     stop_ep = DummyEpisode()
@@ -735,4 +752,9 @@ def test_gate_flow_parity_continue_and_stop_payloads(tmp_path: Path) -> None:
     assert isinstance(stop_gate, HaltRecord)
     stop_checks = stop_ep.artifacts[0]["invariant_checks"]
     assert [check["passed"] for check in stop_checks[:2]] == [True, False]
+    assert [check["invariant_id"] for check in stop_checks[:2]] == [
+        InvariantId.PREDICTION_AVAILABILITY.value,
+        InvariantId.EVIDENCE_LINK_COMPLETENESS.value,
+    ]
     assert stop_gate.stage == "pre-decision:post_write"
+    assert stop_gate.invariant_id == InvariantId.EVIDENCE_LINK_COMPLETENESS.value

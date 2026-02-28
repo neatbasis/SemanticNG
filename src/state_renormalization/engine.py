@@ -125,6 +125,45 @@ def _first_halt_from_evaluations(
     return None, None
 
 
+def _evaluate_gate_phase(
+    *,
+    scope: str,
+    prediction_key: Optional[str],
+    current_predictions: Mapping[str, str],
+    prediction_log_available: bool,
+    phase: str,
+    invariant_id: InvariantId,
+    just_written_prediction: Optional[Mapping[str, Any]],
+) -> GateInvariantEvaluation:
+    phase_ctx = default_check_context(
+        scope=scope,
+        prediction_key=prediction_key,
+        current_predictions=current_predictions,
+        prediction_log_available=prediction_log_available,
+        just_written_prediction=just_written_prediction,
+    )
+    return GateInvariantEvaluation(
+        phase=phase,
+        outcome=_run_invariant(invariant_id, ctx=phase_ctx),
+    )
+
+
+def _result_from_gate_evaluations(
+    *,
+    evaluations: Sequence[GateInvariantEvaluation],
+    gate_point: str,
+) -> GateDecision:
+    halt_outcome, halt_stage = _first_halt_from_evaluations(evaluations=evaluations, gate_point=gate_point)
+    if halt_outcome is None or halt_stage is None:
+        return Success(
+            artifact=GatePredictionOutcome(
+                pre_consume=tuple(ev.outcome for ev in evaluations if ev.phase == "pre_consume"),
+                post_write=tuple(ev.outcome for ev in evaluations if ev.phase == "post_write"),
+            )
+        )
+    return _halt_record_from_outcome(stage=halt_stage, outcome=halt_outcome)
+
+
 def _observer_allowed_invariants(observer: Optional[ObserverFrame]) -> Optional[set[InvariantId]]:
     if observer is None:
         return None
@@ -508,17 +547,22 @@ def evaluate_invariant_gates(
         if not is_enabled or not _observer_allows_invariant(observer=observer, invariant_id=invariant_id):
             continue
 
-        phase_ctx = default_check_context(
+        evaluation = _evaluate_gate_phase(
             scope=scope,
             prediction_key=prediction_key,
             current_predictions=current_predictions,
             prediction_log_available=prediction_log_available,
+            phase=phase,
+            invariant_id=invariant_id,
             just_written_prediction=phase_written_prediction,
         )
-        phase_outcome = _run_invariant(invariant_id, ctx=phase_ctx)
-        evaluations.append(GateInvariantEvaluation(phase=phase, outcome=phase_outcome))
+        evaluations.append(evaluation)
+        if evaluation.outcome.flow == InvariantFlow.STOP:
+            break
 
-    outcome_bundle = GatePredictionOutcome(
+    result = _result_from_gate_evaluations(evaluations=evaluations, gate_point=gate_point)
+
+    outcome_bundle = result.artifact if isinstance(result, Success) else GatePredictionOutcome(
         pre_consume=tuple(ev.outcome for ev in evaluations if ev.phase == "pre_consume"),
         post_write=tuple(ev.outcome for ev in evaluations if ev.phase == "post_write"),
     )
@@ -531,11 +575,9 @@ def evaluate_invariant_gates(
             )
         )
 
-    halt_outcome, halt_stage = _first_halt_from_evaluations(evaluations=evaluations, gate_point=gate_point)
+    halt_outcome, _ = _first_halt_from_evaluations(evaluations=evaluations, gate_point=gate_point)
 
-    halt_record: Optional[HaltRecord] = None
-    if halt_outcome is not None and halt_stage is not None:
-        halt_record = _halt_record_from_outcome(stage=halt_stage, outcome=halt_outcome)
+    if isinstance(result, HaltRecord) and halt_outcome is not None:
         gate_checks.append(
             GateInvariantCheck(
                 gate_point="halt_validation",
@@ -554,13 +596,7 @@ def evaluate_invariant_gates(
             )
         )
 
-    result_kind: str
-    if halt_record is None:
-        result = Success(artifact=outcome_bundle)
-        result_kind = "prediction"
-    else:
-        result = halt_record
-        result_kind = "halt"
+    result_kind = "prediction" if isinstance(result, Success) else "halt"
 
     halt_evidence_ref: Optional[Dict[str, str]] = None
     stable_ids = _episode_stable_ids(ep) if ep is not None else {}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -47,6 +48,20 @@ FIXED_PREDICTION = {
 }
 
 REGISTERED_INVARIANTS = tuple(REGISTRY.keys())
+
+
+@dataclass(frozen=True)
+class InvariantScenario:
+    name: str
+    build_context: Callable[[], Any]
+    expected_passed: bool
+    expected_flow: Flow
+
+
+@dataclass(frozen=True)
+class InvariantCoverage:
+    supports_stop: bool
+    scenarios: tuple[InvariantScenario, ...]
 
 
 def _build_allow_context_for_prediction_availability() -> Any:
@@ -147,24 +162,83 @@ def _build_stop_context_for_explainable_halt_payload() -> Any:
     )
 
 
-INVARIANT_SCENARIO_BUILDERS: dict[InvariantId, dict[str, Callable[[], Any]]] = {
-    InvariantId.PREDICTION_AVAILABILITY: {
-        "allow": _build_allow_context_for_prediction_availability,
-        "stop": _build_stop_context_for_prediction_availability,
-    },
-    InvariantId.EVIDENCE_LINK_COMPLETENESS: {
-        "allow": _build_allow_context_for_evidence_link_completeness,
-        "stop": _build_stop_context_for_evidence_link_completeness,
-    },
-    InvariantId.PREDICTION_OUTCOME_BINDING: {
-        "allow": _build_allow_context_for_prediction_outcome_binding,
-        "stop": _build_stop_context_for_prediction_outcome_binding,
-    },
-    InvariantId.EXPLAINABLE_HALT_PAYLOAD: {
-        "allow": _build_allow_context_for_explainable_halt_payload,
-        "stop": _build_stop_context_for_explainable_halt_payload,
-    },
+INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
+    InvariantId.PREDICTION_AVAILABILITY: InvariantCoverage(
+        supports_stop=True,
+        scenarios=(
+            InvariantScenario(
+                name="pass",
+                build_context=_build_allow_context_for_prediction_availability,
+                expected_passed=True,
+                expected_flow=Flow.CONTINUE,
+            ),
+            InvariantScenario(
+                name="stop",
+                build_context=_build_stop_context_for_prediction_availability,
+                expected_passed=False,
+                expected_flow=Flow.STOP,
+            ),
+        ),
+    ),
+    InvariantId.EVIDENCE_LINK_COMPLETENESS: InvariantCoverage(
+        supports_stop=True,
+        scenarios=(
+            InvariantScenario(
+                name="pass",
+                build_context=_build_allow_context_for_evidence_link_completeness,
+                expected_passed=True,
+                expected_flow=Flow.CONTINUE,
+            ),
+            InvariantScenario(
+                name="stop",
+                build_context=_build_stop_context_for_evidence_link_completeness,
+                expected_passed=False,
+                expected_flow=Flow.STOP,
+            ),
+        ),
+    ),
+    InvariantId.PREDICTION_OUTCOME_BINDING: InvariantCoverage(
+        supports_stop=True,
+        scenarios=(
+            InvariantScenario(
+                name="pass",
+                build_context=_build_allow_context_for_prediction_outcome_binding,
+                expected_passed=True,
+                expected_flow=Flow.CONTINUE,
+            ),
+            InvariantScenario(
+                name="stop",
+                build_context=_build_stop_context_for_prediction_outcome_binding,
+                expected_passed=False,
+                expected_flow=Flow.STOP,
+            ),
+        ),
+    ),
+    InvariantId.EXPLAINABLE_HALT_PAYLOAD: InvariantCoverage(
+        supports_stop=True,
+        scenarios=(
+            InvariantScenario(
+                name="pass",
+                build_context=_build_allow_context_for_explainable_halt_payload,
+                expected_passed=True,
+                expected_flow=Flow.CONTINUE,
+            ),
+            InvariantScenario(
+                name="stop",
+                build_context=_build_stop_context_for_explainable_halt_payload,
+                expected_passed=False,
+                expected_flow=Flow.STOP,
+            ),
+        ),
+    ),
 }
+
+
+MATRIX_CASES = [
+    pytest.param(invariant_id, scenario, id=f"{invariant_id.value}:{scenario.name}")
+    for invariant_id, coverage in INVARIANT_RELEASE_GATE_MATRIX.items()
+    for scenario in coverage.scenarios
+]
 
 
 def _assert_result_contract(result: GateDecision) -> None:
@@ -186,35 +260,36 @@ def test_prediction_record_json_round_trip() -> None:
 
 
 def test_registered_invariant_parameterization_matches_registry() -> None:
-    assert set(REGISTERED_INVARIANTS) == set(INVARIANT_SCENARIO_BUILDERS)
+    assert set(REGISTERED_INVARIANTS) == set(INVARIANT_RELEASE_GATE_MATRIX)
 
 
-@pytest.mark.parametrize("invariant_id", REGISTERED_INVARIANTS)
-def test_invariant_outcomes_are_deterministic_and_contract_compliant(invariant_id: InvariantId) -> None:
+def test_invariant_matrix_release_gate_has_required_coverage() -> None:
+    assert set(REGISTERED_INVARIANTS) == set(INVARIANT_RELEASE_GATE_MATRIX)
+
+    for invariant_id, coverage in INVARIANT_RELEASE_GATE_MATRIX.items():
+        assert any(s.expected_passed for s in coverage.scenarios), f"{invariant_id.value} has no pass scenario"
+        if coverage.supports_stop:
+            assert any(not s.expected_passed for s in coverage.scenarios), f"{invariant_id.value} has no stop scenario"
+
+
+@pytest.mark.parametrize("invariant_id,scenario", MATRIX_CASES)
+def test_invariant_outcomes_are_deterministic_and_contract_compliant(
+    invariant_id: InvariantId,
+    scenario: InvariantScenario,
+) -> None:
     checker = REGISTRY[invariant_id]
-    allow_ctx = INVARIANT_SCENARIO_BUILDERS[invariant_id]["allow"]()
-    stop_ctx = INVARIANT_SCENARIO_BUILDERS[invariant_id]["stop"]()
+    ctx = scenario.build_context()
 
-    allow_first = checker(allow_ctx)
-    allow_second = checker(allow_ctx)
-    assert allow_first == allow_second
-    assert allow_first.invariant_id == invariant_id
-    assert allow_first.passed is True
-    assert allow_first.flow == Flow.CONTINUE
+    first = checker(ctx)
+    second = checker(ctx)
+    assert first == second
+    assert first.invariant_id == invariant_id
+    assert first.passed is scenario.expected_passed
+    assert first.flow == scenario.expected_flow
 
-    stop_first = checker(stop_ctx)
-    stop_second = checker(stop_ctx)
-    assert stop_first == stop_second
-    assert stop_first.invariant_id == invariant_id
-    assert stop_first.passed is False
-    assert stop_first.flow == Flow.STOP
-
-    allow_artifact = normalize_outcome(allow_first, gate="test:allow")
-    stop_artifact = normalize_outcome(stop_first, gate="test:stop")
-    assert allow_artifact.invariant_id == invariant_id.value
-    assert stop_artifact.invariant_id == invariant_id.value
-    assert allow_artifact.gate == "test:allow"
-    assert stop_artifact.gate == "test:stop"
+    normalized = normalize_outcome(first, gate=f"test:{scenario.name}")
+    assert normalized.invariant_id == invariant_id.value
+    assert normalized.gate == f"test:{scenario.name}"
 
 
 @pytest.mark.parametrize(

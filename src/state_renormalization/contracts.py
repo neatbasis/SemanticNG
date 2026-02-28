@@ -410,6 +410,10 @@ class HaltRecord(BaseModel):
             "timestamp_iso": payload["timestamp"],
         }
 
+    def to_canonical_payload(self) -> Dict[str, Any]:
+        """Canonical halt payload used by all STOP branches and persistence paths."""
+        return self.to_persistence_dict()
+
 
 class PredictionRecord(BaseModel):
     model_config = _CONTRACT_CONFIG

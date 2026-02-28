@@ -195,12 +195,10 @@ def append_halt(path: PathLike, record: Any) -> JsonObj:
 
     payload = record
     if isinstance(record, HaltRecord):
-        payload = record.to_persistence_dict()
+        payload = record.to_canonical_payload()
     elif isinstance(record, dict):
-        normalized = HaltRecord.from_payload(record).to_persistence_dict()
-        payload = {**normalized, **record}
-        for key, value in normalized.items():
-            payload.setdefault(key, value)
+        normalized = HaltRecord.from_payload(record).to_canonical_payload()
+        payload = {**record, **normalized}
 
     append_jsonl(p, payload)
     return {"kind": "jsonl", "ref": f"{p.name}@{next_offset}"}

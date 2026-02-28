@@ -60,6 +60,7 @@ from state_renormalization.contracts import (
 )
 from state_renormalization.adapters.persistence import (
     append_halt,
+    append_prediction_event,
     append_prediction_record_event,
     iter_projection_lineage_records,
     append_jsonl,
@@ -1012,11 +1013,26 @@ def append_prediction_record(
     if not policy_decision.allowed:
         return _persist_policy_denial(ep=episode, decision=policy_decision, halt_log_path=halt_log_path)
 
+    adapter_gate = CapabilityAdapterGate(invocation_id=policy_decision.attempt.invocation_id, allowed=True)
+
+    prediction_payload: Any = pred.model_dump(mode="json")
+    if stable_ids:
+        prediction_payload = {**dict(stable_ids), **prediction_payload}
+    prediction_ref = append_prediction_event(
+        prediction_payload,
+        adapter_gate=adapter_gate,
+        path=prediction_log_path,
+        episode_id=getattr(episode, "episode_id", None),
+        conversation_id=getattr(episode, "conversation_id", None),
+        turn_index=getattr(episode, "turn_index", None),
+    )
+
     payload: Any = pred.model_dump(mode="json")
+    payload["evidence_refs"] = [_to_dict(item) for item in pred.evidence_refs]
+    payload["evidence_refs"].append(prediction_ref)
     if stable_ids:
         payload = {**dict(stable_ids), **payload}
 
-    adapter_gate = CapabilityAdapterGate(invocation_id=policy_decision.attempt.invocation_id, allowed=True)
     return append_prediction_record_event(
         payload,
         adapter_gate=adapter_gate,
@@ -1032,11 +1048,14 @@ def append_halt_record(
     *,
     halt_log_path: str | Path = "halts.jsonl",
     stable_ids: Optional[Mapping[str, str]] = None,
+    adapter_gate: Optional[CapabilityAdapterGate] = None,
 ) -> dict[str, str]:
+    if adapter_gate is None:
+        adapter_gate = CapabilityAdapterGate(invocation_id=_new_id("invoke:"), allowed=True)
     payload: Any = halt.to_canonical_payload()
     if stable_ids:
         payload = {**dict(stable_ids), **halt.to_canonical_payload()}
-    return append_halt(halt_log_path, payload)
+    return append_halt(halt_log_path, payload, adapter_gate=adapter_gate)
 
 
 def _stable_repair_id(*, scope_key: str, prediction_id: str, compared_at_iso: str) -> str:

@@ -6,7 +6,13 @@ from state_renormalization.adapters.persistence import append_jsonl, read_jsonl
 from collections.abc import Callable
 
 from state_renormalization.contracts import AskResult, AskStatus, BeliefState, Episode, HaltRecord, PredictionRecord, ProjectionState
-from state_renormalization.engine import evaluate_invariant_gates, replay_projection_analytics, run_mission_loop, to_jsonable_episode
+from state_renormalization.engine import (
+    derive_projection_analytics_from_lineage,
+    evaluate_invariant_gates,
+    replay_projection_analytics,
+    run_mission_loop,
+    to_jsonable_episode,
+)
 
 
 FIXED_PREDICTION = {
@@ -117,3 +123,82 @@ def test_halt_explainability_fields_survive_episode_persistence_roundtrip(
     assert HaltRecord.from_payload(halt_observation).to_canonical_payload() == expected
     assert HaltRecord.from_payload(persisted_halt).to_canonical_payload() == expected
     assert set(expected).issuperset(HaltRecord.required_explainability_fields())
+
+
+def test_derive_projection_analytics_from_lineage_is_deterministic_and_log_only() -> None:
+    lineage = [
+        {
+            "event_kind": "prediction_record",
+            "prediction_id": "pred:base",
+            "scope_key": "turn:1",
+            "filtration_id": "conversation:c1",
+            "target_variable": "user_response_present",
+            "target_horizon_iso": "2026-02-13T00:00:00+00:00",
+            "issued_at_iso": "2026-02-13T00:00:00+00:00",
+            "was_corrected": True,
+            "absolute_error": 0.25,
+            "correction_root_prediction_id": "pred:base",
+            "correction_parent_prediction_id": "pred:base",
+            "correction_revision": 1,
+        },
+        {
+            "event_kind": "prediction_record",
+            "prediction_id": "pred:child",
+            "scope_key": "turn:2",
+            "filtration_id": "conversation:c1",
+            "target_variable": "user_response_present",
+            "target_horizon_iso": "2026-02-14T00:00:00+00:00",
+            "issued_at_iso": "2026-02-14T00:00:00+00:00",
+            "was_corrected": True,
+            "absolute_error": 0.5,
+            "correction_root_prediction_id": "pred:base",
+            "correction_parent_prediction_id": "pred:base",
+            "correction_revision": 2,
+        },
+        {
+            "halt_id": "halt:1",
+            "stage": "gate:pre_consume",
+            "invariant_id": "prediction_availability.v1",
+            "reason": "missing prediction",
+            "details": {"scope": "turn:3"},
+            "evidence": [{"kind": "jsonl", "ref": "predictions.jsonl@4"}],
+            "retryability": True,
+            "timestamp": "2026-02-14T00:00:00+00:00",
+        },
+    ]
+
+    first = derive_projection_analytics_from_lineage(lineage)
+    second = derive_projection_analytics_from_lineage(lineage)
+
+    assert first.model_dump(mode="json") == second.model_dump(mode="json")
+    assert first.correction_count == 2
+    assert first.correction_cost_total == 0.75
+    assert first.correction_cost_mean == 0.375
+    assert first.halt_count == 1
+
+    attributed = first.correction_cost_attribution["pred:base"]
+    assert attributed.correction_count == 2
+    assert attributed.correction_cost_total == 0.75
+
+
+def test_derive_projection_analytics_from_lineage_ignores_non_lineage_rows() -> None:
+    lineage = [
+        {"event_kind": "turn_summary", "turn_index": 1},
+        {
+            "event_kind": "prediction_record",
+            "prediction_id": "pred:x",
+            "scope_key": "turn:x",
+            "filtration_id": "conversation:c1",
+            "target_variable": "user_response_present",
+            "target_horizon_iso": "2026-02-13T00:00:00+00:00",
+            "issued_at_iso": "2026-02-13T00:00:00+00:00",
+            "was_corrected": False,
+        },
+    ]
+
+    analytics = derive_projection_analytics_from_lineage(lineage)
+
+    assert analytics.correction_count == 0
+    assert analytics.correction_cost_total == 0.0
+    assert analytics.halt_count == 0
+    assert analytics.correction_cost_attribution == {}

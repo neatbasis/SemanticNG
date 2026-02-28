@@ -71,6 +71,14 @@ Why this is most timely:
 ### #3 Defer until #1 is green
 
 - Replay-grade projection/correction analytics.
+
+Current analytics phase scope (read-only):
+- Define minimal analytics contracts for correction counts/cost attribution.
+- Derive analytics deterministically from persisted prediction/halt/correction lineage logs only.
+
+Non-goals in this phase:
+- No external integrations for BI/telemetry export.
+- No runtime side effects or changes to mission-loop control flow from analytics derivation.
 - Larger external capability governance surface expansion.
 
 ## Suggested maturity targets for next review

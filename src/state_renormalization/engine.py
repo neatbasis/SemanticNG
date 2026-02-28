@@ -29,6 +29,8 @@ from state_renormalization.contracts import (
     ObserverFrame,
     ProjectionState,
     ProjectionReplayResult,
+    ProjectionAnalyticsSnapshot,
+    CorrectionCostAttribution,
     PredictionOutcome,
     PredictionRecord,
     HaltPayloadValidationError,
@@ -750,11 +752,9 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
         )
 
     projection = ProjectionState(current_predictions={}, updated_at_iso="1970-01-01T00:00:00+00:00")
-    comparisons = 0.0
-    absolute_error_total = 0.0
-    last_comparison_at_iso = None
     fields = set(PredictionRecord.model_fields)
     records_processed = 0
+    lineage_rows: list[Mapping[str, Any]] = []
 
     for _, raw in read_jsonl(path):
         if raw.get("event_kind") not in {"prediction_record", "prediction"}:
@@ -765,17 +765,24 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
         event_time = pred.corrected_at_iso or pred.compared_at_iso or pred.issued_at_iso
         projection = _project_current_at(pred, projection, updated_at_iso=event_time)
         records_processed += 1
+        lineage_rows.append(raw)
 
-        if pred.was_corrected and pred.absolute_error is not None:
-            comparisons += 1.0
-            absolute_error_total += float(pred.absolute_error)
-            last_comparison_at_iso = pred.compared_at_iso or pred.corrected_at_iso or last_comparison_at_iso
+    analytics = derive_projection_analytics_from_lineage(lineage_rows)
 
     metrics: Dict[str, float] = {}
-    if comparisons > 0:
-        metrics["comparisons"] = comparisons
-        metrics["absolute_error_total"] = absolute_error_total
-        metrics["mae"] = absolute_error_total / comparisons
+    if analytics.correction_count > 0:
+        metrics["comparisons"] = float(analytics.correction_count)
+        metrics["absolute_error_total"] = analytics.correction_cost_total
+        metrics["mae"] = analytics.correction_cost_mean
+
+    last_comparison_at_iso = next(
+        (
+            pred.compared_at_iso or pred.corrected_at_iso
+            for pred in reversed(projection.prediction_history)
+            if pred.was_corrected
+        ),
+        None,
+    )
 
     projection = projection.model_copy(
         update={
@@ -787,6 +794,53 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
     return ProjectionReplayResult(
         projection_state=projection,
         records_processed=records_processed,
+    )
+
+
+def derive_projection_analytics_from_lineage(
+    records: Sequence[Mapping[str, Any]],
+) -> ProjectionAnalyticsSnapshot:
+    """Pure analytics derivation from append-only persisted lineage rows."""
+
+    fields = set(PredictionRecord.model_fields)
+    correction_count = 0
+    halt_count = 0
+    correction_cost_total = 0.0
+    attribution: Dict[str, CorrectionCostAttribution] = {}
+
+    for raw in records:
+        kind = raw.get("event_kind")
+        if kind in {"prediction_record", "prediction"}:
+            payload = {k: v for k, v in raw.items() if k in fields}
+            pred = PredictionRecord.model_validate(payload)
+            if not pred.was_corrected or pred.absolute_error is None:
+                continue
+            correction_count += 1
+            correction_cost_total += float(pred.absolute_error)
+            root_id = pred.correction_root_prediction_id or pred.prediction_id
+            item = attribution.get(root_id)
+            if item is None:
+                item = CorrectionCostAttribution(root_prediction_id=root_id)
+            item = item.model_copy(
+                update={
+                    "correction_count": item.correction_count + 1,
+                    "correction_cost_total": item.correction_cost_total + float(pred.absolute_error),
+                }
+            )
+            attribution[root_id] = item
+            continue
+
+        try:
+            HaltRecord.from_payload(raw)
+            halt_count += 1
+        except HaltPayloadValidationError:
+            continue
+
+    return ProjectionAnalyticsSnapshot(
+        correction_count=correction_count,
+        halt_count=halt_count,
+        correction_cost_total=correction_cost_total,
+        correction_cost_attribution=attribution,
     )
 
 

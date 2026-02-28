@@ -541,6 +541,33 @@ class ProjectionReplayResult(BaseModel):
     records_processed: int = 0
 
 
+class CorrectionCostAttribution(BaseModel):
+    """Minimal lineage-derived correction analytics per root prediction."""
+
+    model_config = _CONTRACT_CONFIG
+
+    root_prediction_id: str
+    correction_count: int = 0
+    correction_cost_total: float = 0.0
+
+
+class ProjectionAnalyticsSnapshot(BaseModel):
+    """Deterministic analytics derivable from persisted prediction/halt lineage only."""
+
+    model_config = _CONTRACT_CONFIG
+
+    correction_count: int = 0
+    halt_count: int = 0
+    correction_cost_total: float = 0.0
+    correction_cost_attribution: Dict[str, CorrectionCostAttribution] = Field(default_factory=dict)
+
+    @property
+    def correction_cost_mean(self) -> float:
+        if self.correction_count <= 0:
+            return 0.0
+        return self.correction_cost_total / float(self.correction_count)
+
+
 class PredictionOutcome(BaseModel):
     model_config = _CONTRACT_CONFIG
 

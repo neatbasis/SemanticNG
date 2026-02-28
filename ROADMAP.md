@@ -69,9 +69,9 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
   - Files: `src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`
   - Tests: `tests/test_observer_frame.py`, `tests/test_predictions_contracts_and_gates.py`, `tests/test_invariants.py`
 
-## Next (planned capabilities)
+## Next (promotion checkpoint)
 
-_No currently planned capabilities in `Next`; promotion work shifts to `Later` sequencing._
+_No planned capabilities remain in `Next`; `observer_authorization_contract` is aligned as `done` in `Now` and tracked as a non-regression dependency for `Later` sequencing._
 
 ## Capability status alignment (manifest source-of-truth sync)
 
@@ -108,7 +108,7 @@ _No currently planned capabilities in `Next`; promotion work shifts to `Later` s
 ## Backlog dependency tags
 
 - `Later` item 1 (Replay projection analytics contract): `done`; maintain replay analytics suites as non-regression gates while sequencing `Next` governance contracts.
-- `Later` item 2 (Capability-invocation governance): `planned`; observer authorization contract is complete, so capability-side policy gating can now sequence as the next dependency-unblocked scope.
+- `Later` item 2 (Capability-invocation governance): `planned`; dependency on `observer_authorization_contract` is met (`status: done`), so capability-side policy gating is now the next dependency-unblocked scope.
 - `Later` item 3 (Repair-aware projection evolution): `planned`; sequence after replay analytics baselines are stable to preserve auditable repair-event lineage.
 
 ## Planning cadence

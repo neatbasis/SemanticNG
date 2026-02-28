@@ -10,6 +10,7 @@ MANIFEST_PATH = ROOT / "docs" / "dod_manifest.json"
 ROADMAP_PATH = ROOT / "ROADMAP.md"
 SYSTEM_CONTRACT_MAP_PATH = ROOT / "docs" / "system_contract_map.md"
 PROJECT_MATURITY_PATH = ROOT / "docs" / "project_maturity_evaluation.md"
+RELEASE_CHECKLIST_PATH = ROOT / "docs" / "release_checklist.md"
 VALID_STATUSES = {"done", "in_progress", "planned"}
 ALLOWED_DONE_MILESTONES = {"Now"}
 ALLOWED_DONE_MATURITY = {"operational", "proven"}
@@ -144,6 +145,10 @@ def _extract_completion_ratio_claims(text: str) -> list[tuple[int, int, str]]:
             claims.append((int(match.group(1)), int(match.group(2)), stripped))
 
     return claims
+
+
+def _normalize_doc_label(text: str) -> str:
+    return re.sub(r"\s+", " ", text.strip().lower())
 
 
 def test_roadmap_capability_status_alignment_matches_manifest() -> None:
@@ -290,4 +295,40 @@ def test_project_maturity_bottleneck_claim_is_non_done_manifest_capability() -> 
         "Project maturity bottleneck claim mismatch: "
         f"capability_id='{capability_id}' declared_bottleneck_status='done'. "
         f"Expected bottleneck in non-done set={sorted([k for k, v in manifest_status.items() if v != 'done'])}"
+    )
+
+
+def test_release_checklist_has_no_duplicate_headers_or_checklist_labels() -> None:
+    checklist_text = RELEASE_CHECKLIST_PATH.read_text(encoding="utf-8")
+
+    heading_pattern = re.compile(r"^(#{2,6})\s+(.+?)\s*$")
+    checklist_pattern = re.compile(r"^- \[[ xX]\]\s+\*\*(.+?)\*\*:")
+
+    heading_occurrences: dict[str, list[int]] = {}
+    checklist_occurrences: dict[str, list[int]] = {}
+
+    for line_number, line in enumerate(checklist_text.splitlines(), start=1):
+        stripped = line.strip()
+
+        heading_match = heading_pattern.match(stripped)
+        if heading_match:
+            heading = _normalize_doc_label(heading_match.group(2))
+            heading_occurrences.setdefault(heading, []).append(line_number)
+
+        checklist_match = checklist_pattern.match(stripped)
+        if checklist_match:
+            label = _normalize_doc_label(checklist_match.group(1))
+            checklist_occurrences.setdefault(label, []).append(line_number)
+
+    duplicate_headings = {
+        label: lines for label, lines in heading_occurrences.items() if len(lines) > 1
+    }
+    duplicate_checklist_labels = {
+        label: lines for label, lines in checklist_occurrences.items() if len(lines) > 1
+    }
+
+    assert not duplicate_headings and not duplicate_checklist_labels, (
+        "Release checklist duplicate labels detected: "
+        f"duplicate_headings={duplicate_headings} "
+        f"duplicate_checklist_labels={duplicate_checklist_labels}"
     )

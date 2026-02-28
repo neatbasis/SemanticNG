@@ -48,6 +48,7 @@ FIXED_PREDICTION = {
 }
 
 REGISTERED_INVARIANTS = tuple(REGISTRY.keys())
+REGISTERED_INVARIANT_IDS = tuple(invariant_id.value for invariant_id in REGISTERED_INVARIANTS)
 
 
 @dataclass(frozen=True)
@@ -248,6 +249,20 @@ MATRIX_CASES = [
     for scenario in coverage.scenarios
 ]
 
+ADMISSIBLE_CASES = [
+    pytest.param(invariant_id, scenario, id=f"{invariant_id.value}:{scenario.name}")
+    for invariant_id, coverage in INVARIANT_RELEASE_GATE_MATRIX.items()
+    for scenario in coverage.scenarios
+    if scenario.expected_flow == Flow.CONTINUE
+]
+
+STOP_CASES = [
+    pytest.param(invariant_id, scenario, id=f"{invariant_id.value}:{scenario.name}")
+    for invariant_id, coverage in INVARIANT_RELEASE_GATE_MATRIX.items()
+    for scenario in coverage.scenarios
+    if scenario.expected_flow == Flow.STOP
+]
+
 
 def _assert_result_contract(result: GateDecision) -> None:
     if isinstance(result, Success):
@@ -323,13 +338,13 @@ def test_registered_invariant_parameterization_matches_registry() -> None:
 
 
 def test_invariant_identifiers_are_enumerated_and_registered() -> None:
-    enumerated_identifiers = tuple(invariant.value for invariant in InvariantId)
-    assert enumerated_identifiers == (
+    assert REGISTERED_INVARIANT_IDS == (
         "prediction_availability.v1",
         "evidence_link_completeness.v1",
         "prediction_outcome_binding.v1",
         "explainable_halt_payload.v1",
     )
+    enumerated_identifiers = tuple(invariant.value for invariant in InvariantId)
     assert tuple(InvariantId(identifier) for identifier in enumerated_identifiers) == REGISTERED_INVARIANTS
 
 
@@ -340,6 +355,48 @@ def test_invariant_matrix_release_gate_has_required_coverage() -> None:
         assert any(s.expected_passed for s in coverage.scenarios), f"{invariant_id.value} has no pass scenario"
         if coverage.supports_stop:
             assert any(not s.expected_passed for s in coverage.scenarios), f"{invariant_id.value} has no stop scenario"
+
+
+def test_invariant_matrix_guard_fails_when_registry_gains_uncovered_invariant() -> None:
+    missing_in_matrix = set(REGISTERED_INVARIANTS) - set(INVARIANT_RELEASE_GATE_MATRIX)
+    stale_matrix_entries = set(INVARIANT_RELEASE_GATE_MATRIX) - set(REGISTERED_INVARIANTS)
+
+    assert not missing_in_matrix, (
+        "INVARIANT_RELEASE_GATE_MATRIX is missing registered invariants: "
+        + ", ".join(sorted(invariant.value for invariant in missing_in_matrix))
+    )
+    assert not stale_matrix_entries, (
+        "INVARIANT_RELEASE_GATE_MATRIX contains non-registered invariants: "
+        + ", ".join(sorted(invariant.value for invariant in stale_matrix_entries))
+    )
+
+
+@pytest.mark.parametrize("invariant_id,scenario", ADMISSIBLE_CASES)
+def test_invariant_admissible_branch_is_deterministic(
+    invariant_id: InvariantId,
+    scenario: InvariantScenario,
+) -> None:
+    checker = REGISTRY[invariant_id]
+    first = checker(scenario.build_context())
+    second = checker(scenario.build_context())
+
+    assert first == second
+    assert first.passed is True
+    assert first.flow == Flow.CONTINUE
+
+
+@pytest.mark.parametrize("invariant_id,scenario", STOP_CASES)
+def test_invariant_stop_branch_is_deterministic_when_supported(
+    invariant_id: InvariantId,
+    scenario: InvariantScenario,
+) -> None:
+    checker = REGISTRY[invariant_id]
+    first = checker(scenario.build_context())
+    second = checker(scenario.build_context())
+
+    assert first == second
+    assert first.passed is False
+    assert first.flow == Flow.STOP
 
 
 @pytest.mark.parametrize("invariant_id,scenario", MATRIX_CASES)

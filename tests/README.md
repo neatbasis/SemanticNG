@@ -24,3 +24,13 @@ For step definitions under `src/features/steps/`, keep step functions thin and m
 - For each newly added invariant, add deterministic `pass` and `stop` scenarios when the checker can meaningfully return both outcomes.
 - If an invariant is not directly evaluated by `evaluate_invariant_gates`, keep `gate_inputs=None` in its scenarios and still assert checker/normalization contracts.
 - If an invariant is gate-evaluated, provide `gate_inputs` so artifact-contract assertions exercise both prediction and halt branches.
+
+### Extension guide for new invariants
+
+When adding a new invariant checker in `src/state_renormalization/invariants.py`:
+
+1. Add an `INVARIANT_RELEASE_GATE_MATRIX` entry in `tests/test_predictions_contracts_and_gates.py` keyed by the new `InvariantId`.
+2. Add at least one admissible (`Flow.CONTINUE`) scenario and ensure it is deterministic.
+3. If the checker can emit `Flow.STOP`, add a stop scenario and include representative `gate_inputs` when it is exercised by `evaluate_invariant_gates`.
+4. Keep the expected ordered tuple in `test_invariant_identifiers_are_enumerated_and_registered` updated with the new invariant ID string.
+5. Run the invariant contract tests; the guard test `test_invariant_matrix_guard_fails_when_registry_gains_uncovered_invariant` should fail if matrix coverage is incomplete.

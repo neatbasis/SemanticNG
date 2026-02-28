@@ -89,6 +89,7 @@ from state_renormalization.invariants import (
 from state_renormalization.invariants import (
     Flow as InvariantFlow,
 )
+from state_renormalization.gherkin_document import GherkinDocument
 from state_renormalization.stable_ids import derive_stable_ids
 
 PHATIC_PATTERNS = [
@@ -750,7 +751,6 @@ def _find_stable_ids_from_payload(payload: Mapping[str, Any]) -> Dict[str, str]:
     if doc is None:
         return {}
 
-    doc["uri"] = feature_uri
     stable = derive_stable_ids(doc, uri=feature_uri)
 
     scenario_name = payload.get("scenario_name") or payload.get("scenario")
@@ -790,7 +790,7 @@ def _find_stable_ids_from_payload(payload: Mapping[str, Any]) -> Dict[str, str]:
     return out
 
 
-def _parse_feature_doc(feature_text: str) -> Optional[Dict[str, Any]]:
+def _parse_feature_doc(feature_text: str) -> Optional[GherkinDocument]:
     """
     Parse Gherkin content if optional parser dependencies are installed.
 
@@ -803,8 +803,7 @@ def _parse_feature_doc(feature_text: str) -> Optional[Dict[str, Any]]:
         parser = parser_module.Parser()
         scanner = scanner_module.TokenScanner(feature_text)
         parsed = parser.parse(scanner)
-        if isinstance(parsed, dict):
-            return parsed
+        return GherkinDocument.from_raw(parsed)
     except Exception:
         return None
     return None

@@ -4,7 +4,9 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
+
+from .gherkin_document import GherkinDocument
 
 
 def _sha256_hex(s: str) -> str:
@@ -26,17 +28,16 @@ class StableIds:
     step_ids: Dict[str, str]              # key: step_key -> step_id
 
 
-def derive_stable_ids(gherkin_document: Dict[str, Any], *, uri: Optional[str] = None) -> StableIds:
+def derive_stable_ids(gherkin_document: GherkinDocument, *, uri: Optional[str] = None) -> StableIds:
     """
     Compute stable IDs for feature/scenarios/steps using deterministic hashing.
     Does NOT rely on gherkin-official's internal incremental IDs.
     """
-    doc_uri = uri or gherkin_document.get("uri") or ""
-    feature = gherkin_document.get("feature") or {}
-    feature_name = feature.get("name") or ""
-    feature_loc = feature.get("location") or {}
-    f_line = feature_loc.get("line")
-    f_col = feature_loc.get("column")
+    doc_uri = uri or gherkin_document.uri
+    feature = gherkin_document.feature
+    feature_name = feature.name
+    f_line = feature.location.line
+    f_col = feature.location.column
 
     # Feature ID: uri + feature name (+ location as tie-breaker)
     feature_key_obj = {
@@ -50,18 +51,11 @@ def derive_stable_ids(gherkin_document: Dict[str, Any], *, uri: Optional[str] = 
     scenario_ids: Dict[str, str] = {}
     step_ids: Dict[str, str] = {}
 
-    children = feature.get("children") or []
-    for child in children:
-        scenario = child.get("scenario")
-        if not scenario:
-            # Could also be background/rule/etc. Add later if needed.
-            continue
-
-        s_name = scenario.get("name") or ""
-        s_keyword = scenario.get("keyword") or ""
-        s_loc = scenario.get("location") or {}
-        s_line = s_loc.get("line")
-        s_col = s_loc.get("column")
+    for scenario in feature.scenarios:
+        s_name = scenario.name
+        s_keyword = scenario.keyword
+        s_line = scenario.location.line
+        s_col = scenario.location.column
 
         scenario_key_obj = {
             "feature_id": feature_id,
@@ -76,14 +70,12 @@ def derive_stable_ids(gherkin_document: Dict[str, Any], *, uri: Optional[str] = 
         scenario_key = f"{s_keyword}:{s_name}@{s_line}:{s_col}"
         scenario_ids[scenario_key] = scenario_id
 
-        steps = scenario.get("steps") or []
-        for step in steps:
-            st_text = step.get("text") or ""
-            st_type = step.get("keywordType") or ""
-            st_keyword = step.get("keyword") or ""
-            st_loc = step.get("location") or {}
-            st_line = st_loc.get("line")
-            st_col = st_loc.get("column")
+        for step in scenario.steps:
+            st_text = step.text
+            st_type = step.keyword_type
+            st_keyword = step.keyword
+            st_line = step.location.line
+            st_col = step.location.column
 
             step_key_obj = {
                 "scenario_id": scenario_id,

@@ -13,6 +13,7 @@ from behave import given, when, then
 from gherkin.parser import Parser
 from gherkin.token_scanner import TokenScanner
 
+from state_renormalization.gherkin_document import GherkinDocument
 from state_renormalization.stable_ids import derive_stable_ids
 
 
@@ -184,11 +185,14 @@ def _derive_context_stable_ids(context) -> Dict[str, str]:
         return {}
 
     try:
-        doc = Parser().parse(TokenScanner(Path(feature_path).read_text(encoding="utf-8")))
+        raw_doc = Parser().parse(TokenScanner(Path(feature_path).read_text(encoding="utf-8")))
     except Exception:
         return {}
 
-    doc["uri"] = feature_path
+    doc = GherkinDocument.from_raw(raw_doc, uri=feature_path)
+    if doc is None:
+        return {}
+
     stable = derive_stable_ids(doc, uri=feature_path)
     out: Dict[str, str] = {"feature_id": stable.feature_id}
 

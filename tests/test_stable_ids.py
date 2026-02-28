@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from gherkin.parser import Parser
 from gherkin.token_scanner import TokenScanner
+from typing import Any
 
+from state_renormalization.gherkin_document import GherkinDocument
 from state_renormalization.stable_ids import derive_prediction_id, derive_stable_ids
 
 
@@ -16,14 +18,15 @@ Feature: Addition
 """
 
 
-def _parse(feature_text: str, uri: str):
+def _parse(feature_text: str, uri: str) -> GherkinDocument:
     parser = Parser()
-    doc = parser.parse(TokenScanner(feature_text))
-    doc["uri"] = uri
+    raw_doc = parser.parse(TokenScanner(feature_text))
+    doc = GherkinDocument.from_raw(raw_doc, uri=uri)
+    assert doc is not None
     return doc
 
 
-def test_stable_ids_are_deterministic_across_runs():
+def test_stable_ids_are_deterministic_across_runs() -> None:
     uri = "./features/core/compiler.feature"
 
     doc1 = _parse(FEATURE_TEXT, uri)
@@ -37,7 +40,7 @@ def test_stable_ids_are_deterministic_across_runs():
     assert ids1.step_ids == ids2.step_ids
 
 
-def test_stable_ids_change_if_uri_changes():
+def test_stable_ids_change_if_uri_changes() -> None:
     doc_a = _parse(FEATURE_TEXT, "./features/A.feature")
     doc_b = _parse(FEATURE_TEXT, "./features/B.feature")
 
@@ -48,7 +51,7 @@ def test_stable_ids_change_if_uri_changes():
 
 
 def test_prediction_ids_are_deterministic() -> None:
-    kwargs = {
+    kwargs: dict[str, Any] = {
         "scope_key": "room:kitchen:light",
         "horizon_iso": "2026-02-13T00:05:00+00:00",
         "issued_at_iso": "2026-02-13T00:00:00+00:00",

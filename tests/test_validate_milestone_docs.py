@@ -40,7 +40,7 @@ def test_commands_missing_evidence_rejects_unsupported_evidence_format() -> None
     assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == [command]
 
 
-def test_commands_missing_evidence_reports_missing_when_no_immediate_evidence_line() -> None:
+def test_commands_missing_evidence_accepts_markdown_bullet_wrapped_command() -> None:
     command = "pytest tests/test_invariants.py"
     pr_body = "\n".join(
         [
@@ -49,7 +49,7 @@ def test_commands_missing_evidence_reports_missing_when_no_immediate_evidence_li
         ]
     )
 
-    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == [command]
+    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == []
 
 
 def test_commands_missing_evidence_reports_missing_when_evidence_not_next_line() -> None:
@@ -63,6 +63,43 @@ def test_commands_missing_evidence_reports_missing_when_evidence_not_next_line()
     )
 
     assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == [command]
+
+
+def test_commands_missing_evidence_accepts_markdown_bullet_and_inline_code_command() -> None:
+    command = "pytest tests/test_invariants.py"
+    pr_body = "\n".join(
+        [
+            "- `pytest   tests/test_invariants.py`",
+            "- Evidence: https://ci.example/runs/400",
+        ]
+    )
+
+    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == []
+
+
+def test_commands_missing_evidence_accepts_crlf_body() -> None:
+    command = "pytest tests/test_schema_selector.py"
+    pr_body = "\r\n".join(
+        [
+            command,
+            "Evidence: https://ci.example/runs/401",
+        ]
+    )
+
+    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == []
+
+
+def test_commands_missing_evidence_accepts_single_adjacent_html_comment_before_evidence() -> None:
+    command = "pytest tests/test_capture_outcome_states.py"
+    pr_body = "\n".join(
+        [
+            command,
+            "<!-- rerun details -->",
+            "Evidence: https://ci.example/runs/402",
+        ]
+    )
+
+    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == []
 
 
 def test_done_capability_sync_mismatches_reports_roadmap_milestone_and_maturity_issues() -> None:

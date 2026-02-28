@@ -357,20 +357,39 @@ def _commands_missing_evidence(pr_body: str, commands: list[str]) -> list[str]:
     lines = pr_body.splitlines()
     invalid: list[str] = []
     evidence_line_pattern = re.compile(r"^(Evidence:\s+)?https?://\S+$")
+    html_comment_pattern = re.compile(r"^<!--.*-->$")
+
+    normalized_lines = [_normalize_markdown_line(line) for line in lines]
     for command in commands:
+        normalized_command = _normalize_markdown_line(command)
         found_valid_pair = False
-        for idx, line in enumerate(lines):
-            if line.strip() != command:
+        for idx, line in enumerate(normalized_lines):
+            if line != normalized_command:
                 continue
             if idx + 1 >= len(lines):
                 continue
-            evidence_line = lines[idx + 1].strip()
+            evidence_idx = idx + 1
+            while evidence_idx < len(normalized_lines) and html_comment_pattern.match(normalized_lines[evidence_idx]):
+                evidence_idx += 1
+            if evidence_idx >= len(normalized_lines):
+                continue
+
+            evidence_line = normalized_lines[evidence_idx]
             if evidence_line_pattern.match(evidence_line):
                 found_valid_pair = True
                 break
         if not found_valid_pair:
             invalid.append(command)
     return invalid
+
+
+def _normalize_markdown_line(line: str) -> str:
+    normalized = line.replace("\r", "").strip()
+    normalized = re.sub(r"^[-*+]\s+", "", normalized)
+    if normalized.startswith("`") and normalized.endswith("`") and len(normalized) >= 2:
+        normalized = normalized[1:-1].strip()
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized
 
 
 def _commands_with_invalid_evidence_format(pr_body: str, commands: list[str]) -> list[str]:

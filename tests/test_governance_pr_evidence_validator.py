@@ -39,6 +39,35 @@ def test_mismatched_command_string_fails() -> None:
     assert validate_milestone_docs._commands_missing_evidence(pr_body, [expected_command]) == [expected_command]
 
 
+
+
+def test_command_and_evidence_inside_code_fence_passes() -> None:
+    command = "pytest tests/test_schema_selector.py tests/test_capture_outcome_states.py"
+    pr_body = "\n".join(
+        [
+            "```bash",
+            command,
+            "Evidence: https://github.com/org/repo/actions/runs/44",
+            "```",
+        ]
+    )
+
+    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == []
+
+
+def test_command_with_comment_then_blank_line_before_evidence_fails() -> None:
+    command = "pytest tests/test_schema_selector.py tests/test_capture_outcome_states.py"
+    pr_body = "\n".join(
+        [
+            command,
+            "<!-- kept for context -->",
+            "",
+            "Evidence: https://github.com/org/repo/actions/runs/45",
+        ]
+    )
+
+    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == [command]
+
 def test_roadmap_status_transition_mismatch_detected() -> None:
     transitions = {"observer_authorization_contract": ("planned", "done")}
     roadmap_text = "\n".join(

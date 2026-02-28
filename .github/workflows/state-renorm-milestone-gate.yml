@@ -1,0 +1,60 @@
+name: State Renormalization Milestone Gate
+
+on:
+  pull_request:
+    paths:
+      - 'src/state_renormalization/**'
+      - 'docs/dod_manifest.json'
+      - '.github/workflows/state-renorm-milestone-gate.yml'
+  merge_group:
+    paths:
+      - 'src/state_renormalization/**'
+      - 'docs/dod_manifest.json'
+      - '.github/workflows/state-renorm-milestone-gate.yml'
+
+jobs:
+  milestone-pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]"
+
+      - name: Run milestone pytest commands for in-progress capabilities
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          manifest_path = Path("docs/dod_manifest.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+          commands = []
+          for capability in manifest.get("capabilities", []):
+              if capability.get("status") != "in_progress":
+                  continue
+              commands.extend(capability.get("pytest_commands", []))
+
+          if not commands:
+              print("No in_progress capability pytest commands found; failing gate.")
+              sys.exit(1)
+
+          for command in commands:
+              print(f"\n>>> Running: {command}")
+              completed = subprocess.run(command, shell=True)
+              if completed.returncode != 0:
+                  sys.exit(completed.returncode)
+
+          print("\nAll in_progress milestone pytest commands passed.")
+          PY

@@ -2,11 +2,11 @@
 
 ## Executive assessment
 
-SemanticNG is in an **operational hardening** state with replay completion achieved and remaining work concentrated in policy/governance expansion:
+SemanticNG is in an **operational hardening** state with replay completion achieved and remaining work concentrated in authorization-first governance expansion:
 
 - Core baseline capabilities remain implemented and tested.
 - Capability accounting from the manifest is now `6/9` done.
-- Roadmap sequencing and contract-map maturity framing place the critical path on authorization/governance rollout.
+- Roadmap sequencing and contract-map maturity framing place the critical path on promoting observer authorization from `prototype` toward `operational` before `Later` governance scopes.
 
 ## Evidence snapshot
 
@@ -18,9 +18,9 @@ SemanticNG is in an **operational hardening** state with replay completion achie
 
 Completion ratio (done / total): **66.7%** (`6/9`).
 
-Current bottleneck capability (highest-priority non-`done`): **`observer_authorization_contract`**. It is the first `Next` governance dependency and blocks safe expansion into policy-aware capability invocation.
+Current bottleneck capability (highest-priority non-`done`): **`observer_authorization_contract`**. It is the only `Next` item in the roadmap, remains `planned` in the manifest, and maps to a `prototype` maturity contract in `docs/system_contract_map.md`.
 
-This indicates the project is beyond replay completion and is now in governance hardening + expansion sequencing.
+This indicates the project is beyond replay completion and is now in authorization hardening + governance sequencing.
 
 ### Quality and validation signals
 
@@ -53,22 +53,24 @@ It does **not yet** have:
 
 ### #1 Immediate priority
 
-**Prioritize `observer_authorization_contract` and then `capability_invocation_governance`.**
+**Prioritize `observer_authorization_contract` as the single immediate implementation focus; queue `capability_invocation_governance` next once observer authorization is operational.**
 
 Why this is most timely:
 
-1. Replay projection analytics is marked `done` in the manifest and is no longer the gating bottleneck.
-2. Authorization semantics are the gating dependency for safe policy-aware capability invocation.
-3. Governance expansion now provides the largest incremental risk reduction for the next milestone window.
+1. Replay projection analytics is marked `done` and sits in the `Now` milestone as a maintained non-regression baseline, not a delivery bottleneck.
+2. The roadmap's `Next` section contains only observer authorization, making it the mandatory sequencing gate before `Later` governance capabilities.
+3. The contract map shows observer authorization still at `prototype`, so maturity promotion here provides the largest near-term risk reduction.
 
 ### #2 Concrete near-term execution sequence
 
-1. **Land runtime observer authorization enforcement**
-   - Promote authorization checks from prototype-only contract framing to default-path runtime behavior.
-2. **Stabilize governance policy guardrails**
-   - Add deterministic tests for allowed/denied capability invocation outcomes.
-3. **Keep replay/halt packs as non-regression gates**
-   - Preserve replay/restart + halt explainability packs as required green checks while governance work lands.
+1. **Land runtime observer authorization enforcement (`Next`)**
+   - Promote authorization checks from prototype-only contract framing to default-path runtime behavior with CI-backed gate coverage.
+2. **Promote Observer authorization contract maturity**
+   - Update contract-map maturity once tests show default runtime authorization and allowlist behavior are stable.
+3. **Start capability governance implementation only after observer promotion (`Later`)**
+   - Add deterministic tests for allowed/denied capability invocation outcomes after observer authorization enforcement is green.
+4. **Keep replay/halt packs as non-regression gates**
+   - Preserve replay/restart + halt explainability packs as required green checks while authorization/governance work lands.
 
 ### #3 Defer until #1 is green
 
@@ -78,12 +80,12 @@ Why this is most timely:
 ## Suggested maturity targets for next review
 
 - Promote observer authorization from `prototype` toward `operational` with CI-backed default-path enforcement evidence.
-- Establish `capability_invocation_governance` baseline test evidence after observer authorization enforcement is active.
+- Establish `capability_invocation_governance` baseline test evidence only after observer authorization maturity promotion is recorded.
 - Recompute capability completion and confirm observer + governance tests pass in CI before expanding repair-aware scope.
 
 ## Maturity changelog
 
-- 2026-02-28: Sync pass — updated this evaluation to match manifest totals (`6 done / 0 in_progress / 3 planned`), roadmap sequencing, and contract-map maturity framing; replay is treated as completed and observer authorization is the current bottleneck.
+- 2026-02-28: Sync pass — updated this evaluation to match manifest totals (`6 done / 0 in_progress / 3 planned`), roadmap sequencing (`observer_authorization_contract` as the sole `Next` item), and contract-map maturity framing (observer authorization still `prototype`); replay is treated as a maintained baseline rather than a bottleneck.
 - 2026-02-28: Revalidated `gate_halt_unification` as `done` against its acceptance command (`pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py` => `92 passed, 4 skipped`).
 - 2026-02-28: Confirmed `tests/test_predictions_contracts_and_gates.py` enforces deterministic `Flow.CONTINUE`/`Flow.STOP` parity assertions and `tests/test_persistence_jsonl.py` verifies halt payload durability for canonical `details`, `evidence`, and invariant identity (`invariant_id`) round-trips.
 

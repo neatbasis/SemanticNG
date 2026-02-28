@@ -60,13 +60,24 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
   - Files: `src/state_renormalization/invariants.py`
   - Tests: `tests/test_predictions_contracts_and_gates.py`
 
+### 4) Observer authorization contract
+- **Owner area/module:** Contracts + Engine + Invariants (`src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`)
+- **Success criteria (test outcomes):**
+  - `pytest tests/test_observer_frame.py` passes, validating `ObserverFrame` authorization shape and defaults.
+  - `pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py` passes with authorization gate and invariant allowlist behavior enforced in the runtime pipeline.
+- **Related files/tests:**
+  - Files: `src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`
+  - Tests: `tests/test_observer_frame.py`, `tests/test_predictions_contracts_and_gates.py`, `tests/test_invariants.py`
+
 ## Later (larger architecture goals)
 
-### 1) Replay-grade projection engine and longitudinal correction analytics
+### 1) Replay projection analytics contract (replay-grade projection engine and longitudinal correction analytics)
 - **Owner area/module:** Engine + Persistence + Correction artifacts (`src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`)
 - **Success criteria (test outcomes):**
   - New replay tests pass, proving `ProjectionState` reconstructed from append-only logs is deterministic across repeated runs and independent process restarts.
   - Multi-episode tests pass, demonstrating correction/cost attribution can be computed from persisted lineage without side channels.
+  - Phase scope remains read-only: analytics are derived from persisted prediction/halt/correction lineage only (no side effects, no external integrations).
+  - Non-goal for this phase: no policy changes to gating behavior and no online cost accounting mutations during mission execution.
 - **Related files/tests:**
   - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`
   - Tests: extend `tests/test_predictions_contracts_and_gates.py`; add replay/correction-focused tests under `tests/`.
@@ -88,6 +99,80 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 - **Related files/tests:**
   - Files: `src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py`
   - Tests: existing `tests/test_predictions_contracts_and_gates.py` plus new repair-mode tests.
+
+## Sequencing gate (enforced branch merge policy)
+
+- No `Later` feature branch merges are allowed until all `Next` capability tests are green in CI.
+- Green means every test command listed in the `Next` section completes successfully with no skipped required assertions for gate/halt behavior.
+- Any emergency exception must be documented in planning cadence notes with explicit rationale, owner, and rollback/follow-up date.
+
+## Backlog dependency tags
+
+- `Later` item 1 (Replay projection analytics contract): `requires gate_halt_unification`, `requires invariant matrix complete`
+- `Later` item 2 (Capability-invocation governance): `requires gate_halt_unification`, `requires invariant matrix complete`
+- `Later` item 3 (Repair-aware projection evolution): `requires gate_halt_unification`, `requires invariant matrix complete`
+
+## Planning cadence
+
+- Reserve majority sprint/iteration capacity for `Next` milestones until all `Next` items are complete and green in CI.
+- Track any allocation exception explicitly in cadence logs (date, scope, reason, approver, and timeboxed re-entry to `Next`).
+- Reconfirm dependency tags and sequencing gate status at each planning checkpoint before accepting `Later` scope.
+
+### Weekly CI failure review (lightweight evidence loop)
+
+- Run a weekly 30-minute review that groups CI failures by both `capability_id` and `invariant_id` (from halt details/test metadata).
+- Produce a compact rollup table with: failure count, first-seen date, latest-seen date, and owning roadmap horizon (`Next` or `Later`).
+- Treat this rollup as the default planning input; feature requests can add context but cannot override unresolved high-frequency failures without documented rationale.
+
+#### Weekly review output template
+
+| capability_id | invariant_id | failures (7d) | recurrence rank | mapped roadmap section | owner | action |
+| --- | --- | --- | --- | --- | --- | --- |
+| `observer_authorization` | `observer_not_authorized` | 6 | 1 | `Next` | contracts/engine | land authorization gating + explainable halt persistence follow-up |
+| `replay_projection_analytics` | `prediction_missing_for_effect` | 2 | 4 | `Later` | engine/persistence | keep design prep only until sequencing gate dependencies are met |
+
+#### Recurring-cause tracking and roadmap mapping
+
+- Maintain a running "Top recurring causes" list sourced from the weekly rollup and sorted by 4-week failure concentration.
+- Map each recurring cause directly to one roadmap section:
+  - `Next`: causes tied to active gate/halt, invariant, or authorization milestones.
+  - `Later`: causes tied to blocked capabilities that remain dependency-gated.
+- Re-map causes during each checkpoint if dependency status changes (for example, a `Later` cause can move to `Next` once sequencing prerequisites are met).
+
+#### Priority update rule (failure concentration first)
+
+- Planning priority is determined by failure concentration, not by breadth of incoming feature requests.
+- Default ordering rule:
+  1. Highest 4-week recurring failure cause mapped to `Next`.
+  2. Next highest `Next` cause with unresolved invariant/test gaps.
+  3. Only after top `Next` causes are actively addressed, consider `Later` discovery/design work.
+- Any override requires a roadmap note capturing evidence, approver, and expiry date.
+
+#### Roadmap decision notes (required record)
+
+- At each planning checkpoint, add a short decision note with:
+  - Date/checkpoint identifier.
+  - Top 3 recurring failure causes (with counts and `capability_id`/`invariant_id`).
+  - Chosen priority changes (`Next` vs `Later`) and explicit rationale.
+  - Deferred items and re-evaluation date.
+- Keep these notes in this roadmap file so prioritization remains auditable and evidence-driven over time.
+
+##### Decision notes log (append-only)
+
+| Date | Evidence snapshot (top recurring causes) | Priority decision | Notes/owner |
+| --- | --- | --- | --- |
+| _TBD_ | _Populate from weekly review rollup_ | _Set `Next` focus by highest failure concentration_ | _Record approver + recheck date_ |
+
+### Planning checkpoint capability table
+
+Use this short table at each planning checkpoint to pick exactly one next PR scope.
+
+| Capability ID | Dependency status (met/blocked) | Governance readiness (manifest+roadmap+contract-map aligned) | Test evidence completeness | Risk-reduction score | Recommended next action |
+| --- | --- | --- | --- | --- | --- |
+| `replay_projection_analytics` | blocked (`gate_halt_unification`, `invariant matrix complete`) | blocked | partial | 3/5 | Finish remaining `Next` gate/halt and invariant matrix work; reassess after CI is fully green. |
+| `observer_authorization` | met | partial | partial | 4/5 | Prioritize a focused PR that lands authorization allowlist/runtime gating with persisted explainable halt coverage. |
+| `capability_invocation_governance` | blocked (`gate_halt_unification`, `invariant matrix complete`) | blocked | missing | 5/5 | Keep design/doc prep only; defer merge work until sequencing gate dependencies are marked met. |
+| `repair_aware_projection` | blocked (`gate_halt_unification`, `invariant matrix complete`) | blocked | missing | 3/5 | Draft explicit auditable repair-event contract tests while keeping strict halt-only behavior as default. |
 
 ## Guardrails (unchanged until Next milestones are complete)
 

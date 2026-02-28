@@ -28,7 +28,12 @@ from state_renormalization.contracts import (
     ObservationType,
     ObserverFrame,
     ProjectionState,
+    ProjectionReplayResult,
+    ProjectionAnalyticsSnapshot,
+    CorrectionCostAttribution,
+    PredictionOutcome,
     PredictionRecord,
+    HaltPayloadValidationError,
     HaltRecord,
     EvidenceRef,
     SchemaSelection,
@@ -36,7 +41,7 @@ from state_renormalization.contracts import (
     default_observer_frame,
     project_ambiguity_state,
 )
-from state_renormalization.adapters.persistence import append_halt, append_prediction_record_event
+from state_renormalization.adapters.persistence import append_halt, append_prediction_record_event, read_jsonl
 from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.invariants import (
     Flow as InvariantFlow,
@@ -74,7 +79,7 @@ EXIT_PHRASES = [
 
 
 @dataclass(frozen=True)
-class PredictionOutcome:
+class GatePredictionOutcome:
     pre_consume: Sequence[InvariantOutcome] = field(default_factory=tuple)
     post_write: Sequence[InvariantOutcome] = field(default_factory=tuple)
 
@@ -86,7 +91,7 @@ class PredictionOutcome:
 
 @dataclass(frozen=True)
 class Success:
-    artifact: PredictionOutcome
+    artifact: GatePredictionOutcome
 
 
 GateDecision = Success | HaltRecord
@@ -104,6 +109,62 @@ class GateHaltOutcome:
 class GateInvariantCheck:
     gate_point: str
     output: CheckerResult
+
+
+@dataclass(frozen=True)
+class GateInvariantEvaluation:
+    phase: str
+    outcome: InvariantOutcome
+
+
+def _first_halt_from_evaluations(
+    *,
+    evaluations: Sequence[GateInvariantEvaluation],
+    gate_point: str,
+) -> tuple[Optional[InvariantOutcome], Optional[str]]:
+    for evaluation in evaluations:
+        if evaluation.outcome.flow == InvariantFlow.STOP:
+            return evaluation.outcome, f"{gate_point}:{evaluation.phase}"
+    return None, None
+
+
+def _evaluate_gate_phase(
+    *,
+    scope: str,
+    prediction_key: Optional[str],
+    current_predictions: Mapping[str, str],
+    prediction_log_available: bool,
+    phase: str,
+    invariant_id: InvariantId,
+    just_written_prediction: Optional[Mapping[str, Any]],
+) -> GateInvariantEvaluation:
+    phase_ctx = default_check_context(
+        scope=scope,
+        prediction_key=prediction_key,
+        current_predictions=current_predictions,
+        prediction_log_available=prediction_log_available,
+        just_written_prediction=just_written_prediction,
+    )
+    return GateInvariantEvaluation(
+        phase=phase,
+        outcome=_run_invariant(invariant_id, ctx=phase_ctx),
+    )
+
+
+def _result_from_gate_evaluations(
+    *,
+    evaluations: Sequence[GateInvariantEvaluation],
+    gate_point: str,
+) -> GateDecision:
+    halt_outcome, halt_stage = _first_halt_from_evaluations(evaluations=evaluations, gate_point=gate_point)
+    if halt_outcome is None or halt_stage is None:
+        return Success(
+            artifact=GatePredictionOutcome(
+                pre_consume=tuple(ev.outcome for ev in evaluations if ev.phase == "pre_consume"),
+                post_write=tuple(ev.outcome for ev in evaluations if ev.phase == "post_write"),
+            )
+        )
+    return _halt_record_from_outcome(stage=halt_stage, outcome=halt_outcome)
 
 
 def _observer_allowed_invariants(observer: Optional[ObserverFrame]) -> Optional[set[InvariantId]]:
@@ -176,33 +237,90 @@ def _stable_halt_id(*, stage: str, outcome: InvariantOutcome) -> str:
 
 
 def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltRecord:
+    if outcome.details is None or outcome.evidence is None:
+        raise HaltPayloadValidationError("halt payload is malformed or incomplete")
+
     reason = outcome.reason
-    return HaltRecord(
-        halt_id=_stable_halt_id(stage=stage, outcome=outcome),
-        stage=stage,
-        invariant_id=outcome.invariant_id.value,
-        reason=reason,
-        evidence=[_as_evidence_ref(_to_dict(item)) for item in outcome.evidence],
-        timestamp=_now_iso(),
-        retryability=bool(outcome.action_hints),
+    return HaltRecord.from_payload(
+        HaltRecord.build_canonical_payload(
+            halt_id=_stable_halt_id(stage=stage, outcome=outcome),
+            stage=stage,
+            invariant_id=outcome.invariant_id.value,
+            reason=reason,
+            details=dict(outcome.details),
+            evidence=[_as_evidence_ref(_to_dict(item)).model_dump(mode="json") for item in outcome.evidence],
+            timestamp=_now_iso(),
+            retryability=bool(outcome.action_hints),
+        )
     )
 
 
 def _authorization_halt_record(*, stage: str, reason: str, context: Mapping[str, Any]) -> HaltRecord:
-    evidence = [
-        EvidenceRef(kind="authorization_scope", ref=f"action:{context.get('action', 'unknown')}"),
-        EvidenceRef(kind="required_capability", ref=str(context.get("required_capability") or "unknown")),
-    ]
-    return HaltRecord(
-        halt_id=f"halt:{sha1_text(f'{stage}|authorization.scope.v1|{reason}|{_to_dict(context)}')}",
-        stage=stage,
-        invariant_id="authorization.scope.v1",
-        reason=reason,
-        evidence=evidence,
-        timestamp=_now_iso(),
-        retryability=True,
+    return HaltRecord.from_payload(
+        HaltRecord.build_canonical_payload(
+            halt_id=f"halt:{sha1_text(f'{stage}|authorization.scope.v1|{reason}|{_to_dict(context)}')}",
+            stage=stage,
+            invariant_id="authorization.scope.v1",
+            reason=reason,
+            details={"authorization_context": _to_dict(context)},
+            evidence=[
+                {
+                    "kind": "authorization_scope",
+                    "ref": f"action:{context.get('action', 'unknown')}",
+                },
+                {
+                    "kind": "required_capability",
+                    "ref": str(context.get("required_capability") or "unknown"),
+                },
+            ],
+            timestamp=_now_iso(),
+            retryability=True,
+        )
     )
 
+
+def _evaluate_invariant_gate_pipeline(
+    *,
+    observer: Optional[ObserverFrame],
+    scope: str,
+    prediction_key: Optional[str],
+    current_predictions: Mapping[str, str],
+    prediction_log_available: bool,
+    just_written_prediction: Optional[Mapping[str, Any]],
+    gate_point: str,
+) -> tuple[list[GateInvariantEvaluation], GateDecision]:
+    evaluations: list[GateInvariantEvaluation] = []
+    gate_specs: tuple[tuple[str, InvariantId, bool, Optional[Mapping[str, Any]]], ...] = (
+        ("pre_consume", InvariantId.PREDICTION_AVAILABILITY, True, None),
+        (
+            "post_write",
+            InvariantId.EVIDENCE_LINK_COMPLETENESS,
+            just_written_prediction is not None,
+            just_written_prediction,
+        ),
+    )
+
+    for phase, invariant_id, is_enabled, phase_written_prediction in gate_specs:
+        if not is_enabled or not _observer_allows_invariant(observer=observer, invariant_id=invariant_id):
+            continue
+        evaluation = _evaluate_gate_phase(
+            scope=scope,
+            prediction_key=prediction_key,
+            current_predictions=current_predictions,
+            prediction_log_available=prediction_log_available,
+            phase=phase,
+            invariant_id=invariant_id,
+            just_written_prediction=phase_written_prediction,
+        )
+        evaluations.append(evaluation)
+        if evaluation.outcome.flow == InvariantFlow.STOP:
+            break
+
+    return evaluations, _result_from_gate_evaluations(evaluations=evaluations, gate_point=gate_point)
+
+
+def _halt_payload(halt: HaltRecord) -> Dict[str, Any]:
+    return halt.to_canonical_payload()
 
 def _append_authorization_issue(ep: Episode, *, halt: HaltRecord, context: Mapping[str, Any]) -> None:
     _append_episode_artifact(
@@ -210,14 +328,9 @@ def _append_authorization_issue(ep: Episode, *, halt: HaltRecord, context: Mappi
         {
             "artifact_kind": "authorization_issue",
             "issue_type": "authorization_scope_violation",
-            "halt_id": halt.halt_id,
-            "stage": halt.stage,
-            "invariant_id": halt.invariant_id,
-            "reason": halt.reason,
+            **_halt_payload(halt),
             "observer": _to_dict(getattr(ep, "observer", None)),
             "authorization_context": _to_dict(context),
-            "retryability": halt.retryability,
-            "timestamp": halt.timestamp,
         },
     )
     if not hasattr(ep, "observations") or getattr(ep, "observations") is None:
@@ -456,13 +569,7 @@ def evaluate_invariant_gates(
             {
                 "artifact_kind": "halt_observation",
                 "observation_type": "halt",
-                "halt_id": halt.halt_id,
-                "stage": halt.stage,
-                "invariant_id": halt.invariant_id,
-                "reason": halt.reason,
-                "retryability": halt.retryability,
-                "timestamp": halt.timestamp,
-                "evidence": [_to_dict(e) for e in halt.evidence],
+                **_halt_payload(halt),
                 "halt_evidence_ref": halt_evidence_ref,
             },
         )
@@ -473,49 +580,33 @@ def evaluate_invariant_gates(
         for key, pred in projection_state.current_predictions.items()
     }
 
-    pre_consume: Sequence[InvariantOutcome] = tuple()
-    gate_checks: list[GateInvariantCheck] = []
-    pre_outcome: Optional[InvariantOutcome] = None
-    if _observer_allows_invariant(observer=observer, invariant_id=InvariantId.PREDICTION_AVAILABILITY):
-        pre_ctx = default_check_context(
-            scope=scope,
-            prediction_key=prediction_key,
-            current_predictions=current_predictions,
-            prediction_log_available=prediction_log_available,
-        )
-        pre_outcome = _run_invariant(InvariantId.PREDICTION_AVAILABILITY, ctx=pre_ctx)
-        pre_consume = (pre_outcome,)
-        gate_checks.append(GateInvariantCheck(gate_point=gate_point, output=normalize_outcome(pre_outcome, gate=gate_point)))
-
-    post_write: Sequence[InvariantOutcome] = tuple()
-    if just_written_prediction is not None and _observer_allows_invariant(
+    evaluations, result = _evaluate_invariant_gate_pipeline(
         observer=observer,
-        invariant_id=InvariantId.EVIDENCE_LINK_COMPLETENESS,
-    ):
-        post_ctx = default_check_context(
-            scope=scope,
-            prediction_key=prediction_key,
-            current_predictions=current_predictions,
-            prediction_log_available=prediction_log_available,
-            just_written_prediction=just_written_prediction,
-        )
-        post_write = (_run_invariant(InvariantId.EVIDENCE_LINK_COMPLETENESS, ctx=post_ctx),)
+        scope=scope,
+        prediction_key=prediction_key,
+        current_predictions=current_predictions,
+        prediction_log_available=prediction_log_available,
+        just_written_prediction=just_written_prediction,
+        gate_point=gate_point,
+    )
+    gate_checks: list[GateInvariantCheck] = []
+
+    outcome_bundle = result.artifact if isinstance(result, Success) else GatePredictionOutcome(
+        pre_consume=tuple(ev.outcome for ev in evaluations if ev.phase == "pre_consume"),
+        post_write=tuple(ev.outcome for ev in evaluations if ev.phase == "post_write"),
+    )
+
+    for evaluation in evaluations:
         gate_checks.append(
-            GateInvariantCheck(gate_point=gate_point, output=normalize_outcome(post_write[0], gate=gate_point))
+            GateInvariantCheck(
+                gate_point=f"{gate_point}:{evaluation.phase}",
+                output=normalize_outcome(evaluation.outcome, gate=gate_point),
+            )
         )
 
-    halt_outcome: Optional[InvariantOutcome] = None
-    halt_stage: Optional[str] = None
-    if pre_outcome is not None and pre_outcome.flow == InvariantFlow.STOP:
-        halt_outcome = pre_outcome
-        halt_stage = gate_point
-    elif post_write and post_write[0].flow == InvariantFlow.STOP:
-        halt_outcome = post_write[0]
-        halt_stage = gate_point
+    halt_outcome, _ = _first_halt_from_evaluations(evaluations=evaluations, gate_point=gate_point)
 
-    halt_record: Optional[HaltRecord] = None
-    if halt_outcome is not None and halt_stage is not None:
-        halt_record = _halt_record_from_outcome(stage=halt_stage, outcome=halt_outcome)
+    if isinstance(result, HaltRecord) and halt_outcome is not None:
         gate_checks.append(
             GateInvariantCheck(
                 gate_point="halt_validation",
@@ -534,13 +625,7 @@ def evaluate_invariant_gates(
             )
         )
 
-    result_kind: str
-    if halt_record is None:
-        result = Success(artifact=PredictionOutcome(pre_consume=pre_consume, post_write=post_write))
-        result_kind = "prediction"
-    else:
-        result = halt_record
-        result_kind = "halt"
+    result_kind = "prediction" if isinstance(result, Success) else "halt"
 
     halt_evidence_ref: Optional[Dict[str, str]] = None
     stable_ids = _episode_stable_ids(ep) if ep is not None else {}
@@ -571,9 +656,9 @@ def evaluate_invariant_gates(
                     "prediction_log_available": prediction_log_available,
                     "just_written_prediction": _to_dict(just_written_prediction),
                 },
-                "pre_consume": [_to_dict(outcome) for outcome in pre_consume],
-                "post_write": [_to_dict(outcome) for outcome in post_write],
-                "invariant_results": [_to_dict(outcome) for outcome in tuple(pre_consume) + tuple(post_write)],
+                "pre_consume": [_to_dict(outcome) for outcome in outcome_bundle.pre_consume],
+                "post_write": [_to_dict(outcome) for outcome in outcome_bundle.post_write],
+                "invariant_results": [_to_dict(outcome) for outcome in outcome_bundle.combined],
                 "invariant_checks": [
                     {
                         "gate_point": check.gate_point,
@@ -586,7 +671,7 @@ def evaluate_invariant_gates(
                 ],
                 "kind": result_kind,
                 "prediction": _to_dict(result.artifact) if isinstance(result, Success) else None,
-                "halt": _to_dict(result) if isinstance(result, HaltRecord) else None,
+                "halt": _halt_payload(result) if isinstance(result, HaltRecord) else None,
                 "halt_evidence_ref": halt_evidence_ref,
             },
         )
@@ -609,13 +694,7 @@ def evaluate_invariant_gates(
                     "artifact_kind": "halt_observation",
                     "observation_type": "halt",
                     "observation_id": halt_observation.observation_id,
-                    "halt_id": halt.halt_id,
-                    "stage": halt.stage,
-                    "invariant_id": halt.invariant_id,
-                    "reason": halt.reason,
-                    "retryability": halt.retryability,
-                    "timestamp": halt.timestamp,
-                    "evidence": [_to_dict(e) for e in halt.evidence],
+                    **_halt_payload(halt),
                     "halt_evidence_ref": halt_evidence_ref,
                 },
             )
@@ -650,13 +729,18 @@ def append_halt_record(
     halt_log_path: str | Path = "halts.jsonl",
     stable_ids: Optional[Mapping[str, str]] = None,
 ) -> dict[str, str]:
-    payload: Any = halt.model_dump(mode="json")
+    payload: Any = halt.to_canonical_payload()
     if stable_ids:
-        payload = {**dict(stable_ids), **halt.model_dump(mode="json")}
+        payload = {**dict(stable_ids), **halt.to_canonical_payload()}
     return append_halt(halt_log_path, payload)
 
 
-def project_current(pred: PredictionRecord, projection_state: ProjectionState) -> ProjectionState:
+def _project_current_at(
+    pred: PredictionRecord,
+    projection_state: ProjectionState,
+    *,
+    updated_at_iso: str,
+) -> ProjectionState:
     current = dict(projection_state.current_predictions)
     current[pred.scope_key] = pred
     history = [*projection_state.prediction_history, pred]
@@ -665,7 +749,112 @@ def project_current(pred: PredictionRecord, projection_state: ProjectionState) -
         prediction_history=history,
         correction_metrics=dict(projection_state.correction_metrics),
         last_comparison_at_iso=projection_state.last_comparison_at_iso,
-        updated_at_iso=_now_iso(),
+        updated_at_iso=updated_at_iso,
+    )
+
+
+def project_current(pred: PredictionRecord, projection_state: ProjectionState) -> ProjectionState:
+    return _project_current_at(pred, projection_state, updated_at_iso=_now_iso())
+
+
+def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionReplayResult:
+    path = Path(prediction_log_path)
+    if not path.exists():
+        return ProjectionReplayResult(
+            projection_state=ProjectionState(current_predictions={}, updated_at_iso="1970-01-01T00:00:00+00:00"),
+            records_processed=0,
+        )
+
+    projection = ProjectionState(current_predictions={}, updated_at_iso="1970-01-01T00:00:00+00:00")
+    fields = set(PredictionRecord.model_fields)
+    records_processed = 0
+    lineage_rows: list[Mapping[str, Any]] = []
+
+    for _, raw in read_jsonl(path):
+        if raw.get("event_kind") not in {"prediction_record", "prediction"}:
+            continue
+
+        payload = {k: v for k, v in raw.items() if k in fields}
+        pred = PredictionRecord.model_validate(payload)
+        event_time = pred.corrected_at_iso or pred.compared_at_iso or pred.issued_at_iso
+        projection = _project_current_at(pred, projection, updated_at_iso=event_time)
+        records_processed += 1
+        lineage_rows.append(raw)
+
+    analytics = derive_projection_analytics_from_lineage(lineage_rows)
+
+    metrics: Dict[str, float] = {}
+    if analytics.correction_count > 0:
+        metrics["comparisons"] = float(analytics.correction_count)
+        metrics["absolute_error_total"] = analytics.correction_cost_total
+        metrics["mae"] = analytics.correction_cost_mean
+
+    last_comparison_at_iso = next(
+        (
+            pred.compared_at_iso or pred.corrected_at_iso
+            for pred in reversed(projection.prediction_history)
+            if pred.was_corrected
+        ),
+        None,
+    )
+
+    projection = projection.model_copy(
+        update={
+            "correction_metrics": metrics,
+            "last_comparison_at_iso": last_comparison_at_iso,
+        }
+    )
+
+    return ProjectionReplayResult(
+        projection_state=projection,
+        records_processed=records_processed,
+    )
+
+
+def derive_projection_analytics_from_lineage(
+    records: Sequence[Mapping[str, Any]],
+) -> ProjectionAnalyticsSnapshot:
+    """Pure analytics derivation from append-only persisted lineage rows."""
+
+    fields = set(PredictionRecord.model_fields)
+    correction_count = 0
+    halt_count = 0
+    correction_cost_total = 0.0
+    attribution: Dict[str, CorrectionCostAttribution] = {}
+
+    for raw in records:
+        kind = raw.get("event_kind")
+        if kind in {"prediction_record", "prediction"}:
+            payload = {k: v for k, v in raw.items() if k in fields}
+            pred = PredictionRecord.model_validate(payload)
+            if not pred.was_corrected or pred.absolute_error is None:
+                continue
+            correction_count += 1
+            correction_cost_total += float(pred.absolute_error)
+            root_id = pred.correction_root_prediction_id or pred.prediction_id
+            item = attribution.get(root_id)
+            if item is None:
+                item = CorrectionCostAttribution(root_prediction_id=root_id)
+            item = item.model_copy(
+                update={
+                    "correction_count": item.correction_count + 1,
+                    "correction_cost_total": item.correction_cost_total + float(pred.absolute_error),
+                }
+            )
+            attribution[root_id] = item
+            continue
+
+        try:
+            HaltRecord.from_payload(raw)
+            halt_count += 1
+        except HaltPayloadValidationError:
+            continue
+
+    return ProjectionAnalyticsSnapshot(
+        correction_count=correction_count,
+        halt_count=halt_count,
+        correction_cost_total=correction_cost_total,
+        correction_cost_attribution=attribution,
     )
 
 
@@ -707,23 +896,21 @@ def _reconcile_predictions(
         if pred.target_variable != "user_response_present" or pred.expectation is None:
             continue
 
-        err = observed_value - pred.expectation
+        updated_pred, outcome = bind_prediction_outcome(pred, observed_outcome=observed_value)
         compared += 1
-        error_total += abs(err)
-        compared_at = _now_iso()
-        updated_pred = pred.model_copy(
-            update={
-                "observed_value": observed_value,
-                "prediction_error": err,
-                "absolute_error": abs(err),
-                "observed_at_iso": compared_at,
-                "compared_at_iso": compared_at,
-                "was_corrected": True,
-                "corrected_at_iso": compared_at,
-            }
-        )
+        error_total += outcome.absolute_error
+        compared_at = outcome.recorded_at_iso
         current_predictions[scope_key] = updated_pred
         append_prediction_record(updated_pred, prediction_log_path=prediction_log_path, stable_ids=_episode_stable_ids(ep), episode=ep)
+
+        binding_ctx = default_check_context(
+            scope=scope_key,
+            prediction_key=scope_key,
+            current_predictions=current_predictions,
+            prediction_log_available=True,
+            prediction_outcome=outcome.model_dump(mode="json"),
+        )
+        binding_outcome = REGISTRY[InvariantId.PREDICTION_OUTCOME_BINDING](binding_ctx)
 
         _append_episode_artifact(
             ep,
@@ -733,9 +920,14 @@ def _reconcile_predictions(
                 "scope_key": scope_key,
                 "expected": pred.expectation,
                 "observed": observed_value,
-                "error": err,
-                "absolute_error": abs(err),
+                "error": outcome.error_metric,
+                "absolute_error": outcome.absolute_error,
                 "compared_at_iso": compared_at,
+                "prediction_outcome": outcome.model_dump(mode="json"),
+                "prediction_outcome_binding": normalize_outcome(
+                    binding_outcome,
+                    gate="post-observation",
+                ).__dict__,
             },
         )
 
@@ -751,6 +943,49 @@ def _reconcile_predictions(
         last_comparison_at_iso=_now_iso() if compared else projection_state.last_comparison_at_iso,
         updated_at_iso=_now_iso(),
     )
+
+
+def bind_prediction_outcome(
+    pred: PredictionRecord,
+    *,
+    observed_outcome: Any,
+    recorded_at_iso: Optional[str] = None,
+) -> tuple[PredictionRecord, PredictionOutcome]:
+    expected = pred.expectation
+    observed_value = float(observed_outcome)
+    if expected is None:
+        error_metric = 0.0
+        absolute_error = 0.0
+    else:
+        error_metric = observed_value - expected
+        absolute_error = abs(error_metric)
+
+    compared_at = recorded_at_iso or _now_iso()
+    updated_pred = pred.model_copy(
+        update={
+            "observed_value": observed_value,
+            "prediction_error": error_metric,
+            "absolute_error": absolute_error,
+            "observed_at_iso": compared_at,
+            "compared_at_iso": compared_at,
+            "was_corrected": True,
+            "corrected_at_iso": compared_at,
+            "correction_parent_prediction_id": pred.prediction_id,
+            "correction_root_prediction_id": pred.correction_root_prediction_id or pred.prediction_id,
+            "correction_revision": int(pred.correction_revision) + 1,
+        }
+    )
+
+    outcome = PredictionOutcome(
+        prediction_id=pred.prediction_id,
+        prediction_scope_key=pred.scope_key,
+        target_variable=pred.target_variable,
+        observed_outcome=observed_value,
+        error_metric=error_metric,
+        absolute_error=absolute_error,
+        recorded_at_iso=compared_at,
+    )
+    return updated_pred, outcome
 
 def run_mission_loop(
     ep: Episode,

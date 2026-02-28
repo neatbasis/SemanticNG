@@ -3,9 +3,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, ClassVar, Dict, List, Mapping, Optional
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
+
+
+class HaltPayloadValidationError(ValueError):
+    """Raised when a halt payload cannot be normalized into canonical halt fields."""
 
 # ------------------------------------------------------------------------------
 # Shared BaseModel config helpers
@@ -317,20 +321,127 @@ class Episode(BaseModel):
 
 class EvidenceRef(BaseModel):
     model_config = _CONTRACT_CONFIG
-    kind: str
-    ref: str
+    kind: str = Field(min_length=1)
+    ref: str = Field(min_length=1)
 
 
 class HaltRecord(BaseModel):
     model_config = _CONTRACT_CONFIG
 
-    halt_id: str = Field(validation_alias=AliasChoices("halt_id", "stable_halt_id"))
-    stage: str
-    invariant_id: str = Field(validation_alias=AliasChoices("invariant_id", "violated_invariant_id"))
-    reason: str
-    evidence: List[EvidenceRef] = Field(default_factory=list, validation_alias=AliasChoices("evidence", "evidence_refs"))
+    REQUIRED_EXPLAINABILITY_FIELDS: ClassVar[tuple[str, ...]] = (
+        "invariant_id",
+        "details",
+        "evidence",
+    )
+
+    REQUIRED_PAYLOAD_FIELDS: ClassVar[tuple[str, ...]] = (
+        "halt_id",
+        "stage",
+        "invariant_id",
+        "reason",
+        "details",
+        "evidence",
+        "retryability",
+        "timestamp",
+    )
+
+    halt_id: str = Field(min_length=1, validation_alias=AliasChoices("halt_id", "stable_halt_id"))
+    stage: str = Field(min_length=1)
+    invariant_id: str = Field(min_length=1, validation_alias=AliasChoices("invariant_id", "violated_invariant_id"))
+    reason: str = Field(min_length=1)
+    details: Dict[str, Any]
+    evidence: List[EvidenceRef] = Field(validation_alias=AliasChoices("evidence", "evidence_refs"))
     retryability: bool = Field(validation_alias=AliasChoices("retryability", "retryable"))
-    timestamp: str = Field(validation_alias=AliasChoices("timestamp", "timestamp_iso"))
+    timestamp: str = Field(min_length=1, validation_alias=AliasChoices("timestamp", "timestamp_iso"))
+
+    @model_validator(mode="before")
+    @classmethod
+    def _validate_alias_consistency(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        alias_pairs = (
+            ("halt_id", "stable_halt_id"),
+            ("invariant_id", "violated_invariant_id"),
+            ("evidence", "evidence_refs"),
+            ("retryability", "retryable"),
+            ("timestamp", "timestamp_iso"),
+        )
+        for canonical, alias in alias_pairs:
+            if canonical in data and alias in data and data[canonical] != data[alias]:
+                raise ValueError(f"halt payload field mismatch: {canonical} != {alias}")
+        return data
+
+    @classmethod
+    def required_payload_fields(cls) -> tuple[str, ...]:
+        return cls.REQUIRED_PAYLOAD_FIELDS
+
+    @classmethod
+    def required_explainability_fields(cls) -> tuple[str, ...]:
+        return cls.REQUIRED_EXPLAINABILITY_FIELDS
+
+    @classmethod
+    def canonical_payload_schema(cls) -> Dict[str, str]:
+        """Field map for the canonical halt payload used by STOP emitters."""
+        return {
+            "halt_id": "str",
+            "stage": "str",
+            "invariant_id": "str",
+            "reason": "str",
+            "details": "dict",
+            "evidence": "list",
+            "retryability": "bool",
+            "timestamp": "str",
+        }
+
+    @classmethod
+    def build_canonical_payload(
+        cls,
+        *,
+        halt_id: str,
+        stage: str,
+        invariant_id: str,
+        reason: str,
+        details: Mapping[str, Any],
+        evidence: list[Mapping[str, Any]] | list[EvidenceRef],
+        retryability: bool,
+        timestamp: str,
+    ) -> Dict[str, Any]:
+        """Build and validate a canonical STOP payload shape used by all emitters."""
+        return cls.model_validate(
+            {
+                "halt_id": halt_id,
+                "stage": stage,
+                "invariant_id": invariant_id,
+                "reason": reason,
+                "details": dict(details),
+                "evidence": list(evidence),
+                "retryability": retryability,
+                "timestamp": timestamp,
+            }
+        ).to_canonical_payload()
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "HaltRecord":
+        raw = dict(payload)
+        try:
+            cls._validate_alias_consistency(raw)
+        except ValueError as exc:
+            raise HaltPayloadValidationError(str(exc)) from exc
+        canonical_candidate = {
+            "halt_id": raw.get("halt_id", raw.get("stable_halt_id")),
+            "stage": raw.get("stage"),
+            "invariant_id": raw.get("invariant_id", raw.get("violated_invariant_id")),
+            "reason": raw.get("reason"),
+            "details": raw.get("details"),
+            "evidence": raw.get("evidence", raw.get("evidence_refs")),
+            "retryability": raw.get("retryability", raw.get("retryable")),
+            "timestamp": raw.get("timestamp", raw.get("timestamp_iso")),
+        }
+        try:
+            return cls.model_validate(canonical_candidate)
+        except Exception as exc:
+            raise HaltPayloadValidationError("halt payload is malformed or incomplete") from exc
 
     @property
     def stable_halt_id(self) -> str:
@@ -351,6 +462,22 @@ class HaltRecord(BaseModel):
     @property
     def timestamp_iso(self) -> str:
         return self.timestamp
+
+    def to_persistence_dict(self) -> Dict[str, Any]:
+        payload = self.model_dump(mode="json")
+        return {
+            **payload,
+            "stable_halt_id": payload["halt_id"],
+            "violated_invariant_id": payload["invariant_id"],
+            "evidence_refs": payload["evidence"],
+            "retryable": payload["retryability"],
+            "timestamp_iso": payload["timestamp"],
+        }
+
+    def to_canonical_payload(self) -> Dict[str, Any]:
+        """Canonical halt payload used by all STOP branches and persistence paths."""
+        payload = self.model_dump(mode="json")
+        return {field: payload[field] for field in self.required_payload_fields()}
 
 
 class PredictionRecord(BaseModel):
@@ -377,6 +504,9 @@ class PredictionRecord(BaseModel):
     prediction_error: Optional[float] = None
     absolute_error: Optional[float] = None
     was_corrected: bool = False
+    correction_parent_prediction_id: Optional[str] = None
+    correction_root_prediction_id: Optional[str] = None
+    correction_revision: int = 0
 
     issued_at_iso: str
     observed_at_iso: Optional[str] = None
@@ -429,6 +559,56 @@ class ProjectionState(BaseModel):
     @property
     def has_current_predictions(self) -> bool:
         return bool(self.current_predictions)
+
+
+class ProjectionReplayResult(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    projection_state: ProjectionState
+    records_processed: int = 0
+
+
+class CorrectionCostAttribution(BaseModel):
+    """Minimal lineage-derived correction analytics per root prediction."""
+
+    model_config = _CONTRACT_CONFIG
+
+    root_prediction_id: str
+    correction_count: int = 0
+    correction_cost_total: float = 0.0
+
+
+class ProjectionAnalyticsSnapshot(BaseModel):
+    """Deterministic analytics derivable from persisted prediction/halt lineage only."""
+
+    model_config = _CONTRACT_CONFIG
+
+    correction_count: int = 0
+    halt_count: int = 0
+    correction_cost_total: float = 0.0
+    correction_cost_attribution: Dict[str, CorrectionCostAttribution] = Field(default_factory=dict)
+
+    @property
+    def correction_cost_mean(self) -> float:
+        if self.correction_count <= 0:
+            return 0.0
+        return self.correction_cost_total / float(self.correction_count)
+
+
+class PredictionOutcome(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    prediction_id: str
+    observed_outcome: Any
+    error_metric: float
+    absolute_error: float
+    recorded_at_iso: str = Field(validation_alias=AliasChoices("recorded_at_iso", "recorded_at"))
+    prediction_scope_key: Optional[str] = None
+    target_variable: Optional[str] = None
+
+    @property
+    def recorded_at(self) -> str:
+        return self.recorded_at_iso
 
 # ------------------------------------------------------------------------------
 # Demo-only statuses + BeliefState (Option A)

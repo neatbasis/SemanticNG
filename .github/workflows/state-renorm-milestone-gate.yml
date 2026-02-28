@@ -1,0 +1,164 @@
+name: State Renormalization Milestone Gate
+
+on:
+  pull_request:
+    paths:
+      - 'src/state_renormalization/**'
+      - 'docs/dod_manifest.json'
+      - 'docs/system_contract_map.md'
+      - 'ROADMAP.md'
+      - '.github/pull_request_template.md'
+      - '.github/scripts/validate_milestone_docs.py'
+      - '.github/scripts/capability_parity_report.py'
+      - '.github/workflows/state-renorm-milestone-gate.yml'
+  merge_group:
+    paths:
+      - 'src/state_renormalization/**'
+      - 'docs/dod_manifest.json'
+      - 'docs/system_contract_map.md'
+      - 'ROADMAP.md'
+      - '.github/pull_request_template.md'
+      - '.github/scripts/validate_milestone_docs.py'
+      - '.github/scripts/capability_parity_report.py'
+      - '.github/workflows/state-renorm-milestone-gate.yml'
+
+jobs:
+  milestone-pytest:
+    runs-on: self-hosted
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]"
+
+      - name: Validate milestone documentation governance
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+        run: python .github/scripts/validate_milestone_docs.py
+
+      - name: Generate capability parity report
+        run: python .github/scripts/capability_parity_report.py
+
+      - name: Upload capability parity report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: capability-parity-report
+          path: artifacts/capability_parity_report.txt
+          if-no-files-found: error
+
+      - name: Run milestone pytest commands for relevant changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          def _matches_code_path(changed_file: str, code_path: str) -> bool:
+              normalized = code_path.rstrip("/")
+              return changed_file == normalized or changed_file.startswith(f"{normalized}/")
+
+          manifest_path = Path("docs/dod_manifest.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          capabilities = manifest.get("capabilities", [])
+
+          base_sha = os.environ.get("BASE_SHA")
+          head_sha = os.environ.get("HEAD_SHA")
+          if not base_sha or not head_sha:
+              print("Missing base/head SHA context; failing gate.")
+              sys.exit(1)
+
+          changed_files_cmd = ["git", "diff", "--name-only", base_sha, head_sha]
+          changed_files_out = subprocess.check_output(changed_files_cmd, text=True)
+          changed_files = [line.strip() for line in changed_files_out.splitlines() if line.strip()]
+          touches_state_renorm = any(path.startswith("src/state_renormalization/") for path in changed_files)
+
+          print("Changed files:")
+          for path in changed_files:
+              print(f"  - {path}")
+
+          commands = []
+
+          manifest_changed = "docs/dod_manifest.json" in changed_files
+          for capability in capabilities:
+              if capability.get("status") != "in_progress":
+                  continue
+
+              capability_paths = capability.get("code_paths", [])
+              capability_changed = touches_state_renorm or manifest_changed or any(
+                  _matches_code_path(changed, code_path)
+                  for changed in changed_files
+                  for code_path in capability_paths
+              )
+
+              if capability_changed:
+                  commands.extend(capability.get("pytest_commands", []))
+
+          base_manifest_raw = subprocess.check_output(
+              ["git", "show", f"{base_sha}:docs/dod_manifest.json"],
+              text=True,
+          )
+          base_manifest = json.loads(base_manifest_raw)
+          base_by_id = {cap["id"]: cap for cap in base_manifest.get("capabilities", [])}
+          head_by_id = {cap["id"]: cap for cap in capabilities}
+
+          transitioned_to_done = []
+          for capability_id, head_capability in head_by_id.items():
+              base_capability = base_by_id.get(capability_id)
+              if not base_capability:
+                  continue
+              if base_capability.get("status") == "in_progress" and head_capability.get("status") == "done":
+                  transitioned_to_done.append(head_capability)
+
+          if transitioned_to_done:
+              docs_updated = any(
+                  path == "README.md" or (path.startswith("docs/") and path != "docs/dod_manifest.json")
+                  for path in changed_files
+              )
+              if not docs_updated:
+                  print("Detected in_progress -> done transition without non-manifest documentation updates.")
+                  print("Update README.md and/or docs/*.md alongside status transitions.")
+                  sys.exit(1)
+
+              print("Capabilities transitioned in_progress -> done:")
+              for capability in transitioned_to_done:
+                  print(f"  - {capability['id']}")
+                  commands.extend(capability.get("pytest_commands", []))
+
+          deduped_commands = []
+          seen = set()
+          for command in commands:
+              if command in seen:
+                  continue
+              seen.add(command)
+              deduped_commands.append(command)
+
+          if not deduped_commands:
+              print("No relevant milestone pytest commands for this change set.")
+              sys.exit(0)
+
+          for command in deduped_commands:
+              print(f"\n>>> Running: {command}")
+              completed = subprocess.run(command, shell=True)
+              if completed.returncode != 0:
+                  sys.exit(completed.returncode)
+
+          print("\nAll relevant milestone pytest commands passed.")
+          PY

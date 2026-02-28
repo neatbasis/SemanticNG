@@ -6,6 +6,8 @@ from dataclasses import is_dataclass, asdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, Tuple, Union
 
+from state_renormalization.contracts import HaltRecord
+
 from pydantic import BaseModel
 
 
@@ -184,6 +186,24 @@ def append_prediction_record_event(
 
     return append_prediction(path=path, record=event)
 
+def _canonicalize_halt_payload(record: Any) -> JsonObj:
+    if isinstance(record, HaltRecord):
+        return record.to_canonical_payload()
+    if isinstance(record, dict):
+        canonical = HaltRecord.from_payload(record).to_canonical_payload()
+        stable_ids = {
+            key: value
+            for key in ("feature_id", "scenario_id", "step_id")
+            if isinstance((value := record.get(key)), str)
+        }
+        return {**stable_ids, **canonical}
+    return HaltRecord.from_payload(_to_jsonable(record)).to_canonical_payload()
+
+
+def read_halt_record(record: JsonObj) -> HaltRecord:
+    """Rehydrate a persisted halt artifact into a validated HaltRecord."""
+    return HaltRecord.from_payload(record)
+
 
 def append_halt(path: PathLike, record: Any) -> JsonObj:
     p = Path(path)
@@ -191,5 +211,9 @@ def append_halt(path: PathLike, record: Any) -> JsonObj:
     if p.exists():
         next_offset = len(p.read_text(encoding="utf-8").splitlines()) + 1
 
-    append_jsonl(p, record)
+    payload = _canonicalize_halt_payload(record)
+
+    # Validate persistence/reload parity for explainability payload fields.
+    HaltRecord.from_payload(payload)
+    append_jsonl(p, payload)
     return {"kind": "jsonl", "ref": f"{p.name}@{next_offset}"}

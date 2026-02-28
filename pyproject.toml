@@ -52,3 +52,11 @@ module = "tests.*"
 disallow_any_generics = false
 check_untyped_defs = false
 strict = false
+
+[tool.coverage.run]
+branch = true
+source = ["state_renormalization"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false

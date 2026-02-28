@@ -6,6 +6,9 @@ import sys
 from pathlib import Path
 
 
+MISSING_PR_EVIDENCE_MARKER = "MILESTONE_VALIDATION_ERROR=MISSING_PR_EVIDENCE"
+
+
 def _load_manifest(rev: str) -> dict:
     raw = subprocess.check_output(["git", "show", f"{rev}:docs/dod_manifest.json"], text=True)
     return json.loads(raw)
@@ -448,6 +451,7 @@ def main() -> int:
             commands_by_capability = _transitioned_capability_commands(head_manifest, set(status_transitions))
             missing_evidence = _commands_missing_evidence_by_capability(pr_body, commands_by_capability)
             if missing_evidence:
+                print(MISSING_PR_EVIDENCE_MARKER)
                 print(
                     "PR description must include adjacency evidence for every required transitioned-capability command."
                 )

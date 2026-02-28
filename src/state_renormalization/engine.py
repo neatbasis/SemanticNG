@@ -34,6 +34,10 @@ from state_renormalization.contracts import (
     ProjectionState,
     ProjectionReplayResult,
     ProjectionAnalyticsSnapshot,
+    RepairLineageRef,
+    RepairProposalEvent,
+    RepairResolution,
+    RepairResolutionEvent,
     CorrectionCostAttribution,
     CapabilityAdapterGate,
     CapabilityInvocationAttempt,
@@ -58,6 +62,7 @@ from state_renormalization.adapters.persistence import (
     append_halt,
     append_prediction_record_event,
     iter_projection_lineage_records,
+    append_jsonl,
 )
 from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.invariants import (
@@ -68,6 +73,8 @@ from state_renormalization.invariants import (
     REGISTRY,
     default_check_context,
     normalize_outcome,
+    InvariantHandlingMode,
+    repair_mode_enabled,
 )
 from state_renormalization.stable_ids import derive_stable_ids
 
@@ -1032,6 +1039,54 @@ def append_halt_record(
     return append_halt(halt_log_path, payload)
 
 
+def _stable_repair_id(*, scope_key: str, prediction_id: str, compared_at_iso: str) -> str:
+    return f"repair:{sha1_text(f'{scope_key}|{prediction_id}|{compared_at_iso}')}"
+
+
+def _repair_lineage_ref(
+    *,
+    ep: Episode,
+    pred: PredictionRecord,
+) -> RepairLineageRef:
+    return RepairLineageRef(
+        conversation_id=ep.conversation_id,
+        episode_id=ep.episode_id,
+        turn_index=ep.turn_index,
+        scope_key=pred.scope_key,
+        prediction_id=pred.prediction_id,
+        correction_root_prediction_id=pred.correction_root_prediction_id or pred.prediction_id,
+    )
+
+
+def _append_repair_event(
+    event: RepairProposalEvent | RepairResolutionEvent,
+    *,
+    prediction_log_path: str | Path,
+    stable_ids: Optional[Mapping[str, str]],
+) -> dict[str, str]:
+    payload: dict[str, Any] = event.model_dump(mode="json")
+    if stable_ids:
+        payload = {**dict(stable_ids), **payload}
+    append_jsonl(prediction_log_path, payload)
+    p = Path(prediction_log_path)
+    line_count = len(p.read_text(encoding="utf-8").splitlines())
+    return {"kind": "jsonl", "ref": f"{p.name}@{line_count}"}
+
+
+def _apply_accepted_repair_event(
+    projection_state: ProjectionState,
+    *,
+    resolution_event: RepairResolutionEvent,
+) -> ProjectionState:
+    if resolution_event.decision != RepairResolution.ACCEPTED or resolution_event.accepted_prediction is None:
+        return projection_state
+    return _project_current_at(
+        resolution_event.accepted_prediction,
+        projection_state,
+        updated_at_iso=resolution_event.resolved_at_iso,
+    )
+
+
 def _project_current_at(
     pred: PredictionRecord,
     projection_state: ProjectionState,
@@ -1070,14 +1125,20 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
 
     for raw in iter_projection_lineage_records(path):
         lineage_rows.append(raw)
-        if raw.get("event_kind") not in {"prediction_record", "prediction"}:
+        kind = raw.get("event_kind")
+        if kind in {"prediction_record", "prediction"}:
+            payload = {k: v for k, v in raw.items() if k in fields}
+            pred = PredictionRecord.model_validate(payload)
+            event_time = pred.corrected_at_iso or pred.compared_at_iso or pred.issued_at_iso
+            projection = _project_current_at(pred, projection, updated_at_iso=event_time)
+            records_processed += 1
             continue
 
-        payload = {k: v for k, v in raw.items() if k in fields}
-        pred = PredictionRecord.model_validate(payload)
-        event_time = pred.corrected_at_iso or pred.compared_at_iso or pred.issued_at_iso
-        projection = _project_current_at(pred, projection, updated_at_iso=event_time)
-        records_processed += 1
+        if kind == "repair_resolution":
+            resolution = RepairResolutionEvent.model_validate(raw)
+            projection = _apply_accepted_repair_event(projection, resolution_event=resolution)
+            if resolution.decision == RepairResolution.ACCEPTED:
+                records_processed += 1
 
     analytics = derive_projection_analytics_from_lineage(lineage_rows)
 
@@ -1123,9 +1184,16 @@ def derive_projection_analytics_from_lineage(
 
     for raw in records:
         kind = raw.get("event_kind")
+        pred: PredictionRecord | None = None
         if kind in {"prediction_record", "prediction"}:
             payload = {k: v for k, v in raw.items() if k in fields}
             pred = PredictionRecord.model_validate(payload)
+        elif kind == "repair_resolution":
+            resolution = RepairResolutionEvent.model_validate(raw)
+            if resolution.decision == RepairResolution.ACCEPTED and resolution.accepted_prediction is not None:
+                pred = resolution.accepted_prediction
+
+        if pred is not None:
             if not pred.was_corrected or pred.absolute_error is None:
                 continue
             correction_count += 1
@@ -1182,16 +1250,18 @@ def _reconcile_predictions(
     projection_state: ProjectionState,
     *,
     prediction_log_path: str | Path,
+    invariant_handling_mode: InvariantHandlingMode = InvariantHandlingMode.STRICT_HALT,
 ) -> ProjectionState:
     observed_text = extract_user_utterance(ep)
     observed_value = 1.0 if observed_text else 0.0
 
-    current_predictions = dict(projection_state.current_predictions)
+    updated_projection = projection_state
     metrics = dict(projection_state.correction_metrics)
     compared = 0
     error_total = 0.0
+    stable_ids = _episode_stable_ids(ep)
 
-    for scope_key, pred in list(current_predictions.items()):
+    for scope_key, pred in list(projection_state.current_predictions.items()):
         if pred.target_variable != "user_response_present" or pred.expectation is None:
             continue
 
@@ -1199,21 +1269,68 @@ def _reconcile_predictions(
         compared += 1
         error_total += outcome.absolute_error
         compared_at = outcome.recorded_at_iso
-        current_predictions[scope_key] = updated_pred
-        persist_result = append_prediction_record(
-            updated_pred,
-            prediction_log_path=prediction_log_path,
-            stable_ids=_episode_stable_ids(ep),
-            episode=ep,
-            projection_state=projection_state,
-        )
-        if isinstance(persist_result, HaltRecord):
-            continue
+
+        if repair_mode_enabled(invariant_handling_mode):
+            repair_id = _stable_repair_id(
+                scope_key=scope_key,
+                prediction_id=pred.prediction_id,
+                compared_at_iso=compared_at,
+            )
+            lineage_ref = _repair_lineage_ref(ep=ep, pred=pred)
+            proposal = RepairProposalEvent(
+                repair_id=repair_id,
+                proposed_at_iso=compared_at,
+                reason="prediction outcome reconciliation proposed",
+                invariant_id=InvariantId.PREDICTION_OUTCOME_BINDING.value,
+                lineage_ref=lineage_ref,
+                proposed_prediction=updated_pred,
+                prediction_outcome=outcome,
+            )
+            proposal_ref = _append_repair_event(
+                proposal,
+                prediction_log_path=prediction_log_path,
+                stable_ids=stable_ids,
+            )
+            resolution = RepairResolutionEvent(
+                repair_id=repair_id,
+                decision=RepairResolution.ACCEPTED,
+                resolved_at_iso=compared_at,
+                lineage_ref=lineage_ref,
+                accepted_prediction=updated_pred,
+            )
+            resolution_ref = _append_repair_event(
+                resolution,
+                prediction_log_path=prediction_log_path,
+                stable_ids=stable_ids,
+            )
+            updated_projection = _apply_accepted_repair_event(updated_projection, resolution_event=resolution)
+            _append_episode_artifact(
+                ep,
+                {
+                    "artifact_kind": "repair_event",
+                    "repair_id": repair_id,
+                    "mode": invariant_handling_mode.value,
+                    "proposal": proposal.model_dump(mode="json"),
+                    "resolution": resolution.model_dump(mode="json"),
+                    "proposal_evidence_ref": proposal_ref,
+                    "resolution_evidence_ref": resolution_ref,
+                },
+            )
+        else:
+            persist_result = append_prediction_record(
+                updated_pred,
+                prediction_log_path=prediction_log_path,
+                stable_ids=stable_ids,
+                episode=ep,
+                projection_state=updated_projection,
+            )
+            if not isinstance(persist_result, HaltRecord):
+                updated_projection = _project_current_at(updated_pred, updated_projection, updated_at_iso=compared_at)
 
         binding_ctx = default_check_context(
             scope=scope_key,
             prediction_key=scope_key,
-            current_predictions=current_predictions,
+            current_predictions={k: v.prediction_id for k, v in updated_projection.current_predictions.items()},
             prediction_log_available=True,
             prediction_outcome=outcome.model_dump(mode="json"),
         )
@@ -1235,6 +1352,7 @@ def _reconcile_predictions(
                     binding_outcome,
                     gate="post-observation",
                 ).__dict__,
+                "repair_mode": invariant_handling_mode.value,
             },
         )
 
@@ -1244,8 +1362,8 @@ def _reconcile_predictions(
         metrics["mae"] = metrics["absolute_error_total"] / metrics["comparisons"]
 
     return ProjectionState(
-        current_predictions=current_predictions,
-        prediction_history=list(projection_state.prediction_history),
+        current_predictions=dict(updated_projection.current_predictions),
+        prediction_history=list(updated_projection.prediction_history),
         correction_metrics=metrics,
         last_comparison_at_iso=_now_iso() if compared else projection_state.last_comparison_at_iso,
         updated_at_iso=_now_iso(),
@@ -1302,6 +1420,7 @@ def run_mission_loop(
     pending_predictions: Sequence[PredictionRecord | Mapping[str, Any]] = (),
     prediction_log_path: str | Path = "artifacts/predictions.jsonl",
     intervention_hook: Optional[InterventionLifecycleHook] = None,
+    invariant_handling_mode: InvariantHandlingMode = InvariantHandlingMode.STRICT_HALT,
 ) -> tuple[Episode, BeliefState, ProjectionState]:
     """
     Mission-loop helper: materialize prediction updates before decision stages.
@@ -1395,7 +1514,12 @@ def run_mission_loop(
         return ep, belief, updated_projection
 
     ep = ingest_observation(ep)
-    updated_projection = _reconcile_predictions(ep, updated_projection, prediction_log_path=prediction_log_path)
+    updated_projection = _reconcile_predictions(
+        ep,
+        updated_projection,
+        prediction_log_path=prediction_log_path,
+        invariant_handling_mode=invariant_handling_mode,
+    )
 
     post_observation_gate = evaluate_invariant_gates(
         ep=ep,

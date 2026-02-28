@@ -1,14 +1,27 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, Callable
+
+import pytest
 
 from state_renormalization.contracts import HaltRecord, PredictionRecord, ProjectionState
 from state_renormalization.adapters.persistence import read_jsonl
 from state_renormalization.engine import (
+    GateDecision,
     Success,
     append_prediction_record,
     evaluate_invariant_gates,
     project_current,
+)
+from state_renormalization.invariants import (
+    Flow,
+    InvariantId,
+    InvariantOutcome,
+    REGISTRY,
+    Validity,
+    default_check_context,
+    normalize_outcome,
 )
 
 
@@ -33,6 +46,136 @@ FIXED_PREDICTION = {
     "conditional_variance": None,
 }
 
+REGISTERED_INVARIANTS = tuple(REGISTRY.keys())
+
+
+def _build_allow_context_for_prediction_availability() -> Any:
+    return default_check_context(
+        scope="scope:test",
+        prediction_key="scope:test",
+        current_predictions={"scope:test": "pred:test"},
+        prediction_log_available=True,
+    )
+
+
+def _build_stop_context_for_prediction_availability() -> Any:
+    return default_check_context(
+        scope="scope:test",
+        prediction_key="scope:test",
+        current_predictions={},
+        prediction_log_available=True,
+    )
+
+
+def _build_allow_context_for_evidence_link_completeness() -> Any:
+    return default_check_context(
+        scope="scope:test",
+        prediction_key="scope:test",
+        current_predictions={"scope:test": "pred:test"},
+        prediction_log_available=True,
+        just_written_prediction={"key": "scope:test", "evidence_refs": [{"kind": "jsonl", "ref": "predictions.jsonl@1"}]},
+    )
+
+
+def _build_stop_context_for_evidence_link_completeness() -> Any:
+    return default_check_context(
+        scope="scope:test",
+        prediction_key="scope:test",
+        current_predictions={"scope:test": "pred:test"},
+        prediction_log_available=True,
+        just_written_prediction={"key": "scope:test", "evidence_refs": []},
+    )
+
+
+def _build_allow_context_for_prediction_outcome_binding() -> Any:
+    return default_check_context(
+        scope="scope:test",
+        prediction_key="scope:test",
+        current_predictions={"scope:test": "pred:test"},
+        prediction_log_available=True,
+        prediction_outcome={"prediction_id": "pred:test", "error_metric": 0.12},
+    )
+
+
+def _build_stop_context_for_prediction_outcome_binding() -> Any:
+    return default_check_context(
+        scope="scope:test",
+        prediction_key="scope:test",
+        current_predictions={"scope:test": "pred:test"},
+        prediction_log_available=True,
+        prediction_outcome={"prediction_id": "", "error_metric": 0.12},
+    )
+
+
+def _build_allow_context_for_explainable_halt_payload() -> Any:
+    return default_check_context(
+        scope="scope:test",
+        prediction_key="scope:test",
+        current_predictions={"scope:test": "pred:test"},
+        prediction_log_available=True,
+        halt_candidate=InvariantOutcome(
+            invariant_id=InvariantId.PREDICTION_AVAILABILITY,
+            passed=False,
+            reason="Action selection requires at least one projected current prediction.",
+            flow=Flow.STOP,
+            validity=Validity.INVALID,
+            code="no_predictions_projected",
+            details={"message": "Action selection requires at least one projected current prediction."},
+            evidence=({"kind": "scope", "value": "scope:test"},),
+            action_hints=({"kind": "rebuild_view", "scope": "scope:test"},),
+        ),
+    )
+
+
+def _build_stop_context_for_explainable_halt_payload() -> Any:
+    return default_check_context(
+        scope="scope:test",
+        prediction_key="scope:test",
+        current_predictions={"scope:test": "pred:test"},
+        prediction_log_available=True,
+        halt_candidate=InvariantOutcome(
+            invariant_id=InvariantId.PREDICTION_AVAILABILITY,
+            passed=False,
+            reason="Action selection requires at least one projected current prediction.",
+            flow=Flow.STOP,
+            validity=Validity.INVALID,
+            code="no_predictions_projected",
+            details={"message": "Action selection requires at least one projected current prediction."},
+            evidence=(),
+            action_hints=({"kind": "rebuild_view", "scope": "scope:test"},),
+        ),
+    )
+
+
+INVARIANT_SCENARIO_BUILDERS: dict[InvariantId, dict[str, Callable[[], Any]]] = {
+    InvariantId.PREDICTION_AVAILABILITY: {
+        "allow": _build_allow_context_for_prediction_availability,
+        "stop": _build_stop_context_for_prediction_availability,
+    },
+    InvariantId.EVIDENCE_LINK_COMPLETENESS: {
+        "allow": _build_allow_context_for_evidence_link_completeness,
+        "stop": _build_stop_context_for_evidence_link_completeness,
+    },
+    InvariantId.PREDICTION_OUTCOME_BINDING: {
+        "allow": _build_allow_context_for_prediction_outcome_binding,
+        "stop": _build_stop_context_for_prediction_outcome_binding,
+    },
+    InvariantId.EXPLAINABLE_HALT_PAYLOAD: {
+        "allow": _build_allow_context_for_explainable_halt_payload,
+        "stop": _build_stop_context_for_explainable_halt_payload,
+    },
+}
+
+
+def _assert_result_contract(result: GateDecision) -> None:
+    if isinstance(result, Success):
+        assert all(out.flow == Flow.CONTINUE for out in result.artifact.combined)
+    else:
+        assert isinstance(result, HaltRecord)
+        assert result.halt_id.startswith("halt:")
+        assert result.invariant_id
+        assert result.reason
+
 
 def test_prediction_record_json_round_trip() -> None:
     pred = PredictionRecord.model_validate(FIXED_PREDICTION)
@@ -40,6 +183,125 @@ def test_prediction_record_json_round_trip() -> None:
     reloaded = PredictionRecord.model_validate(dumped)
 
     assert reloaded == pred
+
+
+def test_registered_invariant_parameterization_matches_registry() -> None:
+    assert set(REGISTERED_INVARIANTS) == set(INVARIANT_SCENARIO_BUILDERS)
+
+
+@pytest.mark.parametrize("invariant_id", REGISTERED_INVARIANTS)
+def test_invariant_outcomes_are_deterministic_and_contract_compliant(invariant_id: InvariantId) -> None:
+    checker = REGISTRY[invariant_id]
+    allow_ctx = INVARIANT_SCENARIO_BUILDERS[invariant_id]["allow"]()
+    stop_ctx = INVARIANT_SCENARIO_BUILDERS[invariant_id]["stop"]()
+
+    allow_first = checker(allow_ctx)
+    allow_second = checker(allow_ctx)
+    assert allow_first == allow_second
+    assert allow_first.invariant_id == invariant_id
+    assert allow_first.passed is True
+    assert allow_first.flow == Flow.CONTINUE
+
+    stop_first = checker(stop_ctx)
+    stop_second = checker(stop_ctx)
+    assert stop_first == stop_second
+    assert stop_first.invariant_id == invariant_id
+    assert stop_first.passed is False
+    assert stop_first.flow == Flow.STOP
+
+    allow_artifact = normalize_outcome(allow_first, gate="test:allow")
+    stop_artifact = normalize_outcome(stop_first, gate="test:stop")
+    assert allow_artifact.invariant_id == invariant_id.value
+    assert stop_artifact.invariant_id == invariant_id.value
+    assert allow_artifact.gate == "test:allow"
+    assert stop_artifact.gate == "test:stop"
+
+
+@pytest.mark.parametrize(
+    "invariant_id,just_written_prediction,has_projected_prediction,expect_halt",
+    [
+        (InvariantId.PREDICTION_AVAILABILITY, None, True, False),
+        (InvariantId.PREDICTION_AVAILABILITY, None, False, True),
+        (
+            InvariantId.EVIDENCE_LINK_COMPLETENESS,
+            {"key": "scope:test", "evidence_refs": [{"kind": "jsonl", "ref": "predictions.jsonl@1"}]},
+            True,
+            False,
+        ),
+        (
+            InvariantId.EVIDENCE_LINK_COMPLETENESS,
+            {"key": "scope:test", "evidence_refs": []},
+            True,
+            True,
+        ),
+    ],
+)
+def test_gate_decisions_and_artifacts_are_deterministic_by_invariant(
+    invariant_id: InvariantId,
+    just_written_prediction: dict[str, Any] | None,
+    has_projected_prediction: bool,
+    expect_halt: bool,
+    tmp_path: Path,
+) -> None:
+    class DummyEpisode:
+        def __init__(self) -> None:
+            self.artifacts = []
+
+    projection = ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00")
+    scope_key = FIXED_PREDICTION["scope_key"]
+    if has_projected_prediction:
+        pred = PredictionRecord.model_validate(FIXED_PREDICTION)
+        projection = project_current(pred, projection)
+
+    first_ep = DummyEpisode()
+    second_ep = DummyEpisode()
+    gate_write = None
+    if just_written_prediction is not None:
+        gate_write = dict(just_written_prediction)
+        gate_write["key"] = scope_key
+
+    first = evaluate_invariant_gates(
+        ep=first_ep,
+        scope=scope_key,
+        prediction_key=scope_key,
+        projection_state=projection,
+        prediction_log_available=True,
+        just_written_prediction=gate_write,
+        halt_log_path=tmp_path / f"halts_{invariant_id.value.replace('.', '_')}_1.jsonl",
+    )
+    second = evaluate_invariant_gates(
+        ep=second_ep,
+        scope=scope_key,
+        prediction_key=scope_key,
+        projection_state=projection,
+        prediction_log_available=True,
+        just_written_prediction=gate_write,
+        halt_log_path=tmp_path / f"halts_{invariant_id.value.replace('.', '_')}_2.jsonl",
+    )
+
+    _assert_result_contract(first)
+    _assert_result_contract(second)
+
+    first_artifact = first_ep.artifacts[0]
+    second_artifact = second_ep.artifacts[0]
+    assert first_artifact["artifact_kind"] == "invariant_outcomes"
+    assert second_artifact["artifact_kind"] == "invariant_outcomes"
+    assert first_artifact["invariant_checks"] == second_artifact["invariant_checks"]
+
+    if expect_halt:
+        assert isinstance(first, HaltRecord)
+        assert isinstance(second, HaltRecord)
+        assert first.invariant_id == invariant_id.value
+        assert second.invariant_id == invariant_id.value
+        assert first.halt_id == second.halt_id
+        assert first_artifact["kind"] == "halt"
+        assert any(check["invariant_id"] == InvariantId.EXPLAINABLE_HALT_PAYLOAD.value for check in first_artifact["invariant_checks"])
+    else:
+        assert isinstance(first, Success)
+        assert isinstance(second, Success)
+        assert [out.code for out in first.artifact.combined] == [out.code for out in second.artifact.combined]
+        assert first_artifact["kind"] == "prediction"
+        assert any(check["invariant_id"] == invariant_id.value for check in first_artifact["invariant_checks"])
 
 
 def test_post_write_gate_passes_when_evidence_and_projection_current() -> None:

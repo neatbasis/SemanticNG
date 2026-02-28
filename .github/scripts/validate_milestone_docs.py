@@ -44,6 +44,26 @@ def _extract_maturity_map(markdown_text: str) -> dict[str, str]:
     return maturity
 
 
+def _extract_contract_names_by_milestone(markdown_text: str) -> dict[str, list[str]]:
+    contracts: dict[str, list[str]] = {}
+    current_milestone: str | None = None
+    for line in markdown_text.splitlines():
+        header = re.match(r"^## Milestone: (.+)$", line.strip())
+        if header:
+            current_milestone = header.group(1).strip()
+            contracts.setdefault(current_milestone, [])
+            continue
+        if not current_milestone or not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().split("|")[1:-1]]
+        if len(cells) < 7:
+            continue
+        if cells[0] == "Contract name" or set(cells[0]) == {"-"}:
+            continue
+        contracts[current_milestone].append(cells[0])
+    return contracts
+
+
 def _maturity_transitions(base_text: str, head_text: str) -> list[tuple[str, str, str]]:
     base_map = _extract_maturity_map(base_text)
     head_map = _extract_maturity_map(head_text)
@@ -121,11 +141,58 @@ def main() -> int:
                     print(f"  - Missing command in PR body: {command}")
                 return 1
 
+    head_map_text = Path("docs/system_contract_map.md").read_text(encoding="utf-8")
+
+    contract_names_by_milestone = _extract_contract_names_by_milestone(head_map_text)
+    known_contract_names = {
+        contract_name
+        for contract_names in contract_names_by_milestone.values()
+        for contract_name in contract_names
+    }
+    referenced_contracts: dict[str, list[str]] = {}
+    unknown_references: list[tuple[str, str]] = []
+    for capability in head_manifest.get("capabilities", []):
+        cap_id = capability.get("id", "<unknown>")
+        refs = capability.get("contract_map_refs") or []
+        if not isinstance(refs, list):
+            print(f"Capability '{cap_id}' must define 'contract_map_refs' as a list of contract names.")
+            return 1
+        normalized_refs = [ref for ref in refs if isinstance(ref, str) and ref.strip()]
+        referenced_contracts[cap_id] = normalized_refs
+        for contract_name in normalized_refs:
+            if contract_name not in known_contract_names:
+                unknown_references.append((cap_id, contract_name))
+
+    if unknown_references:
+        print("Found capability references to unknown system contracts.")
+        print("Update docs/dod_manifest.json contract_map_refs or docs/system_contract_map.md contract names.")
+        for cap_id, contract_name in sorted(unknown_references):
+            print(f"  - {cap_id}: {contract_name}")
+        print("Known contract names:")
+        for contract_name in sorted(known_contract_names):
+            print(f"  - {contract_name}")
+        return 1
+
+    active_contracts = set(contract_names_by_milestone.get("Next", [])) | set(
+        contract_names_by_milestone.get("Later", [])
+    )
+    referenced_contract_set = {
+        contract_name
+        for refs in referenced_contracts.values()
+        for contract_name in refs
+    }
+    missing_active_contract_refs = sorted(active_contracts - referenced_contract_set)
+    if missing_active_contract_refs:
+        print("Every active Next/Later contract must be referenced by at least one capability contract_map_refs entry.")
+        print("Add references in docs/dod_manifest.json under the relevant capabilities.")
+        for contract_name in missing_active_contract_refs:
+            print(f"  - Missing reference for contract: {contract_name}")
+        return 1
+
     if "docs/system_contract_map.md" in changed_files:
         base_map_text = subprocess.check_output(
             ["git", "show", f"{base_sha}:docs/system_contract_map.md"], text=True
         )
-        head_map_text = Path("docs/system_contract_map.md").read_text(encoding="utf-8")
         maturity_updates = _maturity_transitions(base_map_text, head_map_text)
         if maturity_updates:
             changelog_entries = _added_changelog_entries(base_sha, head_sha)

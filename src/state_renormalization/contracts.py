@@ -281,6 +281,48 @@ class DecisionEffect(BaseModel):
     hypothesis_eval: Optional[HypothesisEvaluation] = None
 
 
+class InvariantAuditResult(BaseModel):
+    """Normalized gate-check outcome suitable for deterministic audit trails."""
+
+    model_config = _CONTRACT_CONFIG
+
+    gate_point: str
+    invariant_id: str
+    passed: bool
+    reason: str = ""
+    evidence: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class GateInvariantOutcomeBundle(BaseModel):
+    """Per-gate normalized invariant outcomes split by execution phase."""
+
+    model_config = _CONTRACT_CONFIG
+
+    pre_consume: List[Dict[str, Any]] = Field(default_factory=list)
+    post_write: List[Dict[str, Any]] = Field(default_factory=list)
+
+    @property
+    def combined(self) -> List[Dict[str, Any]]:
+        return [*self.pre_consume, *self.post_write]
+
+
+class InterventionAction(str, Enum):
+    NONE = "none"
+    PAUSE = "pause"
+    RESUME = "resume"
+    TIMEOUT = "timeout"
+
+
+class InterventionDecision(BaseModel):
+    """HITL intervention signal emitted at lifecycle hooks in mission loop."""
+
+    model_config = _CONTRACT_CONFIG
+
+    action: InterventionAction = InterventionAction.NONE
+    reason: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
 class ObserverFrame(BaseModel):
     model_config = _CONTRACT_CONFIG
     role: str

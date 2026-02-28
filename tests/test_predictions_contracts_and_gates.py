@@ -1013,3 +1013,32 @@ def test_evaluate_invariant_gates_rejects_malformed_halt_outcome_payload(monkeyp
             ),
             prediction_log_available=True,
         )
+
+
+def test_evaluate_invariant_gates_emits_invariant_audit_records() -> None:
+    class DummyEpisode:
+        def __init__(self) -> None:
+            self.artifacts = []
+
+    pred = PredictionRecord.model_validate(FIXED_PREDICTION)
+    projected = project_current(
+        pred,
+        ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+    )
+
+    ep = DummyEpisode()
+    _ = evaluate_invariant_gates(
+        ep=ep,
+        scope=pred.scope_key,
+        prediction_key=pred.scope_key,
+        projection_state=projected,
+        prediction_log_available=True,
+        just_written_prediction={
+            "key": pred.scope_key,
+            "evidence_refs": [e.model_dump(mode="json") for e in pred.evidence_links],
+        },
+    )
+
+    outcomes_artifact = ep.artifacts[0]
+    assert "invariant_audit" in outcomes_artifact
+    assert outcomes_artifact["invariant_audit"][0]["gate_point"].startswith("pre-decision:")

@@ -62,6 +62,21 @@
       ]
     },
     {
+      "id": "observer_authorization_contract",
+      "title": "Observer authorization contract",
+      "status": "planned",
+      "roadmap_section": "Next",
+      "code_paths": [
+        "src/state_renormalization/contracts.py",
+        "src/state_renormalization/engine.py",
+        "src/state_renormalization/invariants.py"
+      ],
+      "pytest_commands": [
+        "pytest tests/test_observer_frame.py",
+        "pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py"
+      ]
+    },
+    {
       "id": "replay_projection_analytics",
       "title": "Replay-grade projection and correction analytics",
       "status": "in_progress",

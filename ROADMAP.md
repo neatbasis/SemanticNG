@@ -60,6 +60,15 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
   - Files: `src/state_renormalization/invariants.py`
   - Tests: `tests/test_predictions_contracts_and_gates.py`
 
+### 4) Observer authorization contract
+- **Owner area/module:** Contracts + Engine + Invariants (`src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`)
+- **Success criteria (test outcomes):**
+  - `pytest tests/test_observer_frame.py` passes, validating `ObserverFrame` authorization shape and defaults.
+  - `pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py` passes with authorization gate and invariant allowlist behavior enforced in the runtime pipeline.
+- **Related files/tests:**
+  - Files: `src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`
+  - Tests: `tests/test_observer_frame.py`, `tests/test_predictions_contracts_and_gates.py`, `tests/test_invariants.py`
+
 ## Later (larger architecture goals)
 
 ### 1) Replay projection analytics contract (replay-grade projection engine and longitudinal correction analytics)

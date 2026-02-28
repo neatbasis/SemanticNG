@@ -10,6 +10,8 @@
 
 For every status-transition capability in this PR, include the exact `pytest` command lines from `docs/dod_manifest.json` (verbatim) and place one adjacent `https://...` evidence URL directly below each command line.
 
+## AUTOGEN milestone command/evidence pairs (do not edit by hand)
+
 <!-- AUTOGEN SECTION: milestone evidence pairs; source=docs/dod_manifest.json; generator=.github/scripts/render_transition_evidence.py -->
 
 <!-- BEGIN AUTOGEN: milestone-evidence -->

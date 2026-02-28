@@ -6,18 +6,62 @@
 
 - List tests/checks run for this PR.
 
-## Milestone pytest commands and CI evidence (required for status transitions)
+## Milestone pytest commands + CI evidence (mandatory)
 
-For every milestone status transition in this PR, include each exact `pytest` command on one line and one adjacent `https://...` evidence line immediately below it.
+For every status-transition capability in this PR, keep the exact command/evidence adjacency shown below: one `https://...` line immediately under each command line.
 
 ```text
-pytest tests/milestones/test_alpha.py -k gate
-https://github.com/<org>/<repo>/actions/runs/123456789
+# Capability: prediction_persistence_baseline
+pytest tests/test_stable_ids.py tests/test_persistence_jsonl.py tests/test_predictions_contracts_and_gates.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
 
-pytest tests/milestones/test_beta.py -k readiness
-https://github.com/<org>/<repo>/actions/runs/987654321
+# Capability: channel_agnostic_pending_obligation
+pytest tests/test_contracts_belief_state.py tests/test_contracts_decision_effect_shape.py tests/test_engine_pending_obligation.py tests/test_engine_pending_obligation_minimal.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
+# Capability: schema_selection_ambiguity_baseline
+pytest tests/test_schema_selector.py tests/test_schema_bubbling_option_a.py tests/test_capture_outcome_states.py tests/test_engine_calls_selector_with_generic_error.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
+# Capability: gate_halt_unification
+pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
+# Capability: observer_authorization_contract
+pytest tests/test_observer_frame.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
+pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
+# Capability: replay_projection_analytics
+pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
+pytest tests/test_replay_projection_analytics.py tests/test_replay_projection_determinism.py tests/test_replay_projection_restart_contracts.py tests/test_prediction_outcome_binding.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
+pytest tests/replay_projection_analytics/test_append_only_replay.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
+# Capability: invariant_matrix_coverage
+pytest tests/test_predictions_contracts_and_gates.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
+# Capability: capability_invocation_governance
+pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
+pytest tests/test_predictions_contracts_and_gates.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
+# Capability: repair_aware_projection_evolution
+pytest tests/test_repair_mode_projection.py tests/test_repair_events_auditability.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
+pytest tests/test_predictions_contracts_and_gates.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
 ```
 
-- Do not summarize commands; copy/paste the exact command line.
-- Do not group multiple commands under one link.
-- Ensure each command has its own adjacent `https://...` CI evidence line.
+- [ ] I confirmed adjacency formatting was preserved (each command line is immediately followed by its own `https://...` evidence URL).

@@ -90,7 +90,7 @@ def test_render_pr_template_autogen_section_is_sorted_and_wrapped() -> None:
     assert section.startswith(render_transition_evidence.AUTOGEN_BEGIN)
     assert section.endswith(render_transition_evidence.AUTOGEN_END)
     assert "```text" in section
-    assert "Evidence URL: https://github.com/<org>/<repo>/actions/runs/<run_id>" in section
+    assert "https://github.com/<org>/<repo>/actions/runs/<run_id>" in section
     assert section.index("#### Capability: `alpha`") < section.index("#### Capability: `zeta`")
     assert "#### Capability: `empty`" not in section
 

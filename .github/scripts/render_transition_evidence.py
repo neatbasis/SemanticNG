@@ -110,7 +110,7 @@ def _render_pr_template_examples(manifest: dict) -> str:
         lines.append("```text")
         for command in commands:
             lines.append(command)
-            lines.append("Evidence URL: https://github.com/<org>/<repo>/actions/runs/<run_id>")
+            lines.append("https://github.com/<org>/<repo>/actions/runs/<run_id>")
             lines.append("")
         lines.append("```")
         lines.append("")

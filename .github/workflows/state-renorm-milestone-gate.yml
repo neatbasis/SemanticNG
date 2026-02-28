@@ -83,6 +83,10 @@ jobs:
         run: |
           python .github/scripts/render_transition_evidence.py --check-pr-template-autogen
 
+      - name: Run AUTOGEN parity pytest
+        run: |
+          pytest tests/test_render_transition_evidence.py tests/test_dod_manifest.py -k pull_request_template_autogen_section_matches_manifest_commands
+
       - name: Render transition evidence block
         id: render_transition_evidence
         if: ${{ always() }}

@@ -63,3 +63,60 @@ def test_commands_with_invalid_evidence_format_reports_missing_when_evidence_not
     )
 
     assert validate_milestone_docs._commands_with_invalid_evidence_format(pr_body, [command]) == [command]
+
+
+def test_done_capability_sync_mismatches_reports_roadmap_milestone_and_maturity_issues() -> None:
+    manifest = {
+        "capabilities": [
+            {
+                "id": "cap_done_bad",
+                "status": "done",
+                "roadmap_section": "Next",
+                "contract_map_refs": ["Contract A", "Contract B"],
+            }
+        ]
+    }
+    contract_rows = {
+        "Contract A": {"milestone": "Later", "maturity": "operational"},
+        "Contract B": {"milestone": "Now", "maturity": "prototype"},
+    }
+
+    mismatches = validate_milestone_docs._done_capability_sync_mismatches(manifest, contract_rows)
+
+    assert any("roadmap_section='Now'" in mismatch for mismatch in mismatches)
+    assert any("Contract A" in mismatch and "Milestone: Now" in mismatch for mismatch in mismatches)
+    assert any("Contract B" in mismatch and "operational/proven" in mismatch for mismatch in mismatches)
+
+
+def test_milestone_policy_mismatches_reports_later_contract_dependency() -> None:
+    manifest = {
+        "capabilities": [
+            {
+                "id": "cap_now",
+                "roadmap_section": "Now",
+                "contract_map_refs": ["Contract Future"],
+            }
+        ]
+    }
+    contract_rows = {"Contract Future": {"milestone": "Later", "maturity": "prototype"}}
+
+    mismatches = validate_milestone_docs._milestone_policy_mismatches(manifest, contract_rows)
+
+    assert mismatches == [
+        "cap_now (Now) -> Contract Future (Later): capabilities cannot depend on later-milestone contracts."
+    ]
+
+
+def test_maturity_promotion_evidence_mismatches_requires_entry_and_url() -> None:
+    updates = [
+        ("Contract A", "prototype", "operational"),
+        ("Contract B", "operational", "proven"),
+    ]
+    changelog_lines = [
+        "- 2026-02-28 (Next): Contract A prototype -> operational; promoted without link",
+    ]
+
+    mismatches = validate_milestone_docs._maturity_promotion_evidence_mismatches(updates, changelog_lines)
+
+    assert "Contract A: changelog promotion entry must include an evidence URL (http:// or https://)." in mismatches
+    assert "Contract B: missing changelog entry for maturity promotion operational -> proven." in mismatches

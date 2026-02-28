@@ -64,6 +64,25 @@ def _extract_contract_names_by_milestone(markdown_text: str) -> dict[str, list[s
     return contracts
 
 
+def _extract_contract_rows_by_name(markdown_text: str) -> dict[str, dict[str, str]]:
+    rows: dict[str, dict[str, str]] = {}
+    current_milestone: str | None = None
+    for line in markdown_text.splitlines():
+        header = re.match(r"^## Milestone: (.+)$", line.strip())
+        if header:
+            current_milestone = header.group(1).strip()
+            continue
+        if not current_milestone or not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().split("|")[1:-1]]
+        if len(cells) < 7:
+            continue
+        if cells[0] == "Contract name" or set(cells[0]) == {"-"}:
+            continue
+        rows[cells[0]] = {"milestone": current_milestone, "maturity": cells[-1]}
+    return rows
+
+
 def _maturity_transitions(base_text: str, head_text: str) -> list[tuple[str, str, str]]:
     base_map = _extract_maturity_map(base_text)
     head_map = _extract_maturity_map(head_text)
@@ -87,6 +106,115 @@ def _added_changelog_entries(base_sha: str, head_sha: str) -> list[str]:
         if re.match(r"^\+- \d{4}-\d{2}-\d{2} \([^)]+\): ", line):
             entries.append(line[1:])
     return entries
+
+
+def _extract_changelog_lines(markdown_text: str) -> list[str]:
+    lines = markdown_text.splitlines()
+    capture = False
+    entries: list[str] = []
+    for raw_line in lines:
+        line = raw_line.rstrip()
+        if line.strip() == "### Changelog":
+            capture = True
+            continue
+        if capture and re.match(r"^###\s+", line.strip()):
+            break
+        if capture and line.startswith("- "):
+            entries.append(line)
+    return entries
+
+
+def _done_capability_sync_mismatches(
+    head_manifest: dict, contract_rows_by_name: dict[str, dict[str, str]]
+) -> list[str]:
+    mismatches: list[str] = []
+    for capability in head_manifest.get("capabilities", []):
+        if capability.get("status") != "done":
+            continue
+        cap_id = capability.get("id", "<unknown>")
+        roadmap_section = capability.get("roadmap_section")
+        if roadmap_section != "Now":
+            mismatches.append(
+                f"{cap_id}: done capabilities must use roadmap_section='Now' (found '{roadmap_section}')."
+            )
+
+        for contract_name in capability.get("contract_map_refs", []):
+            row = contract_rows_by_name.get(contract_name)
+            if not row:
+                continue
+            milestone = row["milestone"]
+            maturity = row["maturity"]
+            if milestone != "Now":
+                mismatches.append(
+                    f"{cap_id} -> {contract_name}: done capabilities must reference contracts in Milestone: Now (found '{milestone}')."
+                )
+            if maturity in {"prototype", "in_progress"}:
+                mismatches.append(
+                    f"{cap_id} -> {contract_name}: done capabilities require operational/proven maturity (found '{maturity}')."
+                )
+    return mismatches
+
+
+def _milestone_policy_mismatches(
+    head_manifest: dict, contract_rows_by_name: dict[str, dict[str, str]]
+) -> list[str]:
+    order = {"Now": 0, "Next": 1, "Later": 2}
+    mismatches: list[str] = []
+    for capability in head_manifest.get("capabilities", []):
+        cap_id = capability.get("id", "<unknown>")
+        cap_section = capability.get("roadmap_section")
+        cap_rank = order.get(cap_section)
+        if cap_rank is None:
+            continue
+        for contract_name in capability.get("contract_map_refs", []):
+            row = contract_rows_by_name.get(contract_name)
+            if not row:
+                continue
+            contract_milestone = row["milestone"]
+            contract_rank = order.get(contract_milestone)
+            if contract_rank is None:
+                continue
+            if contract_rank > cap_rank:
+                mismatches.append(
+                    f"{cap_id} ({cap_section}) -> {contract_name} ({contract_milestone}): capabilities cannot depend on later-milestone contracts."
+                )
+    return mismatches
+
+
+def _maturity_promotion_evidence_mismatches(
+    maturity_updates: list[tuple[str, str, str]], changelog_lines: list[str]
+) -> list[str]:
+    promotion_mismatches: list[str] = []
+    evidence_pattern = re.compile(r"https?://\S+")
+    for contract_name, before, after in maturity_updates:
+        if before == after:
+            continue
+        if before == "prototype" and after in {"operational", "proven"}:
+            is_promotion = True
+        elif before == "operational" and after == "proven":
+            is_promotion = True
+        else:
+            is_promotion = False
+        if not is_promotion:
+            continue
+
+        matching_entries = [
+            line
+            for line in changelog_lines
+            if contract_name in line and f"{before} -> {after}" in line
+        ]
+        if not matching_entries:
+            promotion_mismatches.append(
+                f"{contract_name}: missing changelog entry for maturity promotion {before} -> {after}."
+            )
+            continue
+
+        if not any(evidence_pattern.search(line) for line in matching_entries):
+            promotion_mismatches.append(
+                f"{contract_name}: changelog promotion entry must include an evidence URL (http:// or https://)."
+            )
+
+    return promotion_mismatches
 
 
 def _commands_with_invalid_evidence_format(pr_body: str, commands: list[str]) -> list[str]:
@@ -175,6 +303,7 @@ def main() -> int:
     head_map_text = Path("docs/system_contract_map.md").read_text(encoding="utf-8")
 
     contract_names_by_milestone = _extract_contract_names_by_milestone(head_map_text)
+    contract_rows_by_name = _extract_contract_rows_by_name(head_map_text)
     known_contract_names = {
         contract_name
         for contract_names in contract_names_by_milestone.values()
@@ -220,6 +349,22 @@ def main() -> int:
             print(f"  - Missing reference for contract: {contract_name}")
         return 1
 
+    done_sync_mismatches = _done_capability_sync_mismatches(head_manifest, contract_rows_by_name)
+    if done_sync_mismatches:
+        print("Found done capability roadmap/maturity synchronization mismatches.")
+        print("Align done capabilities to roadmap_section=Now and Now contracts with operational/proven maturity.")
+        for mismatch in sorted(done_sync_mismatches):
+            print(f"  - {mismatch}")
+        return 1
+
+    milestone_policy_mismatches = _milestone_policy_mismatches(head_manifest, contract_rows_by_name)
+    if milestone_policy_mismatches:
+        print("Found milestone placement mismatches between docs/system_contract_map.md and docs/dod_manifest.json roadmap policy.")
+        print("Capabilities may only reference contracts in the same or earlier milestone horizon (Now < Next < Later).")
+        for mismatch in sorted(milestone_policy_mismatches):
+            print(f"  - {mismatch}")
+        return 1
+
     if "docs/system_contract_map.md" in changed_files:
         base_map_text = subprocess.check_output(
             ["git", "show", f"{base_sha}:docs/system_contract_map.md"], text=True
@@ -233,6 +378,17 @@ def main() -> int:
                     print(f"  - {contract_name}: {before} -> {after}")
                 print("Add one or more entries under '### Changelog' in the format:")
                 print("- YYYY-MM-DD (Milestone): ...")
+                return 1
+
+            promotion_mismatches = _maturity_promotion_evidence_mismatches(
+                maturity_updates,
+                _extract_changelog_lines(head_map_text),
+            )
+            if promotion_mismatches:
+                print("Maturity promotions require a changelog promotion entry with an evidence URL.")
+                print("Use format: - YYYY-MM-DD (Milestone): <contract> <from> -> <to>; rationale. https://...")
+                for mismatch in sorted(promotion_mismatches):
+                    print(f"  - {mismatch}")
                 return 1
 
     print("Milestone documentation governance checks passed.")

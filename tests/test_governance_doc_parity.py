@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "docs" / "dod_manifest.json"
 ROADMAP_PATH = ROOT / "ROADMAP.md"
 SYSTEM_CONTRACT_MAP_PATH = ROOT / "docs" / "system_contract_map.md"
+SPRINT_PLAN_PATH = ROOT / "docs" / "sprint_plan_5x.md"
 PROJECT_MATURITY_PATH = ROOT / "docs" / "project_maturity_evaluation.md"
 RELEASE_CHECKLIST_PATH = ROOT / "docs" / "release_checklist.md"
 VALID_STATUSES = {"done", "in_progress", "planned"}
@@ -149,6 +150,33 @@ def _extract_completion_ratio_claims(text: str) -> list[tuple[int, int, str]]:
 
 def _normalize_doc_label(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip().lower())
+
+
+def _extract_dependency_map(text: str) -> dict[str, tuple[str, ...]]:
+    dependencies: dict[str, tuple[str, ...]] = {}
+    pattern = re.compile(r"^- `([a-z0-9_]+)` depends on: (.+)\.$")
+    for line in text.splitlines():
+        stripped = line.strip()
+        match = pattern.match(stripped)
+        if not match:
+            continue
+        capability_id = match.group(1)
+        dependency_ids = tuple(sorted(re.findall(r"`([a-z0-9_]+)`", match.group(2))))
+        dependencies[capability_id] = dependency_ids
+    return dependencies
+
+
+def _extract_maturity_changelog_capability_refs(contract_map_text: str) -> list[tuple[str, str]]:
+    refs: list[tuple[str, str]] = []
+    for line in contract_map_text.splitlines():
+        stripped = line.strip()
+        if not re.match(r"^- \d{4}-\d{2}-\d{2} \([^)]+\): ", stripped):
+            continue
+        if "->" not in stripped:
+            continue
+        match = re.search(r"capability_id=([a-z0-9_]+)", stripped)
+        refs.append((match.group(1) if match else "", stripped))
+    return refs
 
 
 def test_roadmap_capability_status_alignment_matches_manifest() -> None:
@@ -332,3 +360,70 @@ def test_release_checklist_has_no_duplicate_headers_or_checklist_labels() -> Non
         f"duplicate_headings={duplicate_headings} "
         f"duplicate_checklist_labels={duplicate_checklist_labels}"
     )
+
+
+def test_planned_or_in_progress_capabilities_are_present_in_sprint_plan() -> None:
+    manifest_status = _load_manifest_status_map()
+    sprint_plan_text = SPRINT_PLAN_PATH.read_text(encoding="utf-8")
+
+    active_capabilities = sorted(
+        cap_id for cap_id, status in manifest_status.items() if status in {"planned", "in_progress"}
+    )
+    mentioned_capability_ids = set(re.findall(r"`([a-z0-9_]+)`", sprint_plan_text))
+
+    missing = [cap_id for cap_id in active_capabilities if cap_id not in mentioned_capability_ids]
+
+    assert not missing, (
+        "Sprint plan parity mismatch: every planned/in_progress capability must appear in docs/sprint_plan_5x.md. "
+        f"missing={missing}"
+    )
+
+
+def test_contract_map_maturity_transitions_reference_manifest_capability_and_evidence() -> None:
+    manifest_status = _load_manifest_status_map()
+    contract_map_text = SYSTEM_CONTRACT_MAP_PATH.read_text(encoding="utf-8")
+
+    mismatches: list[str] = []
+    for capability_id, source_line in _extract_maturity_changelog_capability_refs(contract_map_text):
+        if not capability_id:
+            mismatches.append(
+                "System contract-map changelog mismatch: maturity transition entry missing capability_id=... "
+                f"source='{source_line}'"
+            )
+            continue
+        if capability_id not in manifest_status:
+            mismatches.append(
+                "System contract-map changelog mismatch: maturity transition references unknown capability_id. "
+                f"capability_id='{capability_id}' source='{source_line}'"
+            )
+        if "https://" not in source_line and "http://" not in source_line:
+            mismatches.append(
+                "System contract-map changelog mismatch: maturity transition entry missing evidence URL. "
+                f"capability_id='{capability_id}' source='{source_line}'"
+            )
+
+    assert not mismatches, "\n".join(mismatches)
+
+
+def test_dependency_statements_are_consistent_across_roadmap_and_sprint_plan() -> None:
+    roadmap_text = ROADMAP_PATH.read_text(encoding="utf-8")
+    sprint_plan_text = SPRINT_PLAN_PATH.read_text(encoding="utf-8")
+
+    roadmap_dependencies = _extract_dependency_map(roadmap_text)
+    sprint_dependencies = _extract_dependency_map(sprint_plan_text)
+
+    shared_capabilities = sorted(set(roadmap_dependencies) & set(sprint_dependencies))
+    mismatches: list[str] = []
+    for capability_id in shared_capabilities:
+        if roadmap_dependencies[capability_id] != sprint_dependencies[capability_id]:
+            mismatches.append(
+                "Dependency statement conflict across docs: "
+                f"capability_id='{capability_id}' roadmap={roadmap_dependencies[capability_id]} "
+                f"sprint_plan={sprint_dependencies[capability_id]}"
+            )
+
+    assert shared_capabilities, (
+        "Dependency parity check requires canonical dependency statements in both ROADMAP.md and "
+        "docs/sprint_plan_5x.md (use '- `<capability_id>` depends on: `<dependency_id>`, ... .')."
+    )
+    assert not mismatches, "\n".join(mismatches)

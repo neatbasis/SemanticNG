@@ -35,7 +35,7 @@ Cross-sprint execution sequencing, capability dependency leverage, and maturity-
   - Files: `src/state_renormalization/adapters/schema_selector.py`, `src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`
   - Tests: `tests/test_schema_selector.py`, `tests/test_schema_bubbling_option_a.py`, `tests/test_capture_outcome_states.py`, `tests/test_engine_calls_selector_with_generic_error.py`
 
-### 4) Unified gate pipeline and halt persistence (`status: done`)
+### 4) Unified gate pipeline and halt persistence (manifest: `gate_halt_unification`)
 - **Owner area/module:** Engine + Invariants + Contracts + Persistence (`src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`, `src/state_renormalization/contracts.py`, `src/state_renormalization/adapters/persistence.py`)
 - **Success criteria (test outcomes):**
   - `pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py` passes.
@@ -44,7 +44,7 @@ Cross-sprint execution sequencing, capability dependency leverage, and maturity-
   - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`, `src/state_renormalization/contracts.py`, `src/state_renormalization/adapters/persistence.py`
   - Tests: `tests/test_predictions_contracts_and_gates.py`, `tests/test_engine_projection_mission_loop.py`, `tests/test_persistence_jsonl.py`, `tests/test_contracts_halt_record.py`
 
-### 5) Invariant matrix coverage (`status: done`)
+### 5) Invariant matrix coverage (manifest: `invariant_matrix_coverage`)
 - **Owner area/module:** Invariants + Test harness (`src/state_renormalization/invariants.py`, `tests/test_predictions_contracts_and_gates.py`)
 - **Success criteria (test outcomes):**
   - `pytest tests/test_predictions_contracts_and_gates.py` passes with parameterized coverage across all registered `InvariantId` branches.
@@ -53,7 +53,7 @@ Cross-sprint execution sequencing, capability dependency leverage, and maturity-
   - Files: `src/state_renormalization/invariants.py`, `tests/test_predictions_contracts_and_gates.py`
   - Tests: `tests/test_predictions_contracts_and_gates.py`
 
-### 6) Replay projection analytics contract (replay-grade projection engine and longitudinal correction analytics; `status: done`)
+### 6) Replay projection analytics contract (replay-grade projection engine and longitudinal correction analytics; manifest: `replay_projection_analytics`)
 - **Owner area/module:** Engine + Persistence + Correction artifacts (`src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`)
 - **Success criteria (test outcomes):**
   - Replay tests pass, proving `ProjectionState` reconstructed from append-only logs is deterministic across repeated runs and independent process restarts.
@@ -64,7 +64,7 @@ Cross-sprint execution sequencing, capability dependency leverage, and maturity-
   - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`
   - Tests: `tests/test_predictions_contracts_and_gates.py`, `tests/test_persistence_jsonl.py`, `tests/test_replay_projection_analytics.py`, `tests/test_replay_projection_determinism.py`, `tests/test_replay_projection_restart_contracts.py`, `tests/test_prediction_outcome_binding.py`, `tests/replay_projection_analytics/test_append_only_replay.py`
 
-### 7) Observer authorization contract (`status: done`)
+### 7) Observer authorization contract (manifest: `observer_authorization_contract`)
 - **Owner area/module:** Contracts + Engine + Invariants (`src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`)
 - **Success criteria (test outcomes):**
   - `pytest tests/test_observer_frame.py` passes, validating `ObserverFrame` authorization shape and defaults.
@@ -85,7 +85,7 @@ _No planned capabilities remain in `Next`; observer authorization promotion is c
 
 ## Later (larger architecture goals)
 
-### 1) Capability-invocation governance (policy-aware external actions; `status: planned`)
+### 1) Capability-invocation governance (policy-aware external actions; manifest: `capability_invocation_governance`)
 - **Owner area/module:** Engine + Contracts + Capability adapters (`src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, adapter modules under `src/state_renormalization/adapters/`)
 - **Success criteria (test outcomes):**
   - New capability-gating tests pass, showing no externally consequential action executes without a current valid prediction and explicit gate pass.
@@ -94,7 +94,7 @@ _No planned capabilities remain in `Next`; observer authorization promotion is c
   - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, capability adapter files (as added)
   - Tests: add capability governance suites under `tests/` (prediction + halt + side-effect guards).
 
-### 2) Evolution path toward repair-aware projection (without silent mutation; `status: planned`)
+### 2) Evolution path toward repair-aware projection (without silent mutation; manifest: `repair_aware_projection_evolution`)
 - **Owner area/module:** Invariants + Engine (`src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py`)
 - **Success criteria (test outcomes):**
   - Prototype repair-mode tests pass where repair proposals are emitted as explicit auditable events (never implicit state mutation).
@@ -111,9 +111,15 @@ _No planned capabilities remain in `Next`; observer authorization promotion is c
 
 ## Backlog dependency tags
 
-- `Later` item 1 (Replay projection analytics contract): `done`; maintain replay analytics suites as non-regression gates while sequencing `Next` governance contracts.
-- `Later` item 2 (Capability-invocation governance): `planned`; dependency on `observer_authorization_contract` is met (`status: done`), so capability-side policy gating is now the next dependency-unblocked scope.
-- `Later` item 3 (Repair-aware projection evolution): `planned`; sequence after replay analytics baselines are stable to preserve auditable repair-event lineage.
+- `Later` item 1 (`replay_projection_analytics`): see `docs/dod_manifest.json` for canonical status; maintain replay analytics suites as non-regression gates while sequencing `Next` governance contracts.
+- `Later` item 2 (`capability_invocation_governance`): dependency on `observer_authorization_contract` is met per `docs/dod_manifest.json`; capability-side policy gating is the next dependency-unblocked scope.
+- `Later` item 3 (`repair_aware_projection_evolution`): sequence after `replay_projection_analytics` and `capability_invocation_governance` per canonical dependency map in `docs/sprint_plan_5x.md`.
+
+
+## Canonical dependency statements (capability-ID only)
+
+- `capability_invocation_governance` depends on: `observer_authorization_contract`, `invariant_matrix_coverage`, `channel_agnostic_pending_obligation`.
+- `repair_aware_projection_evolution` depends on: `capability_invocation_governance`, `replay_projection_analytics`.
 
 ## Planning cadence
 

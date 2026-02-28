@@ -7,6 +7,15 @@ Canonical references:
 - Contract maturity transitions: `docs/system_contract_map.md`.
 - Completion-layer criteria: `docs/definition_of_complete.md`.
 
+## Source-of-truth matrix
+
+| Decision type | Canonical source-of-truth | One-way derivation rule |
+| --- | --- | --- |
+| Capability status | `docs/dod_manifest.json` | `ROADMAP.md`, `docs/system_contract_map.md`, and sprint notes must reference capability IDs and mirror manifest state; they must not introduce independent status authority. |
+| Maturity level | `docs/system_contract_map.md` | Maturity transitions must cite capability IDs from `docs/dod_manifest.json` and evidence links; downstream docs may summarize but not redefine maturity state. |
+| Horizon sequencing | `ROADMAP.md` | Horizon notes derive from capability IDs and dependency map; execution docs consume this sequence without redefining horizon ownership. |
+| Sprint execution controls | `docs/sprint_plan_5x.md` | Sprint controls (gates, PR requirements, templates) govern execution mechanics only and must reference capability IDs for scope. |
+
 ## Governance outcomes to implement across this plan
 
 The sprint plan below is constrained to deliver these governance outcomes by Sprint 5:
@@ -187,3 +196,14 @@ Use this register when introducing additional `planned` capability IDs.
   3. `docs/system_contract_map.md` maturity rows/changelog,
   4. Promotion workflow checklist items in `README.md`.
 - A capability cannot be promoted to `done` unless its required command packs pass and its contract maturity transition rationale is recorded.
+
+### Canonical dependency statements (capability-ID only)
+
+- `capability_invocation_governance` depends on: `observer_authorization_contract`, `invariant_matrix_coverage`, `channel_agnostic_pending_obligation`.
+- `repair_aware_projection_evolution` depends on: `capability_invocation_governance`, `replay_projection_analytics`.
+
+### Changelog entry template (required for dependency/maturity changes)
+
+Use this template in sprint-close updates and governance PR summaries:
+
+- `- YYYY-MM-DD: capability_id=<capability_id>; change=<status|maturity|dependency>; dependency_delta=<added:[...], removed:[...], unchanged:[...]>; re_evaluation_date=YYYY-MM-DD; evidence=https://...`

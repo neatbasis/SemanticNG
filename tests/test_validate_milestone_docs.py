@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 from pathlib import Path
 
 
@@ -367,3 +368,62 @@ def test_validate_pr_template_fields_fails_missing_governance_handoff_fields() -
     assert any(validate_milestone_docs.MISSING_GOVERNANCE_HANDOFF_MARKER in mismatch for mismatch in mismatches)
     assert any("Governed docs updated with fresh regeneration metadata" in mismatch for mismatch in mismatches)
     assert any("If `no`, provide timeboxed follow-up issue/PR and owner:" in mismatch for mismatch in mismatches)
+
+
+def test_live_contract_map_changelog_transitions_include_capability_id_and_evidence_link() -> None:
+    manifest = validate_milestone_docs._load_manifest("HEAD")
+    capability_ids = {
+        cap.get("id")
+        for cap in manifest.get("capabilities", [])
+        if isinstance(cap.get("id"), str)
+    }
+    contract_map_text = (ROOT / "docs" / "system_contract_map.md").read_text(encoding="utf-8")
+
+    mismatches: list[str] = []
+    for line in validate_milestone_docs._extract_changelog_lines(contract_map_text):
+        if "->" not in line:
+            continue
+        capability_match = re.search(r"capability_id=([a-z0-9_]+)", line)
+        if capability_match is None:
+            mismatches.append(f"missing capability_id in changelog line: {line}")
+            continue
+        if capability_match.group(1) not in capability_ids:
+            mismatches.append(f"unknown capability_id in changelog line: {line}")
+        if "https://" not in line and "http://" not in line:
+            mismatches.append(f"missing evidence link in changelog line: {line}")
+
+    assert not mismatches, "\n".join(mismatches)
+
+
+def test_live_dependency_statements_match_between_roadmap_and_sprint_plan() -> None:
+    pattern = re.compile(r"^- `([a-z0-9_]+)` depends on: (.+)\.$")
+
+    def extract_map(text: str) -> dict[str, tuple[str, ...]]:
+        parsed: dict[str, tuple[str, ...]] = {}
+        for raw in text.splitlines():
+            line = raw.strip()
+            match = pattern.match(line)
+            if not match:
+                continue
+            parsed[match.group(1)] = tuple(sorted(re.findall(r"`([a-z0-9_]+)`", match.group(2))))
+        return parsed
+
+    roadmap_text = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+    sprint_text = (ROOT / "docs" / "sprint_plan_5x.md").read_text(encoding="utf-8")
+
+    roadmap_map = extract_map(roadmap_text)
+    sprint_map = extract_map(sprint_text)
+
+    shared = sorted(set(roadmap_map) & set(sprint_map))
+    assert shared, "expected at least one shared canonical dependency statement across docs"
+
+    mismatches = [
+        cap_id
+        for cap_id in shared
+        if roadmap_map[cap_id] != sprint_map[cap_id]
+    ]
+
+    assert not mismatches, (
+        "conflicting dependency statements across docs for capability IDs: "
+        f"{mismatches}"
+    )

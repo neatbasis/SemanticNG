@@ -4,6 +4,8 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 
 Canonical completion gates and enablement dependencies are defined in `docs/definition_of_complete.md`.
 
+Cross-sprint execution sequencing, capability dependency leverage, and maturity-path exit criteria are tracked in `docs/sprint_plan_5x.md`.
+
 ## Now (already implemented + verified tests)
 
 ### 1) Prediction-first contracts and deterministic persistence baseline

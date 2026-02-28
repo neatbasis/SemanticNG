@@ -85,6 +85,7 @@ When promoting a capability status (for example `planned` -> `in_progress` or `i
 
 - [ ] Update `docs/dod_manifest.json` status + capability metadata.
 - [ ] Update the `ROADMAP.md` **Capability status alignment** section to mirror the transition.
+- [ ] Update `docs/sprint_plan_5x.md` sprint status/exit-criteria notes so capability transition state is synchronized.
 - [ ] Update `docs/system_contract_map.md` relevant contract milestone/maturity rows and add/update the changelog entry if maturity changed.
 - [ ] Regenerate PR template autogen content (`python .github/scripts/render_transition_evidence.py --regenerate-pr-template`).
 - [ ] Paste a transition evidence block with real CI URLs (no placeholders), including command/evidence pairs for transitioned capabilities.

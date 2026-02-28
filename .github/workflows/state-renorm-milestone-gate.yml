@@ -113,7 +113,7 @@ jobs:
           set -e
 
           if [[ $validator_status -ne 0 ]]; then
-            if grep -Fq "PR description must include adjacency evidence" artifacts/validate_milestone_docs.log; then
+            if grep -Fq "MILESTONE_VALIDATION_ERROR=MISSING_PR_EVIDENCE" artifacts/validate_milestone_docs.log; then
               echo "VALIDATOR_MISSING_EVIDENCE=true" >> "$GITHUB_ENV"
             fi
 

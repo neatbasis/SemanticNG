@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 # ------------------------------------------------------------------------------
 # Shared BaseModel config helpers
@@ -424,6 +424,84 @@ class ProjectionState(BaseModel):
     @property
     def has_current_predictions(self) -> bool:
         return bool(self.current_predictions)
+
+
+# ------------------------------------------------------------------------------
+# Human-in-the-loop (HITL) intervention protocol
+# ------------------------------------------------------------------------------
+
+class InterventionStatus(str, Enum):
+    REQUESTED = "requested"
+    PAUSED = "paused"
+    RESUMED = "resumed"
+    TIMEOUT = "timeout"
+    ESCALATED = "escalated"
+
+
+class InterventionResponseType(str, Enum):
+    APPROVE = "approve"
+    REJECT = "reject"
+    OVERRIDE = "override"
+    REQUEST_MORE_CONTEXT = "request_more_context"
+    ACK_TIMEOUT = "ack_timeout"
+
+
+class EscalationTimeoutRule(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    timeout_seconds: int = Field(ge=1)
+    max_timeouts_before_escalation: int = Field(default=1, ge=1)
+    escalation_target: str
+    on_timeout_status: InterventionStatus = InterventionStatus.TIMEOUT
+    on_escalation_status: InterventionStatus = InterventionStatus.ESCALATED
+
+
+class OverrideProvenance(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    override_id: str
+    operator_id: str
+    operator_role: str
+    justification: str
+    source_channel: str
+    ticket_ref: Optional[str] = None
+    supersedes_decision_id: Optional[str] = None
+    applied_at_iso: str
+
+
+class InterventionRequest(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    intervention_id: str
+    episode_id: str
+    conversation_id: str
+    turn_index: int = Field(ge=0)
+    requested_at_iso: str
+    reason: str
+    prompt: str
+    context: Dict[str, Any] = Field(default_factory=dict)
+    timeout_rule: EscalationTimeoutRule
+    timeout_count: int = Field(default=0, ge=0)
+    status: InterventionStatus = InterventionStatus.REQUESTED
+
+
+class OperatorResponse(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    intervention_id: str
+    episode_id: str
+    response_type: InterventionResponseType
+    message: Optional[str] = None
+    provided_at_iso: str
+    approved: bool = False
+    override_payload: Dict[str, Any] = Field(default_factory=dict)
+    override_provenance: Optional[OverrideProvenance] = None
+
+    @model_validator(mode="after")
+    def _validate_override_provenance(self) -> "OperatorResponse":
+        if self.response_type == InterventionResponseType.OVERRIDE and self.override_provenance is None:
+            raise ValueError("override_provenance is required when response_type=override")
+        return self
 
 # ------------------------------------------------------------------------------
 # Demo-only statuses + BeliefState (Option A)

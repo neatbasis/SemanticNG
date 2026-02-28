@@ -29,6 +29,10 @@ from state_renormalization.contracts import (
     ObserverFrame,
     ProjectionState,
     PredictionRecord,
+    InterventionRequest,
+    InterventionStatus,
+    InterventionResponseType,
+    OperatorResponse,
     HaltRecord,
     EvidenceRef,
     SchemaSelection,
@@ -190,6 +194,49 @@ def append_turn_summary(ep: Episode) -> None:
             "operator_action": "review_halts_then_resume_next_turn" if _turn_halt_summary(ep) else None,
         },
     )
+
+
+def pause_episode_for_intervention(ep: Episode, request: InterventionRequest) -> Episode:
+    _append_episode_artifact(
+        ep,
+        {
+            "artifact_kind": "intervention_event",
+            "event_type": "pause",
+            "intervention_id": request.intervention_id,
+            "status": InterventionStatus.PAUSED.value,
+            "requested_at_iso": request.requested_at_iso,
+            "reason": request.reason,
+            "prompt": request.prompt,
+            "timeout_rule": _to_dict(request.timeout_rule),
+            "timeout_count": request.timeout_count,
+            "context": _to_dict(request.context),
+        },
+    )
+    return ep
+
+
+def resume_episode_with_operator_input(ep: Episode, response: OperatorResponse) -> Episode:
+    _append_episode_artifact(
+        ep,
+        {
+            "artifact_kind": "intervention_event",
+            "event_type": "resume",
+            "intervention_id": response.intervention_id,
+            "status": InterventionStatus.RESUMED.value,
+            "response_type": response.response_type.value,
+            "message": response.message,
+            "approved": response.approved,
+            "provided_at_iso": response.provided_at_iso,
+            "override_payload": _to_dict(response.override_payload),
+            "override_provenance": _to_dict(response.override_provenance),
+        },
+    )
+    return ep
+
+
+def evaluate_intervention_timeout(request: InterventionRequest) -> InterventionStatus:
+    timed_out = request.timeout_count >= request.timeout_rule.max_timeouts_before_escalation
+    return request.timeout_rule.on_escalation_status if timed_out else request.timeout_rule.on_timeout_status
 
 
 def _now_iso() -> str:
@@ -659,10 +706,47 @@ def run_mission_loop(
     *,
     pending_predictions: Sequence[PredictionRecord | Mapping[str, Any]] = (),
     prediction_log_path: str | Path = "artifacts/predictions.jsonl",
+    intervention_request: Optional[InterventionRequest] = None,
+    operator_response: Optional[OperatorResponse] = None,
 ) -> tuple[Episode, BeliefState, ProjectionState]:
     """
     Mission-loop helper: materialize prediction updates before decision stages.
     """
+
+    if intervention_request is not None and operator_response is None:
+        pause_episode_for_intervention(ep, intervention_request)
+        if intervention_request.timeout_count > 0:
+            timeout_status = evaluate_intervention_timeout(intervention_request)
+            _append_episode_artifact(
+                ep,
+                {
+                    "artifact_kind": "intervention_event",
+                    "event_type": "timeout_evaluation",
+                    "intervention_id": intervention_request.intervention_id,
+                    "status": timeout_status.value,
+                    "timeout_count": intervention_request.timeout_count,
+                    "max_timeouts_before_escalation": intervention_request.timeout_rule.max_timeouts_before_escalation,
+                    "escalation_target": intervention_request.timeout_rule.escalation_target,
+                },
+            )
+        append_turn_summary(ep)
+        return ep, belief, projection_state
+
+    if operator_response is not None:
+        resume_episode_with_operator_input(ep, operator_response)
+        if operator_response.response_type == InterventionResponseType.OVERRIDE:
+            _append_episode_artifact(
+                ep,
+                {
+                    "artifact_kind": "intervention_event",
+                    "event_type": "override_applied",
+                    "intervention_id": operator_response.intervention_id,
+                    "status": InterventionStatus.RESUMED.value,
+                    "override_payload": _to_dict(operator_response.override_payload),
+                    "override_provenance": _to_dict(operator_response.override_provenance),
+                },
+            )
+
     updated_projection = projection_state
 
     turn_prediction = _emit_turn_prediction(ep)

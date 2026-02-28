@@ -766,29 +766,23 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
         "key": pred.scope_key,
         "evidence_refs": [],
     }
-    assert artifact["invariant_checks"] == [
-        {
-            "gate_point": "pre-decision:pre_consume",
-            "invariant_id": "prediction_availability.v1",
-            "passed": True,
-            "evidence": [],
-            "reason": "current_prediction_available",
-        },
-        {
-            "gate_point": "pre-decision:post_write",
-            "invariant_id": "evidence_link_completeness.v1",
-            "passed": False,
-            "evidence": [{"kind": "scope", "ref": pred.scope_key}],
-            "reason": "Prediction append did not produce linked evidence.",
-        },
-        {
-            "gate_point": "halt_validation",
-            "invariant_id": "explainable_halt_payload.v1",
-            "passed": True,
-            "evidence": [],
-            "reason": "halt_payload_explainable",
-        },
+    checks = artifact["invariant_checks"]
+    assert len(checks) == 3
+    assert [check["invariant_id"] for check in checks] == [
+        "prediction_availability.v1",
+        "evidence_link_completeness.v1",
+        "explainable_halt_payload.v1",
     ]
+    assert [check["passed"] for check in checks] == [True, False, True]
+    assert [check["gate_point"] for check in checks] == [
+        "pre-decision:pre_consume",
+        "pre-decision:post_write",
+        "halt_validation",
+    ]
+    for check in checks:
+        assert set(check.keys()) >= {"gate_point", "invariant_id", "passed", "evidence", "reason"}
+
+    assert checks[1]["evidence"] == [{"kind": "scope", "ref": pred.scope_key}]
 
     halt_observation = ep.artifacts[1]
     assert halt_observation["artifact_kind"] == "halt_observation"

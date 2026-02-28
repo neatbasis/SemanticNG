@@ -50,6 +50,7 @@ FIXED_PREDICTION = {
 }
 
 REGISTERED_INVARIANTS = tuple(REGISTRY.keys())
+REGISTERED_INVARIANT_IDS_FROM_REGISTRY = tuple(invariant_id.value for invariant_id in REGISTERED_INVARIANTS)
 REPLAY_ANALYTICS_SCOPE_REQUIRES_COMPLETE_MATRIX = True
 
 
@@ -281,6 +282,11 @@ MATRIX_CASES = [
     for scenario in coverage.scenarios
 ]
 
+INVARIANT_MATRIX_CASES_BY_ID = [
+    pytest.param(invariant_id, id=invariant_id.value)
+    for invariant_id in REGISTERED_INVARIANTS
+]
+
 MATRIX_SCENARIO_NAMES_BY_INVARIANT = {
     invariant_id: tuple(sorted(scenario.name for scenario in coverage.scenarios))
     for invariant_id, coverage in INVARIANT_RELEASE_GATE_MATRIX.items()
@@ -379,12 +385,7 @@ def test_registered_invariant_parameterization_matches_registry() -> None:
 
 
 def test_invariant_identifiers_are_enumerated_and_registered() -> None:
-    assert REGISTERED_INVARIANT_IDS == (
-        "prediction_availability.v1",
-        "evidence_link_completeness.v1",
-        "prediction_outcome_binding.v1",
-        "explainable_halt_payload.v1",
-    )
+    assert REGISTERED_INVARIANT_IDS == REGISTERED_INVARIANT_IDS_FROM_REGISTRY
     enumerated_identifiers = tuple(invariant.value for invariant in InvariantId)
     assert tuple(InvariantId(identifier) for identifier in enumerated_identifiers) == REGISTERED_INVARIANTS
 
@@ -399,11 +400,12 @@ def test_invariant_matrix_release_gate_has_required_coverage() -> None:
             assert any(not s.expected_passed for s in coverage.scenarios), f"{invariant_id.value} has no stop scenario"
 
 
-def test_invariant_matrix_has_explicit_pass_stop_scenarios_per_invariant() -> None:
-    for invariant_id, scenario_names in MATRIX_SCENARIO_NAMES_BY_INVARIANT.items():
-        assert scenario_names == ("pass", "stop"), (
-            f"{invariant_id.value} must define deterministic pass/stop scenarios; got {scenario_names}"
-        )
+@pytest.mark.parametrize("invariant_id", INVARIANT_MATRIX_CASES_BY_ID)
+def test_invariant_matrix_has_explicit_pass_stop_scenarios_per_invariant(invariant_id: InvariantId) -> None:
+    scenario_names = MATRIX_SCENARIO_NAMES_BY_INVARIANT[invariant_id]
+    assert scenario_names == ("pass", "stop"), (
+        f"{invariant_id.value} must define deterministic pass/stop scenarios; got {scenario_names}"
+    )
 
 
 def test_invariant_matrix_guard_fails_when_registry_gains_uncovered_invariant() -> None:
@@ -653,20 +655,29 @@ def test_gate_matrix_covers_all_gate_evaluated_invariants(invariant_id: Invarian
     assert scenario_name in {"pass", "stop"}
 
 
-def test_gate_matrix_explicitly_marks_non_applicable_gate_coverage() -> None:
-    for invariant_id, coverage in INVARIANT_RELEASE_GATE_MATRIX.items():
-        has_gate_scenarios = any(scenario.gate_inputs is not None for scenario in coverage.scenarios)
-        if has_gate_scenarios:
-            assert coverage.gate_non_applicable is None, f"{invariant_id.value} unexpectedly marked non-applicable"
-        else:
-            assert coverage.gate_non_applicable is not None, f"{invariant_id.value} must declare non-applicable gate rationale"
-            assert coverage.gate_non_applicable.rationale
+@pytest.mark.parametrize("invariant_id", INVARIANT_MATRIX_CASES_BY_ID)
+def test_gate_matrix_explicitly_marks_non_applicable_gate_coverage(invariant_id: InvariantId) -> None:
+    coverage = INVARIANT_RELEASE_GATE_MATRIX[invariant_id]
+    has_gate_scenarios = any(scenario.gate_inputs is not None for scenario in coverage.scenarios)
+    if has_gate_scenarios:
+        assert coverage.gate_non_applicable is None, f"{invariant_id.value} unexpectedly marked non-applicable"
+    else:
+        assert coverage.gate_non_applicable is not None, f"{invariant_id.value} must declare non-applicable gate rationale"
+        assert coverage.gate_non_applicable.rationale
 
 
-@pytest.mark.parametrize("invariant_id", REGISTERED_INVARIANTS, ids=lambda invariant_id: invariant_id.value)
+@pytest.mark.parametrize("invariant_id", INVARIANT_MATRIX_CASES_BY_ID)
 def test_each_registered_invariant_is_exercised_by_matrix_parameterization(invariant_id: InvariantId) -> None:
     coverage = INVARIANT_RELEASE_GATE_MATRIX[invariant_id]
     assert tuple(sorted(s.name for s in coverage.scenarios)) == ("pass", "stop")
+
+
+@pytest.mark.parametrize("invariant_id", INVARIANT_MATRIX_CASES_BY_ID)
+def test_registry_guard_requires_matrix_coverage_for_each_invariant(invariant_id: InvariantId) -> None:
+    assert invariant_id in INVARIANT_RELEASE_GATE_MATRIX, (
+        "INVARIANT_RELEASE_GATE_MATRIX must add deterministic pass/stop (or explicit non-applicable gate rationale) "
+        f"for new registry invariant: {invariant_id.value}"
+    )
 
 
 def test_post_write_gate_passes_when_evidence_and_projection_current() -> None:

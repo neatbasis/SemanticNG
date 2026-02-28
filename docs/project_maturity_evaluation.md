@@ -105,23 +105,14 @@ For each review, execute this update sequence:
 
 ### Review command pack (next-step execution anchors)
 
-- **Done capability command groups**
-  - `pytest tests/test_stable_ids.py tests/test_persistence_jsonl.py tests/test_predictions_contracts_and_gates.py`
-  - `pytest tests/test_contracts_belief_state.py tests/test_contracts_decision_effect_shape.py tests/test_engine_pending_obligation.py tests/test_engine_pending_obligation_minimal.py`
-  - `pytest tests/test_schema_selector.py tests/test_schema_bubbling_option_a.py tests/test_capture_outcome_states.py tests/test_engine_calls_selector_with_generic_error.py`
-  - `pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py`
-  - `pytest tests/test_predictions_contracts_and_gates.py`
+Use generated command packs from `docs/dod_manifest.json` to avoid list drift:
 
-- **Replay/analytics command groups (status-sync candidate)**
-  - `pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py`
-  - `pytest tests/test_replay_projection_analytics.py tests/test_replay_projection_determinism.py tests/test_replay_projection_restart_contracts.py tests/test_prediction_outcome_binding.py`
-  - `pytest tests/replay_projection_analytics/test_append_only_replay.py`
+- PR template-ready checklist block (all capabilities + evidence URL placeholders):
+  - `python .github/scripts/render_transition_evidence.py --emit-pr-template-autogen`
+- Transition-only PR evidence block for the current branch diff:
+  - `python .github/scripts/render_transition_evidence.py --base <base_sha> --head <head_sha>`
 
-- **Planned capability command groups**
-  - `pytest tests/test_observer_frame.py`
-  - `pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py`
-  - `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py`
-  - `pytest tests/test_repair_mode_projection.py tests/test_repair_events_auditability.py`
+Narrative planning in this document should reference those generated outputs rather than copying raw pytest command lists inline.
 
 ## Next milestone checkpoints
 

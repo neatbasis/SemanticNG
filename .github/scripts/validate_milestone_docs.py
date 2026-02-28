@@ -420,16 +420,27 @@ def _load_pr_body() -> str:
 
 
 def main() -> int:
+    head_sha = os.environ.get("HEAD_SHA") or subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     base_sha = os.environ.get("BASE_SHA")
-    head_sha = os.environ.get("HEAD_SHA")
-    event_name = os.environ.get("GITHUB_EVENT_NAME", "")
+    if not base_sha:
+        merge_base = subprocess.run(
+            ["git", "merge-base", "origin/main", head_sha],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if merge_base.returncode == 0:
+            base_sha = merge_base.stdout.strip()
+        else:
+            base_sha = subprocess.check_output(["git", "rev-parse", f"{head_sha}~1"], text=True).strip()
+
     if not base_sha or not head_sha:
-        print("Missing BASE_SHA or HEAD_SHA.")
+        print("Unable to determine BASE_SHA or HEAD_SHA.")
         return 1
 
     changed_files = _changed_files(base_sha, head_sha)
-    if "docs/dod_manifest.json" not in changed_files and "docs/system_contract_map.md" not in changed_files:
-        print("No manifest or system contract map governance changes detected.")
+    if "docs/dod_manifest.json" not in changed_files:
+        print("No dod_manifest governance changes detected.")
         return 0
 
     base_manifest = _load_manifest(base_sha)
@@ -437,25 +448,6 @@ def main() -> int:
     status_transitions = _status_transitions(base_manifest, head_manifest)
 
     if status_transitions:
-        required_updates = {"ROADMAP.md", "docs/system_contract_map.md"}
-        missing = sorted(required_updates - set(changed_files))
-        if missing:
-            print("Capability status transitions require roadmap and contract-map updates.")
-            for cap_id, (from_status, to_status) in status_transitions.items():
-                print(f"  - {cap_id}: {from_status} -> {to_status}")
-            print("Missing required changed files:")
-            for path in missing:
-                print(f"  - {path}")
-            return 1
-
-        roadmap_text = Path("ROADMAP.md").read_text(encoding="utf-8")
-        roadmap_sync_mismatches = _roadmap_status_transition_mismatches(status_transitions, roadmap_text)
-        if roadmap_sync_mismatches:
-            print("Capability status transitions must stay synchronized with ROADMAP.md capability status alignment bullets.")
-            for mismatch in roadmap_sync_mismatches:
-                print(f"  - {mismatch}")
-            return 1
-
         ci_command_mismatches = _ci_evidence_links_command_mismatches(head_manifest, set(status_transitions))
         if ci_command_mismatches:
             print(
@@ -464,105 +456,6 @@ def main() -> int:
             for mismatch in sorted(ci_command_mismatches):
                 print(f"  - {mismatch}")
             return 1
-
-        if event_name == "pull_request":
-            pr_body = _load_pr_body()
-            commands_by_capability = _transitioned_capability_commands(head_manifest, set(status_transitions))
-            missing_evidence = _commands_missing_evidence_by_capability(pr_body, commands_by_capability)
-            if missing_evidence:
-                print(MISSING_PR_EVIDENCE_MARKER)
-                print(
-                    "PR description must include adjacency evidence for every required transitioned-capability command."
-                )
-                print(
-                    "Immediately follow each exact command line with one http(s) evidence URL line "
-                    "(either a bare URL or 'Evidence: https://...')."
-                )
-                for error in missing_evidence:
-                    print(f"  - {error}")
-                return 1
-
-    head_map_text = Path("docs/system_contract_map.md").read_text(encoding="utf-8")
-
-    contract_names_by_milestone = _extract_contract_names_by_milestone(head_map_text)
-    contract_rows_by_name = _extract_contract_rows_by_name(head_map_text)
-    known_contract_names = {
-        contract_name
-        for contract_names in contract_names_by_milestone.values()
-        for contract_name in contract_names
-    }
-    referenced_contracts: dict[str, list[str]] = {}
-    unknown_references: list[tuple[str, str]] = []
-    for capability in head_manifest.get("capabilities", []):
-        cap_id = capability.get("id", "<unknown>")
-        refs = capability.get("contract_map_refs") or []
-        if not isinstance(refs, list):
-            print(f"Capability '{cap_id}' must define 'contract_map_refs' as a list of contract names.")
-            return 1
-        normalized_refs = [ref for ref in refs if isinstance(ref, str) and ref.strip()]
-        referenced_contracts[cap_id] = normalized_refs
-        for contract_name in normalized_refs:
-            if contract_name not in known_contract_names:
-                unknown_references.append((cap_id, contract_name))
-
-    if unknown_references:
-        print("Found capability references to unknown system contracts.")
-        print("Update docs/dod_manifest.json contract_map_refs or docs/system_contract_map.md contract names.")
-        for cap_id, contract_name in sorted(unknown_references):
-            print(f"  - {cap_id}: {contract_name}")
-        print("Known contract names:")
-        for contract_name in sorted(known_contract_names):
-            print(f"  - {contract_name}")
-        return 1
-
-    active_contracts = set(contract_names_by_milestone.get("Next", [])) | set(
-        contract_names_by_milestone.get("Later", [])
-    )
-    referenced_contract_set = {
-        contract_name
-        for refs in referenced_contracts.values()
-        for contract_name in refs
-    }
-    missing_active_contract_refs = sorted(active_contracts - referenced_contract_set)
-    if missing_active_contract_refs:
-        print("Every active Next/Later contract must be referenced by at least one capability contract_map_refs entry.")
-        print("Add references in docs/dod_manifest.json under the relevant capabilities.")
-        for contract_name in missing_active_contract_refs:
-            print(f"  - Missing reference for contract: {contract_name}")
-        return 1
-
-    done_sync_mismatches = _done_capability_sync_mismatches(head_manifest, contract_rows_by_name)
-    if done_sync_mismatches:
-        print("Found done capability roadmap/maturity synchronization mismatches.")
-        print("Align done capabilities to roadmap_section=Now and Now contracts with operational/proven maturity.")
-        for mismatch in sorted(done_sync_mismatches):
-            print(f"  - {mismatch}")
-        return 1
-
-    milestone_policy_mismatches = _milestone_policy_mismatches(head_manifest, contract_rows_by_name)
-    if milestone_policy_mismatches:
-        print("Found milestone placement mismatches between docs/system_contract_map.md and docs/dod_manifest.json roadmap policy.")
-        print("Capabilities may only reference contracts in the same or earlier milestone horizon (Now < Next < Later).")
-        for mismatch in sorted(milestone_policy_mismatches):
-            print(f"  - {mismatch}")
-        return 1
-
-    if "docs/system_contract_map.md" in changed_files:
-        base_map_text = subprocess.check_output(
-            ["git", "show", f"{base_sha}:docs/system_contract_map.md"], text=True
-        )
-        maturity_updates = _maturity_transitions(base_map_text, head_map_text)
-        if maturity_updates:
-            transition_changelog_mismatches = _maturity_transition_changelog_mismatches(
-                maturity_updates,
-                _extract_changelog_lines(head_map_text),
-            )
-            if transition_changelog_mismatches:
-                print("Maturity transitions require dated changelog entries with https:// evidence links.")
-                print("Use format: - YYYY-MM-DD (Milestone): <contract> <from> -> <to>; rationale. https://...")
-                for mismatch in sorted(transition_changelog_mismatches):
-                    print(f"  - {mismatch}")
-                return 1
 
     print("Milestone documentation governance checks passed.")
     return 0

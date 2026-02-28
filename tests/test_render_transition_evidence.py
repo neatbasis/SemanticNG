@@ -68,7 +68,7 @@ def test_render_block_includes_expected_markers_and_evidence_lines() -> None:
     assert "<!-- transition-evidence:end -->" in block
     assert "#### cap_a" in block
     assert "pytest tests/test_alpha.py" in block
-    assert "Evidence: https://example.com/replace-with-evidence/cap_a/1" in block
+    assert "Evidence: https://github.com/<org>/<repo>/actions/runs/<run_id>#capability-cap_a-1" in block
 
 
 def test_render_block_reports_no_transitions_message_when_empty() -> None:

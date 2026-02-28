@@ -104,8 +104,8 @@
     {
       "id": "observer_authorization_contract",
       "title": "Observer authorization contract",
-      "status": "planned",
-      "roadmap_section": "Next",
+      "status": "done",
+      "roadmap_section": "Now",
       "code_paths": [
         "src/state_renormalization/contracts.py",
         "src/state_renormalization/engine.py",

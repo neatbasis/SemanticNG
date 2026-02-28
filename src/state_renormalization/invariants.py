@@ -47,6 +47,12 @@ class CheckerResult:
     code: str = ""
 
 
+@dataclass(frozen=True)
+class InvariantBranchBehavior:
+    continue_behavior: str
+    stop_behavior: Optional[str] = None
+
+
 class CheckContext(Protocol):
     now_iso: str
     scope: str
@@ -243,6 +249,26 @@ REGISTRY: dict[InvariantId, Checker] = {
     InvariantId.EVIDENCE_LINK_COMPLETENESS: check_evidence_link_completeness,
     InvariantId.PREDICTION_OUTCOME_BINDING: check_prediction_outcome_binding,
     InvariantId.EXPLAINABLE_HALT_PAYLOAD: check_explainable_halt_payload,
+}
+
+
+REGISTERED_INVARIANT_BRANCH_BEHAVIORS: dict[InvariantId, InvariantBranchBehavior] = {
+    InvariantId.PREDICTION_AVAILABILITY: InvariantBranchBehavior(
+        continue_behavior="Continue when at least one projected prediction exists and prediction_key resolves if provided.",
+        stop_behavior="Stop when no projected predictions exist or requested prediction_key is absent from projections.",
+    ),
+    InvariantId.EVIDENCE_LINK_COMPLETENESS: InvariantBranchBehavior(
+        continue_behavior="Continue when no prediction was just written (non-applicable) or when append has evidence links and projects current.",
+        stop_behavior="Stop when prediction append log is unavailable, evidence links are missing, or write-before-use projection is violated.",
+    ),
+    InvariantId.PREDICTION_OUTCOME_BINDING: InvariantBranchBehavior(
+        continue_behavior="Continue when no prediction outcome is supplied (non-applicable) or outcome includes prediction_id and numeric error_metric.",
+        stop_behavior="Stop when prediction outcome omits prediction_id or supplies non-numeric error_metric.",
+    ),
+    InvariantId.EXPLAINABLE_HALT_PAYLOAD: InvariantBranchBehavior(
+        continue_behavior="Continue when no halt candidate is present (non-applicable) or STOP candidate includes invariant_id/details/evidence fields.",
+        stop_behavior="Stop when STOP candidate lacks invariant_id/details/evidence explainability fields.",
+    ),
 }
 
 

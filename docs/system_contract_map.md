@@ -21,7 +21,7 @@ Maturity levels:
 
 | Contract name | Source file / class | Invariant IDs | Producing stage | Consuming stage | Test coverage reference | Maturity |
 |---|---|---|---|---|---|---|
-| Halt normalization contract | `src/state_renormalization/contracts.py` (`HaltRecord`) — required explainability fields are mandatory at creation + persistence: `invariant_id`, `details`, `evidence` (plus canonical halt envelope fields) | `explainable_halt_payload.v1` (+ upstream stop invariant that triggered halt) | `evaluate_invariant_gates` stop path | `run_mission_loop` early-return control + halt artifact persistence | `tests/test_predictions_contracts_and_gates.py`, `tests/test_engine_projection_mission_loop.py`, `tests/test_persistence_jsonl.py`, `tests/test_contracts_halt_record.py` | prototype |
+| Halt normalization contract | `src/state_renormalization/contracts.py` (`HaltRecord`) — required explainability fields are mandatory at creation + persistence: `invariant_id`, `details`, `evidence` (plus canonical halt envelope fields) | `explainable_halt_payload.v1` (+ upstream stop invariant that triggered halt) | `evaluate_invariant_gates` stop path | `run_mission_loop` early-return control + halt artifact persistence | `tests/test_predictions_contracts_and_gates.py`, `tests/test_engine_projection_mission_loop.py`, `tests/test_persistence_jsonl.py`, `tests/test_contracts_halt_record.py` | operational |
 | Observer authorization contract | `src/state_renormalization/contracts.py` (`ObserverFrame`) | `authorization.scope.v1` (engine-issued authorization gate), optional restriction of `prediction_availability.v1`/`evidence_link_completeness.v1` | `build_episode` (default or provided observer) | `evaluate_invariant_gates` authorization and invariant allowlist enforcement | `tests/test_observer_frame.py` | prototype |
 
 ## Milestone: Later
@@ -36,3 +36,7 @@ Maturity levels:
 2. Promote `prototype` → `operational` once default-path runtime + gate behavior are covered in CI.
 3. Promote `operational` → `proven` once replay and halt/audit paths are repeatedly validated across milestone regressions.
 4. Keep a short changelog entry in this file when a maturity value changes (date + milestone + rationale).
+
+### Changelog
+
+- 2026-02-28 (Next): Promoted **Halt normalization contract** from `prototype` to `operational` after deterministic invariant matrix coverage added for all registered invariants, including explicit non-applicable gate markers and registry guard tests.

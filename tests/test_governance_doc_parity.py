@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-
+from typing import TypedDict, cast
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "docs" / "dod_manifest.json"
@@ -16,9 +16,18 @@ VALID_STATUSES = {"done", "in_progress", "planned"}
 ALLOWED_DONE_MILESTONES = {"Now"}
 ALLOWED_DONE_MATURITY = {"operational", "proven"}
 
+class CapabilityRecord(TypedDict, total=False):
+    id: str
+    status: str
+    contract_map_refs: list[str]
 
-def _load_manifest() -> dict:
-    return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+
+class ManifestDocument(TypedDict, total=False):
+    capabilities: list[CapabilityRecord]
+
+
+def _load_manifest() -> ManifestDocument:
+    return cast(ManifestDocument, json.loads(MANIFEST_PATH.read_text(encoding="utf-8")))
 
 
 def _load_manifest_status_map() -> dict[str, str]:

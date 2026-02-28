@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
-
+from typing import Any, cast
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / ".github" / "scripts" / "validate_sprint_handoff.py"
@@ -16,6 +16,15 @@ validate_sprint_handoff = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(validate_sprint_handoff)
 
 
+def _load_manifest_capability_ids() -> set[str]:
+    manifest = cast(dict[str, Any], json.loads(MANIFEST_PATH.read_text(encoding="utf-8")))
+    capability_ids: set[str] = set()
+    for cap in manifest.get("capabilities", []):
+        if isinstance(cap, dict) and isinstance(cap.get("id"), str):
+            capability_ids.add(cap["id"])
+    return capability_ids
+
+
 def test_handoff_contains_required_sections() -> None:
     text = HANDOFF_PATH.read_text(encoding="utf-8")
 
@@ -24,11 +33,7 @@ def test_handoff_contains_required_sections() -> None:
 
 
 def test_handoff_preload_capability_ids_exist_in_manifest() -> None:
-    capability_ids = {
-        cap["id"]
-        for cap in json.loads(MANIFEST_PATH.read_text(encoding="utf-8")).get("capabilities", [])
-        if isinstance(cap, dict) and isinstance(cap.get("id"), str)
-    }
+    capability_ids = _load_manifest_capability_ids()
 
     mismatches = validate_sprint_handoff._validate_handoff_file(HANDOFF_PATH, capability_ids)
     assert mismatches == []

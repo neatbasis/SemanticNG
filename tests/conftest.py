@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TypedDict
 
 import pytest
+from typing_extensions import Unpack
 
 from state_renormalization.contracts import (
+    Ambiguity,
     AskMetrics,
     AskResult,
     AskStatus,
@@ -15,6 +18,7 @@ from state_renormalization.contracts import (
     Observation,
     ObservationType,
     ObserverFrame,
+    SchemaHit,
     SchemaSelection,
     VerbosityDecision,
     VerbosityLevel,
@@ -157,7 +161,12 @@ def make_observation() -> Callable[..., Observation]:
 
 @pytest.fixture
 def make_schema_selection() -> Callable[..., SchemaSelection]:
-    def _make_schema_selection(**kwargs) -> SchemaSelection:
+    class _SchemaSelectionKwargs(TypedDict, total=False):
+        schemas: list[SchemaHit]
+        ambiguities: list[Ambiguity]
+        notes: str | None
+
+    def _make_schema_selection(**kwargs: Unpack[_SchemaSelectionKwargs]) -> SchemaSelection:
         return SchemaSelection(**kwargs)
 
     return _make_schema_selection

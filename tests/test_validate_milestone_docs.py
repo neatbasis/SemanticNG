@@ -210,3 +210,49 @@ def test_commands_missing_evidence_by_capability_reports_capability_id() -> None
     assert len(mismatches) == 1
     assert mismatches[0].startswith("cap_b:")
     assert "pytest tests/test_beta.py" in mismatches[0]
+
+
+def test_contract_map_transition_mismatches_requires_existing_contract_row() -> None:
+    manifest = {
+        "capabilities": [
+            {
+                "id": "cap_done",
+                "status": "done",
+                "contract_map_refs": ["Missing Contract"],
+            }
+        ]
+    }
+
+    mismatches = validate_milestone_docs._contract_map_transition_mismatches(
+        manifest,
+        {"cap_done"},
+        {},
+    )
+
+    assert len(mismatches) == 1
+    assert "Missing Contract" in mismatches[0]
+
+
+def test_contract_map_transition_mismatches_requires_done_contract_rows_now_and_operational() -> None:
+    manifest = {
+        "capabilities": [
+            {
+                "id": "cap_done",
+                "status": "done",
+                "contract_map_refs": ["Contract Future", "Contract Prototype"],
+            }
+        ]
+    }
+    rows = {
+        "Contract Future": {"milestone": "Next", "maturity": "operational"},
+        "Contract Prototype": {"milestone": "Now", "maturity": "prototype"},
+    }
+
+    mismatches = validate_milestone_docs._contract_map_transition_mismatches(
+        manifest,
+        {"cap_done"},
+        rows,
+    )
+
+    assert any("Milestone: Now" in mismatch for mismatch in mismatches)
+    assert any("operational/proven" in mismatch for mismatch in mismatches)

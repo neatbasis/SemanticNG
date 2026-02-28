@@ -353,6 +353,45 @@ def _ci_evidence_links_command_mismatches(head_manifest: dict, transitioned_cap_
     return mismatches
 
 
+def _contract_map_transition_mismatches(
+    head_manifest: dict,
+    transitioned_cap_ids: set[str],
+    contract_rows_by_name: dict[str, dict[str, str]],
+) -> list[str]:
+    mismatches: list[str] = []
+    for capability in head_manifest.get("capabilities", []):
+        cap_id = capability.get("id", "<unknown>")
+        if cap_id not in transitioned_cap_ids:
+            continue
+
+        to_status = capability.get("status")
+        contract_refs = capability.get("contract_map_refs", [])
+        for contract_name in contract_refs:
+            row = contract_rows_by_name.get(contract_name)
+            if row is None:
+                mismatches.append(
+                    f"{cap_id}: transitioned to status '{to_status}' but contract_map_refs entry '{contract_name}' "
+                    "is missing from docs/system_contract_map.md."
+                )
+                continue
+
+            milestone = row["milestone"]
+            maturity = row["maturity"]
+            if to_status == "done" and milestone != "Now":
+                mismatches.append(
+                    f"{cap_id} -> {contract_name}: transitioned to status 'done' but mapped contract row must be in "
+                    f"Milestone: Now (found '{milestone}')."
+                )
+
+            if to_status == "done" and maturity in {"prototype", "in_progress"}:
+                mismatches.append(
+                    f"{cap_id} -> {contract_name}: transitioned to status 'done' but mapped contract row must use "
+                    f"operational/proven maturity (found '{maturity}')."
+                )
+
+    return mismatches
+
+
 def _commands_missing_evidence(pr_body: str, commands: list[str]) -> list[str]:
     lines = pr_body.splitlines()
     invalid: list[str] = []
@@ -448,6 +487,25 @@ def main() -> int:
     status_transitions = _status_transitions(base_manifest, head_manifest)
 
     if status_transitions:
+        roadmap_text = Path("ROADMAP.md").read_text(encoding="utf-8")
+        roadmap_mismatches = _roadmap_status_transition_mismatches(status_transitions, roadmap_text)
+        if roadmap_mismatches:
+            print("Capability status transitions must be mirrored in ROADMAP.md status alignment.")
+            for mismatch in roadmap_mismatches:
+                print(f"  - {mismatch}")
+            return 1
+
+        contract_map_text = Path("docs/system_contract_map.md").read_text(encoding="utf-8")
+        contract_rows = _extract_contract_rows_by_name(contract_map_text)
+        contract_map_mismatches = _contract_map_transition_mismatches(
+            head_manifest, set(status_transitions), contract_rows
+        )
+        if contract_map_mismatches:
+            print("Capability status transitions must be mirrored in docs/system_contract_map.md contract rows.")
+            for mismatch in contract_map_mismatches:
+                print(f"  - {mismatch}")
+            return 1
+
         ci_command_mismatches = _ci_evidence_links_command_mismatches(head_manifest, set(status_transitions))
         if ci_command_mismatches:
             print(

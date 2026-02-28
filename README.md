@@ -75,6 +75,26 @@ PRs that change capability status in `docs/dod_manifest.json` or contract maturi
 CI enforces these milestone rules for PRs and merge queues that touch `src/state_renormalization/`, `docs/dod_manifest.json`, or the milestone gate workflow. Other docs can be generated from the manifest as needed.
 
 
+### Promotion workflow checklist
+
+When promoting a capability status (for example `planned` -> `in_progress` or `in_progress` -> `done`), complete this checklist in the same PR:
+
+- [ ] Update `docs/dod_manifest.json` status + capability metadata.
+- [ ] Update the `ROADMAP.md` **Capability status alignment** section to mirror the transition.
+- [ ] Update `docs/system_contract_map.md` relevant contract milestone/maturity rows and add/update the changelog entry if maturity changed.
+- [ ] Regenerate PR template autogen content (`python .github/scripts/render_transition_evidence.py --regenerate-pr-template`).
+- [ ] Paste a transition evidence block with real CI URLs (no placeholders), including command/evidence pairs for transitioned capabilities.
+
+### Local one-step promotion checks
+
+Run all promotion governance checks before pushing:
+
+```bash
+make promotion-checks
+```
+
+This command validates milestone-doc transition sync and enforces PR-template generated-content cleanliness.
+
 ### Pre-submit milestone docs check (local)
 
 Before pushing a PR that changes milestone docs or status transitions, run:
@@ -83,7 +103,7 @@ Before pushing a PR that changes milestone docs or status transitions, run:
 python .github/scripts/validate_milestone_docs.py
 ```
 
-Set required environment variables first:
+Optional: set explicit environment variables to emulate CI PR context:
 
 ```bash
 export BASE_SHA=<base_commit_sha>

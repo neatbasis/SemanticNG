@@ -11,6 +11,16 @@ on:
       - '.github/scripts/validate_milestone_docs.py'
       - '.github/scripts/capability_parity_report.py'
       - '.github/workflows/state-renorm-milestone-gate.yml'
+  pull_request_target:
+    paths:
+      - 'src/state_renormalization/**'
+      - 'docs/dod_manifest.json'
+      - 'docs/system_contract_map.md'
+      - 'ROADMAP.md'
+      - '.github/pull_request_template.md'
+      - '.github/scripts/validate_milestone_docs.py'
+      - '.github/scripts/capability_parity_report.py'
+      - '.github/workflows/state-renorm-milestone-gate.yml'
   merge_group:
     paths:
       - 'src/state_renormalization/**'
@@ -25,6 +35,9 @@ on:
 jobs:
   milestone-pytest:
     runs-on: self-hosted
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -41,13 +54,79 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[test]"
 
+      - name: Compute diff SHAs
+        id: shas
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          base_sha="${PR_BASE_SHA:-${MERGE_GROUP_BASE_SHA:-}}"
+          head_sha="${PR_HEAD_SHA:-${MERGE_GROUP_HEAD_SHA:-}}"
+
+          if [[ -z "$base_sha" || -z "$head_sha" ]]; then
+            echo "Unable to determine BASE_SHA/HEAD_SHA from event context."
+            exit 1
+          fi
+
+          echo "BASE_SHA=$base_sha" >> "$GITHUB_ENV"
+          echo "HEAD_SHA=$head_sha" >> "$GITHUB_ENV"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Render transition evidence block
+        run: |
+          mkdir -p artifacts
+          python .github/scripts/render_transition_evidence.py \
+            --base "$BASE_SHA" \
+            --head "$HEAD_SHA" | tee artifacts/transition_evidence_block.md
+
+      - name: Add transition evidence block to job summary
+        run: |
+          {
+            echo "## Transition Evidence Block"
+            echo
+            cat artifacts/transition_evidence_block.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload transition evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: transition-evidence-block
+          path: artifacts/transition_evidence_block.md
+          if-no-files-found: error
+
       - name: Validate milestone documentation governance
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
-        run: python .github/scripts/validate_milestone_docs.py
+        run: |
+          set -o pipefail
+          python .github/scripts/validate_milestone_docs.py || {
+            echo
+            echo "Copy this exact block into PR description"
+            cat artifacts/transition_evidence_block.md
+            exit 1
+          }
+
+      - name: Comment transition evidence block on PR when validation fails
+        if: ${{ failure() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "### Transition Evidence Block"
+            echo
+            echo "Validation failed due to missing transition evidence."
+            echo "Copy this exact block into the PR description:"
+            echo
+            cat artifacts/transition_evidence_block.md
+          } > artifacts/transition_evidence_comment.md
+
+          gh pr comment "$PR_NUMBER" --body-file artifacts/transition_evidence_comment.md
 
       - name: Generate capability parity report
         run: python .github/scripts/capability_parity_report.py
@@ -60,9 +139,6 @@ jobs:
           if-no-files-found: error
 
       - name: Run milestone pytest commands for relevant changes
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
         run: |
           python - <<'PY'
           import json

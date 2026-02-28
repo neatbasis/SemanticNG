@@ -63,14 +63,29 @@ class InvariantBranchBehavior:
 
 
 class CheckContext(Protocol):
-    now_iso: str
-    scope: str
-    prediction_key: Optional[str]
-    current_predictions: Mapping[str, Any]
-    prediction_log_available: bool
-    just_written_prediction: Optional[Mapping[str, Any]]
-    halt_candidate: Optional[InvariantOutcome]
-    prediction_outcome: Optional[Mapping[str, Any]]
+    @property
+    def now_iso(self) -> str: ...
+
+    @property
+    def scope(self) -> str: ...
+
+    @property
+    def prediction_key(self) -> Optional[str]: ...
+
+    @property
+    def current_predictions(self) -> Mapping[str, Any]: ...
+
+    @property
+    def prediction_log_available(self) -> bool: ...
+
+    @property
+    def just_written_prediction(self) -> Optional[Mapping[str, Any]]: ...
+
+    @property
+    def halt_candidate(self) -> Optional[InvariantOutcome]: ...
+
+    @property
+    def prediction_outcome(self) -> Optional[Mapping[str, Any]]: ...
 
 
 @dataclass(frozen=True)

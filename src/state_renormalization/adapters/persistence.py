@@ -23,7 +23,7 @@ def _to_jsonable(x: Any) -> Any:
         return None
     if isinstance(x, BaseModel):
         return x.model_dump(mode="json")
-    if is_dataclass(x):
+    if is_dataclass(x) and not isinstance(x, type):
         return asdict(x)
     if isinstance(x, dict):
         return {str(k): _to_jsonable(v) for k, v in x.items()}

@@ -516,9 +516,8 @@ class HaltRecord(BaseModel):
     retryability: bool = Field(validation_alias=AliasChoices("retryability", "retryable"))
     timestamp: str = Field(min_length=1, validation_alias=AliasChoices("timestamp", "timestamp_iso"))
 
-    @model_validator(mode="before")
-    @classmethod
-    def _validate_alias_consistency(cls, data: Any) -> Any:
+    @staticmethod
+    def _enforce_alias_consistency(data: Any) -> Any:
         if not isinstance(data, dict):
             return data
 
@@ -533,6 +532,11 @@ class HaltRecord(BaseModel):
             if canonical in data and alias in data and data[canonical] != data[alias]:
                 raise ValueError(f"halt payload field mismatch: {canonical} != {alias}")
         return data
+
+    @model_validator(mode="before")
+    @classmethod
+    def _validate_alias_consistency(cls, data: Any) -> Any:
+        return cls._enforce_alias_consistency(data)
 
     @classmethod
     def required_payload_fields(cls) -> tuple[str, ...]:
@@ -587,7 +591,7 @@ class HaltRecord(BaseModel):
     def from_payload(cls, payload: Mapping[str, Any]) -> "HaltRecord":
         raw = dict(payload)
         try:
-            cls._validate_alias_consistency(raw)
+            cls._enforce_alias_consistency(raw)
         except ValueError as exc:
             raise HaltPayloadValidationError(str(exc)) from exc
         canonical_candidate = {

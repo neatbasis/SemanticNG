@@ -197,31 +197,10 @@ def append_halt(path: PathLike, record: Any) -> JsonObj:
     if isinstance(record, HaltRecord):
         payload = record.to_persistence_dict()
     elif isinstance(record, dict):
-        halt_fields = {
-            "halt_id",
-            "stable_halt_id",
-            "stage",
-            "invariant_id",
-            "violated_invariant_id",
-            "reason",
-            "evidence",
-            "evidence_refs",
-            "retryability",
-            "retryable",
-            "timestamp",
-            "timestamp_iso",
-        }
-        passthrough = {k: v for k, v in record.items() if k not in halt_fields}
-        canonical_candidate = {
-            "halt_id": record.get("halt_id", record.get("stable_halt_id")),
-            "stage": record.get("stage"),
-            "invariant_id": record.get("invariant_id", record.get("violated_invariant_id")),
-            "reason": record.get("reason"),
-            "evidence": record.get("evidence", record.get("evidence_refs", [])),
-            "retryability": record.get("retryability", record.get("retryable")),
-            "timestamp": record.get("timestamp", record.get("timestamp_iso")),
-        }
-        payload = {**passthrough, **HaltRecord.model_validate(canonical_candidate).to_persistence_dict()}
+        normalized = HaltRecord.from_payload(record).to_persistence_dict()
+        payload = {**normalized, **record}
+        for key, value in normalized.items():
+            payload.setdefault(key, value)
 
     append_jsonl(p, payload)
     return {"kind": "jsonl", "ref": f"{p.name}@{next_offset}"}

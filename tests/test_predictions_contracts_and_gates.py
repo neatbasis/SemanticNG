@@ -120,6 +120,11 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
     assert artifact["artifact_kind"] == "invariant_outcomes"
     assert artifact["kind"] == "halt"
     assert artifact["halt"]["halt_id"].startswith("halt:")
+    assert artifact["halt"]["stable_halt_id"] == artifact["halt"]["halt_id"]
+    assert artifact["halt"]["violated_invariant_id"] == artifact["halt"]["invariant_id"]
+    assert artifact["halt"]["evidence_refs"] == artifact["halt"]["evidence"]
+    assert artifact["halt"]["retryable"] == artifact["halt"]["retryability"]
+    assert artifact["halt"]["timestamp_iso"] == artifact["halt"]["timestamp"]
     assert artifact["halt_evidence_ref"] == {"kind": "jsonl", "ref": "halts.jsonl@1"}
     assert artifact["invariant_context"]["prediction_log_available"] is True
     assert artifact["invariant_context"]["has_current_predictions"] is True
@@ -155,6 +160,10 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
     assert halt_observation["artifact_kind"] == "halt_observation"
     assert halt_observation["observation_type"] == "halt"
     assert halt_observation["halt_id"].startswith("halt:")
+    assert halt_observation["stable_halt_id"] == halt_observation["halt_id"]
+    assert halt_observation["violated_invariant_id"] == halt_observation["invariant_id"]
+    assert halt_observation["retryable"] == halt_observation["retryability"]
+    assert halt_observation["timestamp_iso"] == halt_observation["timestamp"]
     assert halt_observation["invariant_id"] == "evidence_link_completeness.v1"
 
 

@@ -219,6 +219,18 @@ def test_evaluate_invariant_gates_blocks_unauthorized_observer(make_episode, mak
     issue = next(a for a in ep.artifacts if a.get("artifact_kind") == "authorization_issue")
     assert issue["issue_type"] == "authorization_scope_violation"
     assert issue["authorization_context"]["action"] == "evaluate_invariant_gates"
+    assert issue["stable_halt_id"] == issue["halt_id"]
+    assert issue["violated_invariant_id"] == issue["invariant_id"]
+    assert issue["evidence_refs"] == issue["evidence"]
+    assert issue["retryable"] == issue["retryability"]
+    assert issue["timestamp_iso"] == issue["timestamp"]
+
+    halt_observation = next(a for a in ep.artifacts if a.get("artifact_kind") == "halt_observation")
+    assert halt_observation["stable_halt_id"] == halt_observation["halt_id"]
+    assert halt_observation["violated_invariant_id"] == halt_observation["invariant_id"]
+    assert halt_observation["evidence_refs"] == halt_observation["evidence"]
+    assert halt_observation["retryable"] == halt_observation["retryability"]
+    assert halt_observation["timestamp_iso"] == halt_observation["timestamp"]
 
 
 def test_policy_functions_block_unauthorized_actions(make_episode, make_ask_result, make_observer) -> None:

@@ -1,6 +1,10 @@
 {
   "version": 1,
-  "statuses": ["done", "in_progress", "planned"],
+  "statuses": [
+    "done",
+    "in_progress",
+    "planned"
+  ],
   "capabilities": [
     {
       "id": "prediction_persistence_baseline",
@@ -46,7 +50,7 @@
     {
       "id": "gate_halt_unification",
       "title": "Unified gate pipeline and halt persistence",
-      "status": "in_progress",
+      "status": "done",
       "roadmap_section": "Next",
       "code_paths": [
         "src/state_renormalization/contracts.py",

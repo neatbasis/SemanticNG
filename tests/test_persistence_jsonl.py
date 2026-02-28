@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from state_renormalization.adapters.persistence import append_halt, append_jsonl, read_jsonl
+from state_renormalization.contracts import HaltRecord
 from state_renormalization.engine import to_jsonable_episode
 
 
@@ -26,10 +27,29 @@ def test_append_and_read_jsonl_roundtrip(tmp_path: Path) -> None:
 def test_append_halt_jsonl_roundtrip_and_evidence_ref_format(tmp_path: Path) -> None:
     p = tmp_path / "halts.jsonl"
 
-    ref = append_halt(p, {"halt_id": "halt:1", "stage": "post_write", "reason": "x"})
+    halt = HaltRecord(
+        halt_id="halt:1",
+        stage="post_write",
+        invariant_id="evidence_link_completeness.v1",
+        reason="x",
+        evidence=[{"kind": "scope", "ref": "scope:test"}],
+        retryability=True,
+        timestamp="2026-02-13T00:00:00+00:00",
+    )
+
+    ref = append_halt(p, halt)
 
     (meta, rec), = list(read_jsonl(p))
     assert rec["halt_id"] == "halt:1"
+    assert rec["stable_halt_id"] == "halt:1"
+    assert rec["invariant_id"] == "evidence_link_completeness.v1"
+    assert rec["violated_invariant_id"] == "evidence_link_completeness.v1"
+    assert rec["evidence"] == [{"kind": "scope", "ref": "scope:test"}]
+    assert rec["evidence_refs"] == [{"kind": "scope", "ref": "scope:test"}]
+    assert rec["retryability"] is True
+    assert rec["retryable"] is True
+    assert rec["timestamp"] == "2026-02-13T00:00:00+00:00"
+    assert rec["timestamp_iso"] == "2026-02-13T00:00:00+00:00"
     assert rec["stage"] == "post_write"
     assert meta["lineno"] == 1
     assert ref == {"kind": "jsonl", "ref": "halts.jsonl@1"}

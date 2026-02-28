@@ -6,6 +6,8 @@ from dataclasses import is_dataclass, asdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, Tuple, Union
 
+from state_renormalization.contracts import HaltRecord
+
 from pydantic import BaseModel
 
 
@@ -191,5 +193,35 @@ def append_halt(path: PathLike, record: Any) -> JsonObj:
     if p.exists():
         next_offset = len(p.read_text(encoding="utf-8").splitlines()) + 1
 
-    append_jsonl(p, record)
+    payload = record
+    if isinstance(record, HaltRecord):
+        payload = record.to_persistence_dict()
+    elif isinstance(record, dict):
+        halt_fields = {
+            "halt_id",
+            "stable_halt_id",
+            "stage",
+            "invariant_id",
+            "violated_invariant_id",
+            "reason",
+            "evidence",
+            "evidence_refs",
+            "retryability",
+            "retryable",
+            "timestamp",
+            "timestamp_iso",
+        }
+        passthrough = {k: v for k, v in record.items() if k not in halt_fields}
+        canonical_candidate = {
+            "halt_id": record.get("halt_id", record.get("stable_halt_id")),
+            "stage": record.get("stage"),
+            "invariant_id": record.get("invariant_id", record.get("violated_invariant_id")),
+            "reason": record.get("reason"),
+            "evidence": record.get("evidence", record.get("evidence_refs", [])),
+            "retryability": record.get("retryability", record.get("retryable")),
+            "timestamp": record.get("timestamp", record.get("timestamp_iso")),
+        }
+        payload = {**passthrough, **HaltRecord.model_validate(canonical_candidate).to_persistence_dict()}
+
+    append_jsonl(p, payload)
     return {"kind": "jsonl", "ref": f"{p.name}@{next_offset}"}

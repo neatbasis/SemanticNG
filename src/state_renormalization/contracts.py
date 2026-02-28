@@ -352,6 +352,17 @@ class HaltRecord(BaseModel):
     def timestamp_iso(self) -> str:
         return self.timestamp
 
+    def to_persistence_dict(self) -> Dict[str, Any]:
+        payload = self.model_dump(mode="json")
+        return {
+            **payload,
+            "stable_halt_id": payload["halt_id"],
+            "violated_invariant_id": payload["invariant_id"],
+            "evidence_refs": payload["evidence"],
+            "retryable": payload["retryability"],
+            "timestamp_iso": payload["timestamp"],
+        }
+
 
 class PredictionRecord(BaseModel):
     model_config = _CONTRACT_CONFIG

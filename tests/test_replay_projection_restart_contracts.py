@@ -144,3 +144,32 @@ def test_replay_does_not_mutate_halt_explainability_fields(
     for payload in halt_payloads:
         canonical = HaltRecord.from_payload(payload).to_canonical_payload()
         assert required.issubset(canonical)
+
+
+def test_restart_branch_replay_remains_deterministic_with_mixed_lineage_noise(tmp_path: Path) -> None:
+    seed_log = tmp_path / "seed.jsonl"
+    seed_log.write_text(
+        "\n".join(
+            [
+                '{"event_kind":"prediction_record","prediction_id":"pred:1","scope_key":"turn:1","filtration_id":"conversation:c1","target_variable":"user_response_present","target_horizon_iso":"2026-02-13T00:00:00+00:00","issued_at_iso":"2026-02-13T00:00:00+00:00"}',
+                '{"halt_id":"halt:1","stage":"pre-decision","invariant_id":"prediction_availability.v1","reason":"missing","details":{"scope":"turn:1"},"evidence":[{"kind":"jsonl","ref":"predictions.jsonl@1"}],"retryability":true,"timestamp":"2026-02-13T00:00:01+00:00"}',
+                '{"event_kind":"prediction_record",',
+                '[]',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    branch_a = tmp_path / "branch-a.jsonl"
+    branch_b = tmp_path / "branch-b.jsonl"
+    payload = seed_log.read_text(encoding="utf-8")
+    branch_a.write_text(payload, encoding="utf-8")
+    branch_b.write_text(payload, encoding="utf-8")
+
+    replay_a = replay_projection_analytics(branch_a)
+    replay_b = replay_projection_analytics(branch_b)
+
+    assert replay_a.model_dump(mode="json") == replay_b.model_dump(mode="json")
+    assert replay_a.records_processed == 1
+    assert replay_a.analytics_snapshot.halt_count == 1

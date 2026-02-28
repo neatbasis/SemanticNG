@@ -233,3 +233,30 @@ def test_derive_projection_analytics_from_lineage_ignores_non_lineage_rows() -> 
     assert analytics.correction_cost_total == 0.0
     assert analytics.halt_count == 0
     assert analytics.correction_cost_attribution == {}
+
+
+def test_replay_projection_analytics_uses_lineage_iterator_and_ignores_runtime_only_rows(tmp_path: Path) -> None:
+    log_path = tmp_path / "lineage.jsonl"
+    append_jsonl(
+        log_path,
+        {
+            "event_kind": "prediction_record",
+            "prediction_id": "pred:a",
+            "scope_key": "turn:1",
+            "filtration_id": "conversation:c1",
+            "target_variable": "user_response_present",
+            "target_horizon_iso": "2026-02-13T00:00:00+00:00",
+            "issued_at_iso": "2026-02-13T00:00:00+00:00",
+            "was_corrected": True,
+            "absolute_error": 0.2,
+            "correction_root_prediction_id": "pred:a",
+            "runtime_cache": {"not": "persisted-analytics-input"},
+        },
+    )
+    append_jsonl(log_path, {"event_kind": "debug_runtime_state", "value": 99})
+
+    replay = replay_projection_analytics(log_path)
+
+    assert replay.records_processed == 1
+    assert replay.analytics_snapshot.correction_count == 1
+    assert replay.analytics_snapshot.correction_cost_total == 0.2

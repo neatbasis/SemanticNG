@@ -294,7 +294,12 @@ class InvariantAuditResult(BaseModel):
     invariant_id: str
     passed: bool
     reason: str = ""
+    flow: str = "continue"
+    validity: str = "valid"
+    code: str = ""
     evidence: List[Dict[str, Any]] = Field(default_factory=list)
+    details: Dict[str, Any] = Field(default_factory=dict)
+    action_hints: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class GateInvariantOutcomeBundle(BaseModel):
@@ -315,6 +320,29 @@ class InterventionAction(str, Enum):
     PAUSE = "pause"
     RESUME = "resume"
     TIMEOUT = "timeout"
+    ESCALATE = "escalate"
+
+
+class InterventionOverrideSource(str, Enum):
+    OPERATOR = "operator"
+    POLICY = "policy"
+    SYSTEM = "system"
+
+
+class InterventionRequest(BaseModel):
+    """Engine-emitted lifecycle request for HITL processing."""
+
+    model_config = _CONTRACT_CONFIG
+
+    request_id: str
+    phase: str
+    episode_id: str
+    conversation_id: str
+    turn_index: int
+    projection_updated_at_iso: str
+    created_at_iso: str
+    timeout_s: Optional[float] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class InterventionDecision(BaseModel):
@@ -325,6 +353,21 @@ class InterventionDecision(BaseModel):
     action: InterventionAction = InterventionAction.NONE
     reason: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    request_id: Optional[str] = None
+    responded_at_iso: Optional[str] = None
+    override_provenance: Optional[str] = None
+    override_source: Optional[InterventionOverrideSource] = None
+
+    @model_validator(mode="after")
+    def _validate_override_provenance(self) -> "InterventionDecision":
+        if self.action != InterventionAction.RESUME:
+            return self
+
+        if self.override_source is None or not self.override_provenance:
+            raise ValueError(
+                "resume intervention requires explicit override_source and override_provenance"
+            )
+        return self
 
 
 class ObserverFrame(BaseModel):

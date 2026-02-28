@@ -37,6 +37,7 @@ from state_renormalization.contracts import (
     CorrectionCostAttribution,
     InterventionAction,
     InterventionDecision,
+    InterventionRequest,
     InvariantAuditResult,
     PredictionOutcome,
     PredictionRecord,
@@ -48,7 +49,11 @@ from state_renormalization.contracts import (
     default_observer_frame,
     project_ambiguity_state,
 )
-from state_renormalization.adapters.persistence import append_halt, append_prediction_record_event, read_jsonl
+from state_renormalization.adapters.persistence import (
+    append_halt,
+    append_prediction_record_event,
+    iter_projection_lineage_records,
+)
 from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.invariants import (
     Flow as InvariantFlow,
@@ -558,6 +563,38 @@ def _run_invariant(invariant_id: InvariantId, *, ctx) -> InvariantOutcome:
     return outcome
 
 
+
+
+def _invariant_audit_result_from_checker(gate_point: str, normalized: CheckerResult) -> InvariantAuditResult:
+    return InvariantAuditResult(
+        gate_point=gate_point,
+        invariant_id=normalized.invariant_id,
+        passed=normalized.passed,
+        reason=normalized.reason,
+        flow=normalized.flow,
+        validity=normalized.validity,
+        code=normalized.code,
+        evidence=[_to_dict(item) for item in normalized.evidence],
+        details=_to_dict(normalized.details) or {},
+        action_hints=[_to_dict(item) for item in normalized.action_hints],
+    )
+
+
+def _build_intervention_request(
+    *,
+    ep: Episode,
+    projection_state: ProjectionState,
+    phase: str,
+) -> InterventionRequest:
+    return InterventionRequest(
+        request_id=_new_id("hitl:"),
+        phase=phase,
+        episode_id=ep.episode_id,
+        conversation_id=ep.conversation_id,
+        turn_index=ep.turn_index,
+        projection_updated_at_iso=projection_state.updated_at_iso,
+        created_at_iso=_now_iso(),
+    )
 def _normalize_intervention_decision(decision: InterventionDecision | Mapping[str, Any] | None) -> InterventionDecision:
     if decision is None:
         return InterventionDecision(action=InterventionAction.NONE)
@@ -577,25 +614,63 @@ def _apply_intervention_hook(
     if intervention_hook is None:
         return True, InterventionDecision(action=InterventionAction.NONE)
 
-    decision = _normalize_intervention_decision(
-        intervention_hook(
-            phase=phase,
-            episode=ep,
-            belief=belief,
-            projection_state=projection_state,
-        )
+    request = _build_intervention_request(ep=ep, projection_state=projection_state, phase=phase)
+    _append_episode_artifact(
+        ep,
+        {
+            "artifact_kind": "intervention_request",
+            **request.model_dump(mode="json"),
+        },
+    )
+
+    raw_decision = intervention_hook(
+        phase=phase,
+        episode=ep,
+        belief=belief,
+        projection_state=projection_state,
+    )
+    normalized_input = _to_dict(raw_decision) if raw_decision is not None else {"action": "none"}
+    if isinstance(normalized_input, dict):
+        normalized_input.setdefault("request_id", request.request_id)
+        normalized_input.setdefault("responded_at_iso", _now_iso())
+
+    decision = _normalize_intervention_decision(normalized_input)
+
+    _append_episode_artifact(
+        ep,
+        {
+            "artifact_kind": "intervention_response",
+            "phase": phase,
+            "request_id": request.request_id,
+            "response": decision.model_dump(mode="json"),
+        },
     )
     _append_episode_artifact(
         ep,
         {
             "artifact_kind": "intervention_lifecycle",
             "phase": phase,
+            "request_id": request.request_id,
             "action": decision.action.value,
             "reason": decision.reason,
             "metadata": _to_dict(decision.metadata),
+            "override_source": _to_dict(decision.override_source),
+            "override_provenance": decision.override_provenance,
+            "responded_at_iso": decision.responded_at_iso,
         },
     )
-    if decision.action in {InterventionAction.PAUSE, InterventionAction.TIMEOUT}:
+
+    if decision.action in {InterventionAction.PAUSE, InterventionAction.TIMEOUT, InterventionAction.ESCALATE}:
+        _append_episode_artifact(
+            ep,
+            {
+                "artifact_kind": "intervention_terminal",
+                "phase": phase,
+                "request_id": request.request_id,
+                "action": decision.action.value,
+                "reason": decision.reason,
+            },
+        )
         append_turn_summary(ep)
         return False, decision
 
@@ -669,35 +744,35 @@ def evaluate_invariant_gates(
             )
         )
         invariant_audit.append(
-            InvariantAuditResult(
-                gate_point=f"{gate_point}:{evaluation.phase}",
-                invariant_id=normalized.invariant_id,
-                passed=normalized.passed,
-                reason=normalized.reason,
-                evidence=[_to_dict(item) for item in normalized.evidence],
+            _invariant_audit_result_from_checker(
+                f"{gate_point}:{evaluation.phase}",
+                normalized,
             )
         )
 
     halt_outcome, _ = _first_halt_from_evaluations(evaluations=evaluations, gate_point=gate_point)
 
     if isinstance(result, HaltRecord) and halt_outcome is not None:
+        halt_validation = normalize_outcome(
+            REGISTRY[InvariantId.EXPLAINABLE_HALT_PAYLOAD](
+                default_check_context(
+                    scope=scope,
+                    prediction_key=prediction_key,
+                    current_predictions=current_predictions,
+                    prediction_log_available=prediction_log_available,
+                    just_written_prediction=just_written_prediction,
+                    halt_candidate=halt_outcome,
+                )
+            ),
+            gate=gate_point,
+        )
         gate_checks.append(
             GateInvariantCheck(
                 gate_point="halt_validation",
-                output=normalize_outcome(
-                    REGISTRY[InvariantId.EXPLAINABLE_HALT_PAYLOAD](
-                        default_check_context(
-                            scope=scope,
-                            prediction_key=prediction_key,
-                            current_predictions=current_predictions,
-                            prediction_log_available=prediction_log_available,
-                            just_written_prediction=just_written_prediction,
-                            halt_candidate=halt_outcome,
-                        )
-                    ), gate=gate_point
-                ),
+                output=halt_validation,
             )
         )
+        invariant_audit.append(_invariant_audit_result_from_checker("halt_validation", halt_validation))
 
     result_kind = "prediction" if isinstance(result, Success) else "halt"
 
@@ -740,6 +815,11 @@ def evaluate_invariant_gates(
                         "passed": check.output.passed,
                         "evidence": _to_dict(check.output.evidence),
                         "reason": check.output.reason,
+                        "flow": check.output.flow,
+                        "validity": check.output.validity,
+                        "code": check.output.code,
+                        "details": _to_dict(check.output.details),
+                        "action_hints": _to_dict(check.output.action_hints),
                     }
                     for check in gate_checks
                 ],
@@ -846,7 +926,8 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
     records_processed = 0
     lineage_rows: list[Mapping[str, Any]] = []
 
-    for _, raw in read_jsonl(path):
+    for raw in iter_projection_lineage_records(path):
+        lineage_rows.append(raw)
         if raw.get("event_kind") not in {"prediction_record", "prediction"}:
             continue
 
@@ -855,7 +936,6 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
         event_time = pred.corrected_at_iso or pred.compared_at_iso or pred.issued_at_iso
         projection = _project_current_at(pred, projection, updated_at_iso=event_time)
         records_processed += 1
-        lineage_rows.append(raw)
 
     analytics = derive_projection_analytics_from_lineage(lineage_rows)
 

@@ -128,3 +128,79 @@ def test_hitl_mapping_decision_payload_is_normalized_and_timeout_halts_after_gat
     assert lifecycle_artifacts[-1]["action"] == "timeout"
     assert lifecycle_artifacts[-1]["metadata"] == {"ticket": "ops:123"}
     assert any(a.get("artifact_kind") == "turn_summary" for a in episode.artifacts)
+
+
+def test_hitl_escalation_stops_loop_and_persists_request_response_artifacts(
+    make_episode: Callable[..., Episode],
+) -> None:
+    episode = make_episode(conversation_id="conv:hitl-escalate", turn_index=1)
+
+    run_mission_loop(
+        episode,
+        BeliefState(),
+        _blank_projection(),
+        intervention_hook=lambda **_: {
+            "action": "escalate",
+            "reason": "needs-human-review",
+            "metadata": {"queue": "tier2"},
+        },
+    )
+
+    request = next(a for a in episode.artifacts if a.get("artifact_kind") == "intervention_request")
+    response = next(a for a in episode.artifacts if a.get("artifact_kind") == "intervention_response")
+    lifecycle = next(a for a in episode.artifacts if a.get("artifact_kind") == "intervention_lifecycle")
+    terminal = next(a for a in episode.artifacts if a.get("artifact_kind") == "intervention_terminal")
+
+    assert request["request_id"] == response["request_id"] == lifecycle["request_id"] == terminal["request_id"]
+    assert lifecycle["action"] == "escalate"
+    assert response["response"]["metadata"] == {"queue": "tier2"}
+    assert any(a.get("artifact_kind") == "turn_summary" for a in episode.artifacts)
+
+
+def test_hitl_resume_requires_explicit_override_provenance(
+    make_episode: Callable[..., Episode],
+) -> None:
+    episode = make_episode(conversation_id="conv:hitl-resume", turn_index=1)
+
+    def invalid_resume(**_kwargs):
+        return {"action": "resume", "reason": "force-continue"}
+
+    try:
+        run_mission_loop(
+            episode,
+            BeliefState(),
+            _blank_projection(),
+            intervention_hook=invalid_resume,
+        )
+    except ValueError as exc:
+        assert "override_source" in str(exc)
+    else:
+        raise AssertionError("Expected resume intervention without provenance to fail contract validation")
+
+
+def test_hitl_resume_with_override_provenance_is_persisted(
+    make_episode: Callable[..., Episode],
+) -> None:
+    episode = make_episode(conversation_id="conv:hitl-resume-ok", turn_index=1)
+
+    def hook(*, phase, **_kwargs):
+        if phase == "mission_loop:start":
+            return {
+                "action": "resume",
+                "reason": "manual override",
+                "override_source": "operator",
+                "override_provenance": "ticket:ops-77",
+            }
+        return {"action": "none"}
+
+    run_mission_loop(
+        episode,
+        BeliefState(),
+        _blank_projection(),
+        intervention_hook=hook,
+    )
+
+    lifecycle = next(a for a in episode.artifacts if a.get("artifact_kind") == "intervention_lifecycle")
+    assert lifecycle["action"] == "resume"
+    assert lifecycle["override_source"] == "operator"
+    assert lifecycle["override_provenance"] == "ticket:ops-77"

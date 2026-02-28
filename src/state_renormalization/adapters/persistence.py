@@ -191,20 +191,36 @@ def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
     """Yield append-only projection lineage rows that can be rehydrated.
 
     Includes prediction events and canonical halt payload rows.
-    Excludes unknown event kinds and malformed halt-like rows that fail
-    ``HaltRecord.from_payload`` validation.
+    Excludes unknown event kinds and malformed/non-object JSONL rows.
     """
 
-    for _, raw in read_jsonl(path):
-        kind = raw.get("event_kind")
-        if kind in {"prediction_record", "prediction"}:
-            yield raw
-            continue
+    p = Path(path)
+    if not p.exists():
+        return
 
-        try:
-            yield HaltRecord.from_payload(raw).to_canonical_payload()
-        except Exception:
-            continue
+    with p.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            raw_line = line.strip()
+            if not raw_line:
+                continue
+
+            try:
+                raw = json.loads(raw_line)
+            except json.JSONDecodeError:
+                continue
+
+            if not isinstance(raw, dict):
+                continue
+
+            kind = raw.get("event_kind")
+            if kind in {"prediction_record", "prediction"}:
+                yield raw
+                continue
+
+            try:
+                yield HaltRecord.from_payload(raw).to_canonical_payload()
+            except Exception:
+                continue
 
 def _canonicalize_halt_payload(record: Any) -> JsonObj:
     if isinstance(record, HaltRecord):

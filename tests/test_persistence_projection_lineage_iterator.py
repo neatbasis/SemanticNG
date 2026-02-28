@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from state_renormalization.adapters.persistence import append_jsonl, iter_projection_lineage_records
@@ -82,3 +83,24 @@ def test_iter_projection_lineage_records_includes_only_rehydratable_halts(tmp_pa
 
     assert lineage == [valid_canonical_halt]
     assert HaltRecord.from_payload(lineage[0]).to_canonical_payload() == valid_canonical_halt
+
+
+def test_iter_projection_lineage_records_skips_malformed_json_lines_and_non_object_rows(tmp_path: Path) -> None:
+    path = tmp_path / "malformed.jsonl"
+    canonical_halt = _canonical_halt_payload("halt:ok", timestamp="2026-02-14T00:00:00+00:00")
+    path.write_text(
+        "\n".join(
+            [
+                '{"event_kind":"prediction_record","prediction_id":"pred:ok","scope_key":"turn:1"}',
+                '{"event_kind":"prediction_record",',  # malformed JSON
+                '[]',
+                '"string"',
+                json.dumps(canonical_halt),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    lineage = list(iter_projection_lineage_records(path))
+    assert [row.get("prediction_id", row.get("halt_id")) for row in lineage] == ["pred:ok", "halt:ok"]

@@ -135,6 +135,14 @@ Run lint checks (optional):
 ruff check src tests
 ```
 
+## Current workflow (supersedes temporary integration freeze procedures)
+
+Active contributor workflow expectations are canonical in `docs/release_checklist.md`.
+
+- Use normal PR flow with branch protection and required CI checks enabled.
+- Rebase/merge sequencing controls from `docs/integration_notes.md` are historical and non-normative unless explicitly reactivated via the objective criteria documented there.
+- For milestone/maturity transitions, follow the checklist and evidence requirements in `docs/release_checklist.md`.
+
 ## Notes on dependencies
 
 - `pyproject.toml` is the source of truth for package metadata and dependencies.

@@ -1,4 +1,8 @@
-# Integration merge sequencing note
+> [!WARNING]
+> **Historical context only (temporary integration freeze era, 2025-02 to 2025-03).**
+> This document is **non-normative** and retained for recordkeeping. The active contributor workflow now lives in `README.md` ("Current workflow") and `docs/release_checklist.md` (canonical release/integration expectations). Treat this note as inactive unless the objective reactivation criteria below are explicitly met.
+
+# Integration merge sequencing note (historical)
 
 Integration branch: `integration/pr-conflict-resolution`
 
@@ -43,6 +47,20 @@ Land the merged stack strictly in the defined order and do fast follow-up rebase
 
 Do not run concurrent merges for these PRs while freeze is active.
 
+## Objective activation / deactivation criteria
+
+Apply this sequencing protocol only when **all** activation criteria are true:
+
+1. Branch protection is temporarily relaxed or bypassed for integration purposes (for example, an admin-controlled integration branch with manual sequencing).
+2. At least **3 active PRs** are modifying the same conflict-prone paths listed above.
+3. Recent merge/rebase attempts show repeated conflict churn (for example, at least **2 conflict-heavy rebases/merges** across the same stack within a single integration cycle).
+
+Deactivate this protocol as soon as **any** deactivation criterion is true:
+
+1. Branch protection and required checks are fully restored for normal PR flow.
+2. The conflict queue drops below the multi-PR threshold (fewer than 3 active PRs touching the same conflict-prone paths).
+3. Two consecutive landings complete without material manual conflict resolution on the protected paths.
+
 ## Required post-merge validation gate (after every merge)
 
 Before advancing to the next PR in sequence, rerun both:
@@ -59,4 +77,3 @@ When a PR is superseded by integration resolution, close it with an explicit `me
 - Link to the integration PR/merge commit that preserved behavior.
 - Commit SHA(s) containing preserved changes.
 - Short list of preserved features/contracts retained.
-

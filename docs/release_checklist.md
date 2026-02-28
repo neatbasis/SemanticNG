@@ -2,6 +2,14 @@
 
 Use this checklist before tagging a release.
 
+## Canonical contributor workflow expectations
+
+This document is the canonical source for active release/integration workflow expectations.
+
+- Default to standard PR flow with branch protection and required checks enabled.
+- Use milestone gate + manifest evidence as merge prerequisites for milestone/maturity changes.
+- Treat `docs/integration_notes.md` as historical context only unless its explicit activation criteria are met.
+
 - [ ] **Milestone gate pass links recorded:** Include links to the latest successful `State Renormalization Milestone Gate` CI run(s) for this release candidate.
 - [ ] **Manifest is canonical:** Capability status, code paths, and command coverage are updated directly in `docs/dod_manifest.json`.
 - [ ] **Status transition commands captured in manifest:** Each transitioned capability has complete `pytest_commands` and synchronized `ci_evidence_links.command` entries in manifest order.
@@ -25,11 +33,13 @@ Do not merge milestone or maturity update PRs until all conditions are met:
 2. `docs/dod_manifest.json` contains the canonical command/evidence mapping for transitioned capabilities.
 3. Any derived docs are regenerated from the manifest when required.
 
-## Integration branch stabilization controls (temporary)
+## Exceptional integration stabilization controls (reactivation only)
 
-- [ ] **Merge freeze applied for touched files:** `src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, and governance docs are frozen for direct parallel merges during stabilization.
-- [ ] **Stack merged serially in defined order:** Integration merges were landed one-by-one (not in parallel) with immediate follow-up rebases between merges.
-- [ ] **Post-merge validation run after each landed PR:** Conflict-prone suites and governance validation both passed before moving to the next PR.
+Use these controls only when the activation criteria in `docs/integration_notes.md` are met:
+
+- [ ] **Merge freeze scope explicitly declared:** Conflict-prone files and governance docs in scope are listed in the integration plan.
+- [ ] **Stack merged serially in defined order:** Integration merges are landed one-by-one (not in parallel) with immediate follow-up rebases.
+- [ ] **Post-merge validation run after each landed PR:** Conflict-prone suites and governance validation pass before moving to the next PR.
 - [ ] **Superseded PRs closed with `merged-via-integration` notes:** Every superseded PR includes links to preserving integration commits and a feature-retention summary.
 
 ## Integration PR feature-retention checklist

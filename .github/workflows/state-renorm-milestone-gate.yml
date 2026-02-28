@@ -127,8 +127,8 @@ jobs:
 
               echo
               echo "Adjacency evidence validation failed."
-              echo "Copy/paste the generated block from the 'Transitioned Capability Evidence' section in this job summary"
-              echo "or from artifact 'transition_evidence.txt' into the PR body, then re-run checks."
+              echo "Copy this block into PR description:"
+              cat artifacts/transition_evidence.txt
             else
               echo
               echo "Milestone validation failed. See artifacts/validate_milestone_docs.log for details."

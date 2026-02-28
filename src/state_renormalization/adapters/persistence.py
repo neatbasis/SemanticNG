@@ -217,7 +217,7 @@ def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
                 continue
 
             kind = raw.get("event_kind")
-            if kind in {"prediction_record", "prediction"}:
+            if kind in {"prediction_record", "prediction", "repair_proposal", "repair_resolution"}:
                 yield raw
                 continue
 

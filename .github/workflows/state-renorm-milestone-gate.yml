@@ -6,10 +6,12 @@ on:
     paths:
       - 'src/state_renormalization/**'
       - 'docs/dod_manifest.json'
+      - 'docs/sprint_handoffs/**'
       - 'docs/system_contract_map.md'
       - 'ROADMAP.md'
       - '.github/pull_request_template.md'
       - '.github/scripts/validate_milestone_docs.py'
+      - '.github/scripts/validate_sprint_handoff.py'
       - '.github/scripts/capability_parity_report.py'
       - '.github/scripts/render_transition_evidence.py'
       - '.github/workflows/state-renorm-milestone-gate.yml'
@@ -18,10 +20,12 @@ on:
     paths:
       - 'src/state_renormalization/**'
       - 'docs/dod_manifest.json'
+      - 'docs/sprint_handoffs/**'
       - 'docs/system_contract_map.md'
       - 'ROADMAP.md'
       - '.github/pull_request_template.md'
       - '.github/scripts/validate_milestone_docs.py'
+      - '.github/scripts/validate_sprint_handoff.py'
       - '.github/scripts/capability_parity_report.py'
       - '.github/scripts/render_transition_evidence.py'
       - '.github/workflows/state-renorm-milestone-gate.yml'
@@ -29,10 +33,12 @@ on:
     paths:
       - 'src/state_renormalization/**'
       - 'docs/dod_manifest.json'
+      - 'docs/sprint_handoffs/**'
       - 'docs/system_contract_map.md'
       - 'ROADMAP.md'
       - '.github/pull_request_template.md'
       - '.github/scripts/validate_milestone_docs.py'
+      - '.github/scripts/validate_sprint_handoff.py'
       - '.github/scripts/capability_parity_report.py'
       - '.github/scripts/render_transition_evidence.py'
       - '.github/workflows/state-renorm-milestone-gate.yml'
@@ -87,7 +93,7 @@ jobs:
 
       - name: Run AUTOGEN parity pytest
         run: |
-          pytest tests/test_render_transition_evidence.py tests/test_pr_template_autogen_governance.py
+          pytest tests/test_render_transition_evidence.py tests/test_pr_template_autogen_governance.py tests/test_sprint_handoff_validation.py
 
       - name: Render transition evidence block
         id: render_transition_evidence
@@ -128,6 +134,11 @@ jobs:
             echo "Milestone validation failed. See artifacts/validate_milestone_docs.log for details."
             exit "$validator_status"
           fi
+
+
+      - name: Validate sprint handoff artifacts
+        run: |
+          python .github/scripts/validate_sprint_handoff.py
 
       - name: Run milestone pytest commands for relevant changes
         run: |

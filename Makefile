@@ -7,4 +7,4 @@ test:
 	pytest
 
 test-cov:
-	pytest --cov=state_renormalization --cov-report=term-missing --cov-report=xml
+	pytest --cov --cov-report=term-missing --cov-report=xml

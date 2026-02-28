@@ -126,27 +126,43 @@ python .github/scripts/validate_milestone_docs.py
 
 ## Running tests
 
-Run the pytest suite:
+### pytest
+
+`pytest` is the primary test runner for all unit/integration checks under `tests/`.
+Configuration is centralized in `pyproject.toml` under `[tool.pytest.ini_options]`
+(`testpaths`, `pythonpath`, strict flags, and shared defaults).
+
+Run the full pytest suite:
 
 ```bash
 pytest
 ```
 
-Run tests with coverage (requires `pytest-cov` from `.[test]`):
+### coverage (`pytest-cov` + coverage.py)
+
+Coverage reporting is executed through `pytest-cov`, while coverage behavior
+(branch mode, source scope, omissions, and thresholds) is configured in
+`pyproject.toml` under `[tool.coverage.run]` and `[tool.coverage.report]`.
+
+Run tests with coverage:
 
 ```bash
 make test-cov
 # or directly:
-pytest --cov=state_renormalization --cov-report=term-missing --cov-report=xml
+pytest --cov --cov-report=term-missing --cov-report=xml
 ```
 
-Run type checks (optional):
+### mypy (optional)
+
+`mypy` performs static type checking for `src/` and `tests/`.
 
 ```bash
 mypy src tests
 ```
 
-Run lint checks (optional):
+### ruff (optional)
+
+`ruff` runs lint checks for style and common correctness issues.
 
 ```bash
 ruff check src tests

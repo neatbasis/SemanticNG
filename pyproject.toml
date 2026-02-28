@@ -29,8 +29,17 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.pytest.ini_options]
+minversion = "7.0"
 testpaths = ["tests"]
-addopts = "-q"
+pythonpath = ["src"]
+python_files = ["test_*.py"]
+addopts = [
+  "-ra",
+  "--strict-markers",
+  "--strict-config",
+  "--disable-warnings",
+  "--maxfail=1",
+]
 
 [tool.mypy]
 python_version = "3.11"
@@ -55,8 +64,13 @@ strict = false
 
 [tool.coverage.run]
 branch = true
-source = ["state_renormalization"]
+source = ["src/state_renormalization"]
+omit = [
+  "tests/*",
+  "src/**/__init__.py",
+]
 
 [tool.coverage.report]
 show_missing = true
-skip_covered = false
+skip_covered = true
+fail_under = 80

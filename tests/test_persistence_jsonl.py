@@ -6,7 +6,7 @@ import json
 import pytest
 from pathlib import Path
 
-from state_renormalization.adapters.persistence import append_halt, append_jsonl, read_jsonl
+from state_renormalization.adapters.persistence import append_halt, append_jsonl, read_halt_record, read_jsonl
 from state_renormalization.contracts import HaltRecord
 from state_renormalization.engine import to_jsonable_episode
 
@@ -324,6 +324,36 @@ def test_halt_reprojection_fails_closed_for_malformed_payload(tmp_path: Path) ->
     with pytest.raises(Exception):
         HaltRecord.from_payload(malformed)
 
+
+
+
+def test_append_halt_round_trip_reload_preserves_explainability_payload(tmp_path: Path) -> None:
+    p = tmp_path / "halts.jsonl"
+
+    payload = {
+        "halt_id": "halt:explainability",
+        "stage": "pre-decision:post_write",
+        "invariant_id": "evidence_link_completeness.v1",
+        "reason": "explainability fields",
+        "details": {
+            "message": "explainability fields",
+            "debug": {"scope": "scope:test", "attempt": 4},
+        },
+        "evidence": [
+            {"kind": "scope", "ref": "scope:test"},
+            {"kind": "prediction_key", "ref": "scope:test"},
+        ],
+        "retryability": True,
+        "timestamp": "2026-02-13T00:00:04+00:00",
+    }
+
+    append_halt(p, payload)
+    (_, persisted), = list(read_jsonl(p))
+    reloaded = read_halt_record(persisted)
+
+    assert reloaded.to_canonical_payload() == payload
+    assert reloaded.details == payload["details"]
+    assert [item.model_dump(mode="json") for item in reloaded.evidence] == payload["evidence"]
 
 def test_append_halt_round_trip_preserves_all_canonical_and_stable_id_fields(tmp_path: Path) -> None:
     p = tmp_path / "halts.jsonl"

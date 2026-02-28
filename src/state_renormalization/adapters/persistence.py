@@ -197,7 +197,12 @@ def _canonicalize_halt_payload(record: Any) -> JsonObj:
             if isinstance((value := record.get(key)), str)
         }
         return {**stable_ids, **canonical}
-    return _to_jsonable(record)
+    return HaltRecord.from_payload(_to_jsonable(record)).to_canonical_payload()
+
+
+def read_halt_record(record: JsonObj) -> HaltRecord:
+    """Rehydrate a persisted halt artifact into a validated HaltRecord."""
+    return HaltRecord.from_payload(record)
 
 
 def append_halt(path: PathLike, record: Any) -> JsonObj:
@@ -208,5 +213,7 @@ def append_halt(path: PathLike, record: Any) -> JsonObj:
 
     payload = _canonicalize_halt_payload(record)
 
+    # Validate persistence/reload parity for explainability payload fields.
+    HaltRecord.from_payload(payload)
     append_jsonl(p, payload)
     return {"kind": "jsonl", "ref": f"{p.name}@{next_offset}"}

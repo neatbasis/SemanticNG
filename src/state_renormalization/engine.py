@@ -242,28 +242,28 @@ def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltR
 
     reason = outcome.reason
     return HaltRecord.from_payload(
-        {
-            "halt_id": _stable_halt_id(stage=stage, outcome=outcome),
-            "stage": stage,
-            "invariant_id": outcome.invariant_id.value,
-            "reason": reason,
-            "details": dict(outcome.details),
-            "evidence": [_as_evidence_ref(_to_dict(item)).model_dump(mode="json") for item in outcome.evidence],
-            "timestamp": _now_iso(),
-            "retryability": bool(outcome.action_hints),
-        }
+        HaltRecord.build_canonical_payload(
+            halt_id=_stable_halt_id(stage=stage, outcome=outcome),
+            stage=stage,
+            invariant_id=outcome.invariant_id.value,
+            reason=reason,
+            details=dict(outcome.details),
+            evidence=[_as_evidence_ref(_to_dict(item)).model_dump(mode="json") for item in outcome.evidence],
+            timestamp=_now_iso(),
+            retryability=bool(outcome.action_hints),
+        )
     )
 
 
 def _authorization_halt_record(*, stage: str, reason: str, context: Mapping[str, Any]) -> HaltRecord:
     return HaltRecord.from_payload(
-        {
-            "halt_id": f"halt:{sha1_text(f'{stage}|authorization.scope.v1|{reason}|{_to_dict(context)}')}",
-            "stage": stage,
-            "invariant_id": "authorization.scope.v1",
-            "reason": reason,
-            "details": {"authorization_context": _to_dict(context)},
-            "evidence": [
+        HaltRecord.build_canonical_payload(
+            halt_id=f"halt:{sha1_text(f'{stage}|authorization.scope.v1|{reason}|{_to_dict(context)}')}",
+            stage=stage,
+            invariant_id="authorization.scope.v1",
+            reason=reason,
+            details={"authorization_context": _to_dict(context)},
+            evidence=[
                 {
                     "kind": "authorization_scope",
                     "ref": f"action:{context.get('action', 'unknown')}",
@@ -273,10 +273,50 @@ def _authorization_halt_record(*, stage: str, reason: str, context: Mapping[str,
                     "ref": str(context.get("required_capability") or "unknown"),
                 },
             ],
-            "timestamp": _now_iso(),
-            "retryability": True,
-        }
+            timestamp=_now_iso(),
+            retryability=True,
+        )
     )
+
+
+def _evaluate_invariant_gate_pipeline(
+    *,
+    observer: Optional[ObserverFrame],
+    scope: str,
+    prediction_key: Optional[str],
+    current_predictions: Mapping[str, str],
+    prediction_log_available: bool,
+    just_written_prediction: Optional[Mapping[str, Any]],
+    gate_point: str,
+) -> tuple[list[GateInvariantEvaluation], GateDecision]:
+    evaluations: list[GateInvariantEvaluation] = []
+    gate_specs: tuple[tuple[str, InvariantId, bool, Optional[Mapping[str, Any]]], ...] = (
+        ("pre_consume", InvariantId.PREDICTION_AVAILABILITY, True, None),
+        (
+            "post_write",
+            InvariantId.EVIDENCE_LINK_COMPLETENESS,
+            just_written_prediction is not None,
+            just_written_prediction,
+        ),
+    )
+
+    for phase, invariant_id, is_enabled, phase_written_prediction in gate_specs:
+        if not is_enabled or not _observer_allows_invariant(observer=observer, invariant_id=invariant_id):
+            continue
+        evaluation = _evaluate_gate_phase(
+            scope=scope,
+            prediction_key=prediction_key,
+            current_predictions=current_predictions,
+            prediction_log_available=prediction_log_available,
+            phase=phase,
+            invariant_id=invariant_id,
+            just_written_prediction=phase_written_prediction,
+        )
+        evaluations.append(evaluation)
+        if evaluation.outcome.flow == InvariantFlow.STOP:
+            break
+
+    return evaluations, _result_from_gate_evaluations(evaluations=evaluations, gate_point=gate_point)
 
 
 def _halt_payload(halt: HaltRecord) -> Dict[str, Any]:
@@ -540,42 +580,16 @@ def evaluate_invariant_gates(
         for key, pred in projection_state.current_predictions.items()
     }
 
+    evaluations, result = _evaluate_invariant_gate_pipeline(
+        observer=observer,
+        scope=scope,
+        prediction_key=prediction_key,
+        current_predictions=current_predictions,
+        prediction_log_available=prediction_log_available,
+        just_written_prediction=just_written_prediction,
+        gate_point=gate_point,
+    )
     gate_checks: list[GateInvariantCheck] = []
-    evaluations: list[GateInvariantEvaluation] = []
-
-    gate_specs: list[tuple[str, InvariantId, bool, Optional[Mapping[str, Any]]]] = [
-        (
-            "pre_consume",
-            InvariantId.PREDICTION_AVAILABILITY,
-            True,
-            None,
-        ),
-        (
-            "post_write",
-            InvariantId.EVIDENCE_LINK_COMPLETENESS,
-            just_written_prediction is not None,
-            just_written_prediction,
-        ),
-    ]
-
-    for phase, invariant_id, is_enabled, phase_written_prediction in gate_specs:
-        if not is_enabled or not _observer_allows_invariant(observer=observer, invariant_id=invariant_id):
-            continue
-
-        evaluation = _evaluate_gate_phase(
-            scope=scope,
-            prediction_key=prediction_key,
-            current_predictions=current_predictions,
-            prediction_log_available=prediction_log_available,
-            phase=phase,
-            invariant_id=invariant_id,
-            just_written_prediction=phase_written_prediction,
-        )
-        evaluations.append(evaluation)
-        if evaluation.outcome.flow == InvariantFlow.STOP:
-            break
-
-    result = _result_from_gate_evaluations(evaluations=evaluations, gate_point=gate_point)
 
     outcome_bundle = result.artifact if isinstance(result, Success) else GatePredictionOutcome(
         pre_consume=tuple(ev.outcome for ev in evaluations if ev.phase == "pre_consume"),

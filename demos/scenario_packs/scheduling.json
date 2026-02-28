@@ -1,0 +1,30 @@
+{
+  "context": "scheduling",
+  "session_id": "sched-001",
+  "turns": [
+    {
+      "prediction_key": "schedule:meeting:1",
+      "prediction_issued": true,
+      "evidence_used": [{"kind": "calendar", "ref": "events/primary#882"}],
+      "intervention_events": [],
+      "expected_value": 0.9,
+      "observed_value": 0.8
+    },
+    {
+      "prediction_key": "schedule:meeting:2",
+      "prediction_issued": true,
+      "evidence_used": [],
+      "intervention_events": [{"type": "clarification", "actor": "assistant"}],
+      "expected_value": 0.7,
+      "observed_value": 0.5
+    },
+    {
+      "prediction_key": "schedule:meeting:3",
+      "prediction_issued": true,
+      "evidence_used": [{"kind": "calendar", "ref": "events/primary#890"}],
+      "intervention_events": [{"type": "reschedule_suggestion"}],
+      "expected_value": 0.6,
+      "observed_value": 0.55
+    }
+  ]
+}

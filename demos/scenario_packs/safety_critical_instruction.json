@@ -1,0 +1,31 @@
+{
+  "context": "safety_critical_instruction",
+  "session_id": "safety-001",
+  "turns": [
+    {
+      "prediction_key": "safety:shutdown:step1",
+      "prediction_issued": true,
+      "evidence_used": [{"kind": "sensor", "ref": "pressure#A1"}],
+      "intervention_events": [{"type": "require_confirmation"}],
+      "expected_value": 1.0,
+      "observed_value": 0.95
+    },
+    {
+      "prediction_key": "safety:shutdown:step2",
+      "prediction_issued": true,
+      "prediction_log_available": false,
+      "evidence_used": [{"kind": "sensor", "ref": "temperature#B4"}],
+      "intervention_events": [{"type": "manual_override"}],
+      "expected_value": 0.95,
+      "observed_value": 0.65
+    },
+    {
+      "prediction_key": "safety:shutdown:step3",
+      "prediction_issued": true,
+      "evidence_used": [{"kind": "operator_note", "ref": "handoff#12"}],
+      "intervention_events": [],
+      "expected_value": 0.8,
+      "observed_value": 0.78
+    }
+  ]
+}

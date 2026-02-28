@@ -58,6 +58,31 @@ Validate this inventory in tests:
 pytest tests/test_dod_manifest.py
 ```
 
+
+## Demo scenario packs
+
+Run multi-turn demo sessions across scheduling, safety-critical instruction, and ontology/schema alignment contexts:
+
+```bash
+python demos/run_scenario_sessions.py
+```
+
+This writes `demos/output/session_report.json` containing per-turn capture fields:
+
+- `prediction_issued`
+- `evidence_used`
+- `intervention_events`
+- `invariant_checks`
+- `halt_issue_warn_outcome`
+- `correction_metric`
+
+and summary metrics:
+
+- `invariant_pass_rate`
+- `intervention_rate`
+- `correction_trend`
+- `recovery_success_after_halts`
+
 ## Running tests
 
 Run the pytest suite:

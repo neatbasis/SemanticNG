@@ -1,0 +1,30 @@
+{
+  "context": "ontology_schema_alignment",
+  "session_id": "ontology-001",
+  "turns": [
+    {
+      "prediction_key": "align:class:person",
+      "prediction_issued": true,
+      "evidence_used": [{"kind": "ontology", "ref": "pizza.owl#Person"}],
+      "intervention_events": [{"type": "schema_vote"}],
+      "expected_value": 0.88,
+      "observed_value": 0.76
+    },
+    {
+      "prediction_key": "align:class:organization",
+      "prediction_issued": true,
+      "evidence_used": [{"kind": "schemaorg", "ref": "schema.org/Organization"}],
+      "intervention_events": [{"type": "human_review"}],
+      "expected_value": 0.8,
+      "observed_value": 0.75
+    },
+    {
+      "prediction_key": "align:property:address",
+      "prediction_issued": true,
+      "evidence_used": [{"kind": "ontology", "ref": "pizza.owl#hasAddress"}],
+      "intervention_events": [],
+      "expected_value": 0.85,
+      "observed_value": 0.84
+    }
+  ]
+}

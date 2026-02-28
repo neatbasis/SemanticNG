@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Optional, Protocol
 
@@ -413,22 +414,64 @@ def build_selector_context(text: Optional[str], *, error: Optional[CaptureOutcom
 
 
 RULE_PHASES: tuple[str, ...] = ("hard-stop", "ambiguity-disambiguation", "fallback")
-RULES_BY_PHASE: dict[str, list[Rule]] = {
-    "hard-stop": [
-        NoResponseRule(),
-        EmptyInputRule(),
-        ExitIntentRule(),
-    ],
-    "ambiguity-disambiguation": [
-        VagueActorRule(),
-        UrlIntentRule(),
-        TimerUnitRule(),
-        UncertaintyRule(),
-    ],
-    "fallback": [
-        ActionableIntentRule()
-    ],
-}
+
+
+@dataclass
+class RuleRegistry:
+    """
+    Registry-based phase pipeline.
+
+    `domain` allows adding domain/context specific rules without modifying selector flow.
+    """
+
+    phases: tuple[str, ...] = RULE_PHASES
+    _rules_by_domain: dict[str, dict[str, list[Rule]]] = field(
+        default_factory=lambda: defaultdict(lambda: {phase: [] for phase in RULE_PHASES})
+    )
+
+    def register(self, *, phase: str, rule: Rule, domain: str = "default", prepend: bool = False) -> None:
+        if phase not in self.phases:
+            raise ValueError(f"Unknown rule phase '{phase}'. Expected one of: {', '.join(self.phases)}")
+        bucket = self._rules_by_domain[domain][phase]
+        if prepend:
+            bucket.insert(0, rule)
+            return
+        bucket.append(rule)
+
+    def phase_rules(self, *, phase: str, domain: str = "default") -> list[Rule]:
+        if phase not in self.phases:
+            raise ValueError(f"Unknown rule phase '{phase}'. Expected one of: {', '.join(self.phases)}")
+        domain_rules = self._rules_by_domain.get(domain, {}).get(phase, [])
+        if domain == "default":
+            return list(domain_rules)
+        default_rules = self._rules_by_domain.get("default", {}).get(phase, [])
+        return [*domain_rules, *default_rules]
+
+    def clone_domain(self, *, domain: str = "default") -> dict[str, list[Rule]]:
+        return {phase: list(self.phase_rules(phase=phase, domain=domain)) for phase in self.phases}
+
+
+RULE_REGISTRY = RuleRegistry()
+
+
+def register_rule(*, phase: str, rule: Rule, domain: str = "default", prepend: bool = False) -> Rule:
+    RULE_REGISTRY.register(phase=phase, rule=rule, domain=domain, prepend=prepend)
+    return rule
+
+
+register_rule(phase="hard-stop", rule=NoResponseRule())
+register_rule(phase="hard-stop", rule=EmptyInputRule())
+register_rule(phase="hard-stop", rule=ExitIntentRule())
+
+register_rule(phase="ambiguity-disambiguation", rule=VagueActorRule())
+register_rule(phase="ambiguity-disambiguation", rule=UrlIntentRule())
+register_rule(phase="ambiguity-disambiguation", rule=TimerUnitRule())
+register_rule(phase="ambiguity-disambiguation", rule=UncertaintyRule())
+
+register_rule(phase="fallback", rule=ActionableIntentRule())
+
+
+RULES_BY_PHASE: dict[str, list[Rule]] = RULE_REGISTRY.clone_domain(domain="default")
 
 
 def _legacy_naive_schema_selector(text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
@@ -483,11 +526,13 @@ def _legacy_naive_schema_selector(text: Optional[str], *, error: Optional[Captur
         SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
     )
 
-def naive_schema_selector(text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
+def naive_schema_selector(
+    text: Optional[str], *, error: Optional[CaptureOutcome], domain: str = "default"
+) -> SchemaSelection:
     ctx = build_selector_context(text, error=error)
 
     for phase in RULE_PHASES:
-        for rule in RULES_BY_PHASE[phase]:
+        for rule in RULE_REGISTRY.phase_rules(phase=phase, domain=domain):
             if rule.applies(ctx):
                 return rule.emit(ctx)
 

@@ -66,6 +66,13 @@ ignore = [
 ]
 
 [tool.mypy]
+# Mypy policy tiers:
+# - Tier 1 (strict): core domain logic under src/state_renormalization/**
+# - Tier 2 (moderate): Behave step glue under src/features/steps/**
+# - Tier 3 (relaxed): tests/**
+#
+# Keep global defaults strict so new production modules start from strong typing.
+# Then relax only the rules that are impractical for dynamic test/BDD glue code.
 python_version = "3.11"
 strict = true
 warn_unused_ignores = true
@@ -75,12 +82,21 @@ no_implicit_optional = true
 disallow_any_generics = true
 disallow_subclassing_any = true
 check_untyped_defs = true
-files = ["src/state_renormalization", "tests"]
+files = ["src/state_renormalization", "src/features/steps", "tests"]
 pretty = true
 show_error_codes = true
 
 # If your project imports optional deps in some modules:
 ignore_missing_imports = false
+
+# Tier 2: Behave step glue often relies on dynamic decorators/context objects.
+# Keep strict mode on, but disable only the checks that are noisy for this layer.
+[[tool.mypy.overrides]]
+module = "src.features.steps.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+check_untyped_defs = false
 
 # Tests often use duck-typing/fakes:
 [[tool.mypy.overrides]]

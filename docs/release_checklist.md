@@ -12,15 +12,13 @@ Use this checklist before tagging a release.
 
 ## Copy/paste evidence block (validator-compatible)
 
-Use this exact shape in the PR body for every status transition command:
+Generate the PR-template block from `docs/dod_manifest.json` instead of maintaining command examples here:
 
-```text
-pytest tests/milestones/test_alpha.py -k gate
-https://github.com/<org>/<repo>/actions/runs/123456789
-
-pytest tests/milestones/test_beta.py -k readiness
-https://github.com/<org>/<repo>/actions/runs/987654321
+```bash
+python .github/scripts/render_transition_evidence.py --emit-pr-template-autogen
 ```
+
+Paste the generated capability sections into the PR body and replace each placeholder URL with the matching CI run URL.
 
 ## Merge expectations for milestone and maturity PRs
 

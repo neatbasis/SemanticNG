@@ -8,6 +8,9 @@ Use this checklist before tagging a release.
 - [ ] **PR body evidence is required in addition to manifest fields:** Even when manifest evidence fields are populated (for example `ci_evidence_links`), command/evidence URL pairs must also appear in the PR body for validator pass.
 - [ ] **PR-body evidence placement verified:** Evidence must appear in the PR body near each command string (command line followed immediately by its evidence URL).
 - [ ] **Manifest evidence limitation acknowledged:** `docs/dod_manifest.json` evidence fields (for example `ci_evidence_links`) are insufficient by themselves for CI validator pass; the same evidence must be present in the PR body in command/evidence pairs.
+
+- [ ] **Local pre-commit guard enabled:** run `git config core.hooksPath .githooks` once per clone so transitioned-capability test commands are executed before commit.
+- [ ] **PR evidence block rendered from manifest transitions:** generate exact adjacency-ready command lines with `python .github/scripts/render_transition_evidence.py --base <base_sha> --head <head_sha>` and paste them into the PR body without markdown bullets/backticks.
 - [ ] **Maturity changelog updates captured:** Every maturity promotion/demotion in `docs/system_contract_map.md` has a dated changelog entry and corresponding CI evidence link.
 
 ## Copy/paste evidence block (validator-compatible)

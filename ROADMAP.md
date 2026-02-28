@@ -118,6 +118,51 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 - Track any allocation exception explicitly in cadence logs (date, scope, reason, approver, and timeboxed re-entry to `Next`).
 - Reconfirm dependency tags and sequencing gate status at each planning checkpoint before accepting `Later` scope.
 
+### Weekly CI failure review (lightweight evidence loop)
+
+- Run a weekly 30-minute review that groups CI failures by both `capability_id` and `invariant_id` (from halt details/test metadata).
+- Produce a compact rollup table with: failure count, first-seen date, latest-seen date, and owning roadmap horizon (`Next` or `Later`).
+- Treat this rollup as the default planning input; feature requests can add context but cannot override unresolved high-frequency failures without documented rationale.
+
+#### Weekly review output template
+
+| capability_id | invariant_id | failures (7d) | recurrence rank | mapped roadmap section | owner | action |
+| --- | --- | --- | --- | --- | --- | --- |
+| `observer_authorization` | `observer_not_authorized` | 6 | 1 | `Next` | contracts/engine | land authorization gating + explainable halt persistence follow-up |
+| `replay_projection_analytics` | `prediction_missing_for_effect` | 2 | 4 | `Later` | engine/persistence | keep design prep only until sequencing gate dependencies are met |
+
+#### Recurring-cause tracking and roadmap mapping
+
+- Maintain a running "Top recurring causes" list sourced from the weekly rollup and sorted by 4-week failure concentration.
+- Map each recurring cause directly to one roadmap section:
+  - `Next`: causes tied to active gate/halt, invariant, or authorization milestones.
+  - `Later`: causes tied to blocked capabilities that remain dependency-gated.
+- Re-map causes during each checkpoint if dependency status changes (for example, a `Later` cause can move to `Next` once sequencing prerequisites are met).
+
+#### Priority update rule (failure concentration first)
+
+- Planning priority is determined by failure concentration, not by breadth of incoming feature requests.
+- Default ordering rule:
+  1. Highest 4-week recurring failure cause mapped to `Next`.
+  2. Next highest `Next` cause with unresolved invariant/test gaps.
+  3. Only after top `Next` causes are actively addressed, consider `Later` discovery/design work.
+- Any override requires a roadmap note capturing evidence, approver, and expiry date.
+
+#### Roadmap decision notes (required record)
+
+- At each planning checkpoint, add a short decision note with:
+  - Date/checkpoint identifier.
+  - Top 3 recurring failure causes (with counts and `capability_id`/`invariant_id`).
+  - Chosen priority changes (`Next` vs `Later`) and explicit rationale.
+  - Deferred items and re-evaluation date.
+- Keep these notes in this roadmap file so prioritization remains auditable and evidence-driven over time.
+
+##### Decision notes log (append-only)
+
+| Date | Evidence snapshot (top recurring causes) | Priority decision | Notes/owner |
+| --- | --- | --- | --- |
+| _TBD_ | _Populate from weekly review rollup_ | _Set `Next` focus by highest failure concentration_ | _Record approver + recheck date_ |
+
 ### Planning checkpoint capability table
 
 Use this short table at each planning checkpoint to pick exactly one next PR scope.

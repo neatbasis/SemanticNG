@@ -56,6 +56,8 @@ def test_replay_projection_analytics_is_deterministic_across_repeated_runs(
     assert replay_a.records_processed == 3
     assert replay_a.projection_state.current_predictions.keys() == online_projection.current_predictions.keys()
     assert replay_a.projection_state.correction_metrics["comparisons"] == online_projection.correction_metrics["comparisons"]
+    assert replay_a.analytics_snapshot.correction_count == 1
+    assert replay_a.analytics_snapshot.correction_cost_total == 0.25
 
 
 def test_replay_projection_analytics_exposes_correction_lineage_from_append_only_log(
@@ -87,9 +89,38 @@ def test_replay_projection_analytics_exposes_correction_lineage_from_append_only
     assert replayed.correction_root_prediction_id == replayed.prediction_id
     assert replayed.correction_revision == 1
 
-    rows = [record for _, record in read_jsonl(log_path)]
-    corrected_rows = [row for row in rows if row.get("scope_key") == "turn:1" and row.get("was_corrected")]
-    assert corrected_rows[-1]["correction_root_prediction_id"] == "pred:base"
+    attribution = replay.analytics_snapshot.correction_cost_attribution["pred:base"]
+    assert attribution.correction_count == 1
+    assert attribution.correction_cost_total == 0.25
+
+
+def test_replay_projection_analytics_snapshot_matches_for_independent_consumers(
+    make_episode: Callable[..., Episode],
+    make_ask_result: Callable[..., AskResult],
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / "predictions.jsonl"
+    ep = make_episode(
+        conversation_id="conv:independent-consumers",
+        turn_index=1,
+        ask=make_ask_result(status=AskStatus.OK, sentence="yes"),
+    )
+
+    run_mission_loop(
+        ep,
+        BeliefState(),
+        ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+        pending_predictions=[PredictionRecord.model_validate(FIXED_PREDICTION)],
+        prediction_log_path=log_path,
+    )
+
+    consumer_a_snapshot = replay_projection_analytics(log_path).analytics_snapshot
+    consumer_b_snapshot = replay_projection_analytics(log_path).analytics_snapshot
+
+    assert consumer_a_snapshot.model_dump(mode="json") == consumer_b_snapshot.model_dump(mode="json")
+    assert consumer_a_snapshot.correction_count == 1
+    assert consumer_a_snapshot.correction_cost_total == 0.25
+    assert consumer_a_snapshot.correction_cost_attribution["pred:base"].correction_count == 1
 
 
 def test_halt_explainability_fields_survive_episode_persistence_roundtrip(

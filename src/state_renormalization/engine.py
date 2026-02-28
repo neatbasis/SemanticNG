@@ -762,6 +762,7 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
     if not path.exists():
         return ProjectionReplayResult(
             projection_state=ProjectionState(current_predictions={}, updated_at_iso="1970-01-01T00:00:00+00:00"),
+            analytics_snapshot=ProjectionAnalyticsSnapshot(),
             records_processed=0,
         )
 
@@ -807,6 +808,7 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
 
     return ProjectionReplayResult(
         projection_state=projection,
+        analytics_snapshot=analytics,
         records_processed=records_processed,
     )
 

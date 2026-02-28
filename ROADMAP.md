@@ -60,9 +60,7 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
   - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`
   - Tests: `tests/test_predictions_contracts_and_gates.py`, `tests/test_persistence_jsonl.py`, `tests/test_replay_projection_analytics.py`, `tests/test_replay_projection_determinism.py`, `tests/test_replay_projection_restart_contracts.py`, `tests/test_prediction_outcome_binding.py`, `tests/replay_projection_analytics/test_append_only_replay.py`
 
-## Next (planned capabilities)
-
-### 1) Observer authorization contract (`status: planned`)
+### 7) Observer authorization contract (`status: done`)
 - **Owner area/module:** Contracts + Engine + Invariants (`src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`)
 - **Success criteria (test outcomes):**
   - `pytest tests/test_observer_frame.py` passes, validating `ObserverFrame` authorization shape and defaults.
@@ -71,11 +69,15 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
   - Files: `src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`
   - Tests: `tests/test_observer_frame.py`, `tests/test_predictions_contracts_and_gates.py`, `tests/test_invariants.py`
 
+## Next (planned capabilities)
+
+_No currently planned capabilities in `Next`; promotion work shifts to `Later` sequencing._
+
 ## Capability status alignment (manifest source-of-truth sync)
 
-- `done`: `prediction_persistence_baseline`, `channel_agnostic_pending_obligation`, `schema_selection_ambiguity_baseline`, `gate_halt_unification`, `invariant_matrix_coverage`, `replay_projection_analytics`.
+- `done`: `prediction_persistence_baseline`, `channel_agnostic_pending_obligation`, `schema_selection_ambiguity_baseline`, `gate_halt_unification`, `invariant_matrix_coverage`, `replay_projection_analytics`, `observer_authorization_contract`.
 - `in_progress`: _none currently recorded_.
-- `planned`: `observer_authorization_contract`, `capability_invocation_governance`, `repair_aware_projection_evolution`.
+- `planned`: `capability_invocation_governance`, `repair_aware_projection_evolution`.
 
 ## Later (larger architecture goals)
 
@@ -106,7 +108,7 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 ## Backlog dependency tags
 
 - `Later` item 1 (Replay projection analytics contract): `done`; maintain replay analytics suites as non-regression gates while sequencing `Next` governance contracts.
-- `Later` item 2 (Capability-invocation governance): `planned`; sequence after observer authorization contract to keep authorization semantics stable before external side-effect policy gating.
+- `Later` item 2 (Capability-invocation governance): `planned`; observer authorization contract is complete, so capability-side policy gating can now sequence as the next dependency-unblocked scope.
 - `Later` item 3 (Repair-aware projection evolution): `planned`; sequence after replay analytics baselines are stable to preserve auditable repair-event lineage.
 
 ## Planning cadence
@@ -125,7 +127,7 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 
 | capability_id | invariant_id | failures (7d) | recurrence rank | mapped roadmap section | owner | action |
 | --- | --- | --- | --- | --- | --- | --- |
-| `observer_authorization_contract` | `observer_not_authorized` | 6 | 1 | `Next` | contracts/engine | land authorization gating + explainable halt persistence follow-up |
+| `observer_authorization_contract` | `observer_not_authorized` | 6 | 1 | `Now` | contracts/engine | keep authorization gating + explainable halt persistence coverage green as a non-regression signal |
 | `replay_projection_analytics` | `prediction_missing_for_effect` | 2 | 4 | `Later` | engine/persistence | maintain deterministic replay analytics regressions as a stability baseline while `Next` items are prioritized |
 
 #### Recurring-cause tracking and roadmap mapping
@@ -166,9 +168,9 @@ Use this short table at each planning checkpoint to pick exactly one next PR sco
 
 | Capability ID | Dependency status (met/blocked) | Governance readiness (manifest+roadmap+contract-map aligned) | Test evidence completeness | Risk-reduction score | Recommended next action |
 | --- | --- | --- | --- | --- | --- |
-| `replay_projection_analytics` | met (`status=done`) | aligned | complete | 2/5 | Keep replay analytics tests green as non-regression guardrails; prioritize `observer_authorization_contract` for next implementation PRs. |
-| `observer_authorization_contract` | met (`status=planned`) | partial | partial | 4/5 | Prioritize the next PR to land runtime authorization gating + persisted explainable halt coverage. |
-| `capability_invocation_governance` | blocked (sequence after observer authorization) | blocked | missing | 5/5 | Keep design/doc prep only; defer merge work until observer authorization is done. |
+| `replay_projection_analytics` | met (`status=done`) | aligned | complete | 2/5 | Keep replay analytics tests green as non-regression guardrails while sequencing capability invocation governance. |
+| `observer_authorization_contract` | met (`status=done`) | aligned | complete | 4/5 | Maintain authorization gate/invariant allowlist tests as non-regression guardrails. |
+| `capability_invocation_governance` | met (observer authorization dependency complete) | partial | missing | 5/5 | Promote as next implementation PR scope with policy-aware side-effect gating tests. |
 | `repair_aware_projection_evolution` | blocked (sequence after replay analytics hardening) | blocked | missing | 3/5 | Draft explicit auditable repair-event contract tests while keeping strict halt-only behavior as default. |
 
 ## Guardrails (unchanged until Next milestones are complete)

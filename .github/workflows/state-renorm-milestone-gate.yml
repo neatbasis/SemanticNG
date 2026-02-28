@@ -90,25 +90,21 @@ jobs:
           mkdir -p artifacts
           python .github/scripts/render_transition_evidence.py \
             --base "$BASE_SHA" \
-            --head "$HEAD_SHA" | tee artifacts/transition-evidence.txt
+            --head "$HEAD_SHA" | tee artifacts/transition_evidence.txt
 
-      - name: Add transition evidence block to job summary
-        run: |
           {
             echo "## Transitioned Capability Evidence"
             echo
             echo "Paste this exact block into the PR description when milestone validation requests it."
             echo
-            echo '```markdown'
-            cat artifacts/transition-evidence.txt
-            echo '```'
+            cat artifacts/transition_evidence.txt
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload transition evidence artifact
         uses: actions/upload-artifact@v4
         with:
-          name: transition-evidence.txt
-          path: artifacts/transition-evidence.txt
+          name: transition_evidence.txt
+          path: artifacts/transition_evidence.txt
           if-no-files-found: error
 
       - name: Validate milestone documentation governance
@@ -128,14 +124,15 @@ jobs:
           if [[ $validator_status -ne 0 ]]; then
             if grep -Fq "MILESTONE_VALIDATION_ERROR=MISSING_PR_EVIDENCE" artifacts/validate_milestone_docs.log; then
               echo "VALIDATOR_MISSING_EVIDENCE=true" >> "$GITHUB_ENV"
-            fi
 
-            echo
-            echo "Milestone validation failed: missing transitioned-capability evidence block in the PR description."
-            echo "Remediation:"
-            echo "  1) Copy the generated block from the 'Transitioned Capability Evidence' section in this job summary."
-            echo "  2) Or download artifact 'transition-evidence.txt' and paste its contents into the PR description."
-            echo "  3) Keep the block formatting unchanged, then re-run checks."
+              echo
+              echo "Adjacency evidence validation failed."
+              echo "Copy/paste the generated block from the 'Transitioned Capability Evidence' section in this job summary"
+              echo "or from artifact 'transition_evidence.txt' into the PR body, then re-run checks."
+            else
+              echo
+              echo "Milestone validation failed. See artifacts/validate_milestone_docs.log for details."
+            fi
             exit "$validator_status"
           fi
 
@@ -151,7 +148,7 @@ jobs:
             echo "Validation failed due to missing transition evidence."
             echo "Copy this exact block into the PR description:"
             echo
-            cat artifacts/transition-evidence.txt
+            cat artifacts/transition_evidence.txt
           } > artifacts/transition_evidence_comment.md
 
       - name: Post transition evidence comment using GitHub API

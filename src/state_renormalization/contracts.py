@@ -565,6 +565,7 @@ class ProjectionReplayResult(BaseModel):
     model_config = _CONTRACT_CONFIG
 
     projection_state: ProjectionState
+    analytics_snapshot: ProjectionAnalyticsSnapshot = Field(default_factory=lambda: ProjectionAnalyticsSnapshot())
     records_processed: int = 0
 
 

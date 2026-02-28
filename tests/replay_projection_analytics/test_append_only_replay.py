@@ -169,11 +169,6 @@ def test_append_only_replay_preserves_minimal_correction_lineage_for_analytics(
     assert replayed.correction_parent_prediction_id == "pred:base"
     assert replayed.correction_revision == 1
 
-    rows = [row for _, row in read_jsonl(prediction_log) if row.get("event_kind") == "prediction_record"]
-    corrected_rows = [row for row in rows if row.get("scope_key") == "turn:1" and row.get("was_corrected")]
-    assert corrected_rows
-
-    latest = corrected_rows[-1]
-    assert latest["correction_root_prediction_id"] == "pred:base"
-    assert latest["correction_parent_prediction_id"] == "pred:base"
-    assert latest["correction_revision"] == 1
+    attribution = replay_projection_analytics(prediction_log).analytics_snapshot.correction_cost_attribution["pred:base"]
+    assert attribution.correction_count == 1
+    assert attribution.correction_cost_total == 0.25

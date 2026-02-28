@@ -176,3 +176,29 @@ def test_observer_included_in_schema_and_utterance_artifacts(make_episode, make_
     assert schema_artifact["observer"]["role"] == "assistant"
     assert utterance_artifact["observer"]["role"] == "assistant"
     assert utterance_artifact["interpretation_frame"]["authorization_level"] == "baseline"
+
+
+def test_build_episode_reads_stable_ids_from_nested_payload(make_policy_decision) -> None:
+    ep = build_episode(
+        conversation_id="conv:test",
+        turn_index=1,
+        assistant_prompt_asked="prompt",
+        policy_decision=make_policy_decision(),
+        payload={
+            "sentence": "hi",
+            "metrics": AskMetrics().model_dump(mode="json"),
+            "stable_ids": {
+                "feature_id": "feat_nested",
+                "scenario_id": "scn_nested",
+                "step_id": "stp_nested",
+            },
+            "scenario": "ignored when explicit ids are present",
+            "step_name": "ignored when explicit ids are present",
+        },
+        outputs=_outputs(),
+    )
+
+    policy_artifact = ep.artifacts[0]
+    assert policy_artifact["feature_id"] == "feat_nested"
+    assert policy_artifact["scenario_id"] == "scn_nested"
+    assert policy_artifact["step_id"] == "stp_nested"

@@ -199,6 +199,9 @@ def _derive_context_stable_ids(context) -> Dict[str, str]:
             if key.split(":", 1)[-1].split("@", 1)[0] == scenario_name:
                 scenario_id = sid
                 break
+    elif len(stable.scenario_ids) == 1:
+        scenario_id = next(iter(stable.scenario_ids.values()))
+
     if scenario_id is not None:
         out["scenario_id"] = scenario_id
 
@@ -212,6 +215,8 @@ def _derive_context_stable_ids(context) -> Dict[str, str]:
                 if key_scenario == scenario_key and key_step_text == step_name:
                     out["step_id"] = sid
                     break
+    elif len(stable.step_ids) == 1:
+        out["step_id"] = next(iter(stable.step_ids.values()))
 
     return out
 
@@ -224,9 +229,11 @@ def _initialize_pipeline_context(context) -> None:
 def _build_ingested_resource(context, dc: Dict[str, Any], payload_text: str) -> Resource:
     stable_ids = _derive_context_stable_ids(context)
     meta = {"dc": dict(dc)}
+    payload = {"text": payload_text}
     if stable_ids:
         meta["stable_ids"] = dict(stable_ids)
-    payload = {"text": payload_text}
+        meta.setdefault("semanticng", {}).update(stable_ids)
+        payload.update(stable_ids)
     canonical = {
         "meta": meta,
         "payload": payload,

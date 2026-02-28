@@ -141,6 +141,8 @@ def _derive_context_stable_ids(context) -> Dict[str, str]:
             if key.split(":", 1)[-1].split("@", 1)[0] == scenario_name:
                 out["scenario_id"] = sid
                 break
+    elif len(stable.scenario_ids) == 1:
+        out["scenario_id"] = next(iter(stable.scenario_ids.values()))
 
     step_name = getattr(step, "name", None)
     scenario_id = out.get("scenario_id")
@@ -153,6 +155,8 @@ def _derive_context_stable_ids(context) -> Dict[str, str]:
                 if key_scenario == scenario_key and key_step_text == step_name:
                     out["step_id"] = sid
                     break
+    elif len(stable.step_ids) == 1:
+        out["step_id"] = next(iter(stable.step_ids.values()))
 
     return out
 
@@ -173,6 +177,7 @@ def _build_and_store_resource(context) -> None:
     stable_ids = _derive_context_stable_ids(context)
     if stable_ids:
         context._meta["stable_ids"] = dict(stable_ids)
+        context._meta.setdefault("semanticng", {}).update(stable_ids)
     context.resource = build_resource(
         meta=context._meta,
         payload=context._payload,

@@ -75,3 +75,29 @@ def test_append_jsonl_persists_episode_observer(make_episode, tmp_path: Path) ->
     (_, rec), = list(read_jsonl(p))
     assert rec["observer"]["role"] == "assistant"
     assert "baseline.dialog" in rec["observer"]["capabilities"]
+
+
+def test_append_jsonl_propagates_stable_ids_to_embedding_and_ontology_records(tmp_path: Path) -> None:
+    p = tmp_path / "records.jsonl"
+
+    append_jsonl(
+        p,
+        {
+            "kind": "episode",
+            "stable_ids": {
+                "feature_id": "feat_1",
+                "scenario_id": "scn_1",
+                "step_id": "stp_1",
+            },
+            "embedding": {"model": "text-embedding-3"},
+            "ontology_alignment": {"concept": "Event"},
+            "elasticsearch_documents": [
+                {"index": "semanticng-events"},
+            ],
+        },
+    )
+
+    (_, rec), = list(read_jsonl(p))
+    assert rec["embedding"]["feature_id"] == "feat_1"
+    assert rec["ontology_alignment"]["scenario_id"] == "scn_1"
+    assert rec["elasticsearch_documents"][0]["step_id"] == "stp_1"

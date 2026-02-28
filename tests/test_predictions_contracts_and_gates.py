@@ -251,6 +251,42 @@ def _assert_result_contract(result: GateDecision) -> None:
         assert result.reason
 
 
+def test_gate_flow_contract_parity_for_continue_and_stop(tmp_path: Path) -> None:
+    scope = FIXED_PREDICTION["scope_key"]
+    projected = project_current(
+        PredictionRecord.model_validate(FIXED_PREDICTION),
+        ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+    )
+
+    continue_gate = evaluate_invariant_gates(
+        ep=None,
+        scope=scope,
+        prediction_key=scope,
+        projection_state=projected,
+        prediction_log_available=True,
+        just_written_prediction={"key": scope, "evidence_refs": [{"kind": "jsonl", "ref": "predictions.jsonl@1"}]},
+        halt_log_path=tmp_path / "continue_halts.jsonl",
+    )
+    stop_gate = evaluate_invariant_gates(
+        ep=None,
+        scope=scope,
+        prediction_key=scope,
+        projection_state=projected,
+        prediction_log_available=True,
+        just_written_prediction={"key": scope, "evidence_refs": []},
+        halt_log_path=tmp_path / "stop_halts.jsonl",
+    )
+
+    assert isinstance(continue_gate, Success)
+    assert all(out.flow == Flow.CONTINUE for out in continue_gate.artifact.pre_consume)
+    assert all(out.flow == Flow.CONTINUE for out in continue_gate.artifact.post_write)
+    assert all(out.flow == Flow.CONTINUE for out in continue_gate.artifact.combined)
+
+    assert isinstance(stop_gate, HaltRecord)
+    assert stop_gate.stage == "pre-decision:post_write"
+    assert stop_gate.invariant_id == InvariantId.EVIDENCE_LINK_COMPLETENESS.value
+
+
 def test_prediction_record_json_round_trip() -> None:
     pred = PredictionRecord.model_validate(FIXED_PREDICTION)
     dumped = pred.model_dump(mode="json")
@@ -457,11 +493,7 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
     assert artifact["artifact_kind"] == "invariant_outcomes"
     assert artifact["kind"] == "halt"
     assert artifact["halt"]["halt_id"].startswith("halt:")
-    assert artifact["halt"]["stable_halt_id"] == artifact["halt"]["halt_id"]
-    assert artifact["halt"]["violated_invariant_id"] == artifact["halt"]["invariant_id"]
-    assert artifact["halt"]["evidence_refs"] == artifact["halt"]["evidence"]
-    assert artifact["halt"]["retryable"] == artifact["halt"]["retryability"]
-    assert artifact["halt"]["timestamp_iso"] == artifact["halt"]["timestamp"]
+    assert set(artifact["halt"].keys()) == set(HaltRecord.required_payload_fields())
     assert artifact["halt_evidence_ref"] == {"kind": "jsonl", "ref": "halts.jsonl@1"}
     assert artifact["invariant_context"]["prediction_log_available"] is True
     assert artifact["invariant_context"]["has_current_predictions"] is True
@@ -497,10 +529,7 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
     assert halt_observation["artifact_kind"] == "halt_observation"
     assert halt_observation["observation_type"] == "halt"
     assert halt_observation["halt_id"].startswith("halt:")
-    assert halt_observation["stable_halt_id"] == halt_observation["halt_id"]
-    assert halt_observation["violated_invariant_id"] == halt_observation["invariant_id"]
-    assert halt_observation["retryable"] == halt_observation["retryability"]
-    assert halt_observation["timestamp_iso"] == halt_observation["timestamp"]
+    assert set(halt_observation.keys()) >= set(HaltRecord.required_payload_fields())
     assert halt_observation["invariant_id"] == "evidence_link_completeness.v1"
 
 

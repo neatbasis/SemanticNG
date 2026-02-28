@@ -415,7 +415,8 @@ class HaltRecord(BaseModel):
 
     def to_canonical_payload(self) -> Dict[str, Any]:
         """Canonical halt payload used by all STOP branches and persistence paths."""
-        return self.to_persistence_dict()
+        payload = self.model_dump(mode="json")
+        return {field: payload[field] for field in self.required_payload_fields()}
 
 
 class PredictionRecord(BaseModel):

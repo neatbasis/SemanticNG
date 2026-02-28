@@ -44,17 +44,13 @@ def test_append_halt_jsonl_roundtrip_and_evidence_ref_format(tmp_path: Path) -> 
 
     (meta, rec), = list(read_jsonl(p))
     assert rec["halt_id"] == "halt:1"
-    assert rec["stable_halt_id"] == "halt:1"
     assert rec["invariant_id"] == "evidence_link_completeness.v1"
-    assert rec["violated_invariant_id"] == "evidence_link_completeness.v1"
     assert rec["details"] == {"message": "x", "context": {"gate": "post_write"}}
     assert rec["evidence"] == [{"kind": "scope", "ref": "scope:test"}]
-    assert rec["evidence_refs"] == [{"kind": "scope", "ref": "scope:test"}]
     assert rec["retryability"] is True
-    assert rec["retryable"] is True
     assert rec["timestamp"] == "2026-02-13T00:00:00+00:00"
-    assert rec["timestamp_iso"] == "2026-02-13T00:00:00+00:00"
     assert rec["stage"] == "post_write"
+    assert set(rec.keys()) == set(HaltRecord.required_payload_fields())
     assert meta["lineno"] == 1
     assert ref == {"kind": "jsonl", "ref": "halts.jsonl@1"}
     assert "@" in ref["ref"]
@@ -127,7 +123,7 @@ def test_append_jsonl_propagates_stable_ids_to_embedding_and_ontology_records(tm
     assert rec["elasticsearch_documents"][0]["step_id"] == "stp_1"
 
 
-def test_append_halt_preserves_existing_halt_payload_fields_exactly(tmp_path: Path) -> None:
+def test_append_halt_reprojects_alias_payload_to_canonical_shape(tmp_path: Path) -> None:
     p = tmp_path / "halts.jsonl"
 
     payload = {
@@ -149,7 +145,11 @@ def test_append_halt_preserves_existing_halt_payload_fields_exactly(tmp_path: Pa
     append_halt(p, payload)
 
     (_, rec), = list(read_jsonl(p))
-    assert rec == payload
+    assert set(rec.keys()) == set(HaltRecord.required_payload_fields())
+    assert rec["halt_id"] == payload["halt_id"]
+    assert rec["invariant_id"] == payload["invariant_id"]
+    assert rec["evidence"] == payload["evidence"]
+    assert rec["retryability"] is True
 
 
 def test_append_halt_rejects_incomplete_payloads(tmp_path: Path) -> None:
@@ -217,7 +217,6 @@ def test_append_halt_flow_parity_across_stop_and_continue_artifacts(tmp_path: Pa
         "retryable": False,
         "timestamp": "2026-02-13T00:00:01+00:00",
         "timestamp_iso": "2026-02-13T00:00:01+00:00",
-        "flow": "continue",
     }
 
     append_halt(p, stop_payload)
@@ -227,14 +226,10 @@ def test_append_halt_flow_parity_across_stop_and_continue_artifacts(tmp_path: Pa
     stop_rec, continue_rec = rows
 
     for rec in (stop_rec, continue_rec):
-        assert rec["stable_halt_id"] == rec["halt_id"]
-        assert rec["violated_invariant_id"] == rec["invariant_id"]
+        assert set(rec.keys()) == set(HaltRecord.required_payload_fields())
         assert isinstance(rec["details"], dict)
-        assert rec["evidence_refs"] == rec["evidence"]
-        assert rec["retryable"] == rec["retryability"]
-        assert rec["timestamp_iso"] == rec["timestamp"]
-
-    assert continue_rec["flow"] == "continue"
+        assert isinstance(rec["retryability"], bool)
+        assert isinstance(rec["timestamp"], str)
 
 
 def test_append_halt_roundtrip_reprojects_required_fields_without_mutation(tmp_path: Path) -> None:
@@ -255,9 +250,41 @@ def test_append_halt_roundtrip_reprojects_required_fields_without_mutation(tmp_p
     (_, persisted), = list(read_jsonl(p))
     reprojected = HaltRecord.from_payload(persisted).to_canonical_payload()
 
+    assert set(reprojected.keys()) == set(HaltRecord.required_payload_fields())
     assert reprojected["invariant_id"] == payload["invariant_id"]
     assert reprojected["details"] == payload["details"]
     assert reprojected["evidence"] == payload["evidence"]
+
+
+def test_append_halt_round_trip_preserves_halt_payload_field_integrity(tmp_path: Path) -> None:
+    p = tmp_path / "halts.jsonl"
+
+    payload = {
+        "stable_halt_id": "halt:integrity",
+        "stage": "pre-decision:post_write",
+        "violated_invariant_id": "evidence_link_completeness.v1",
+        "reason": "integrity",
+        "details": {"message": "integrity", "attempt": 2},
+        "evidence_refs": [{"kind": "scope", "ref": "scope:test"}],
+        "retryable": True,
+        "timestamp_iso": "2026-02-13T00:00:02+00:00",
+    }
+
+    append_halt(p, payload)
+    (_, persisted), = list(read_jsonl(p))
+    roundtrip = HaltRecord.from_payload(persisted).to_canonical_payload()
+
+    assert persisted == roundtrip
+    assert roundtrip == {
+        "halt_id": "halt:integrity",
+        "stage": "pre-decision:post_write",
+        "invariant_id": "evidence_link_completeness.v1",
+        "reason": "integrity",
+        "details": {"message": "integrity", "attempt": 2},
+        "evidence": [{"kind": "scope", "ref": "scope:test"}],
+        "retryability": True,
+        "timestamp": "2026-02-13T00:00:02+00:00",
+    }
 
 
 def test_halt_reprojection_fails_closed_for_malformed_payload(tmp_path: Path) -> None:

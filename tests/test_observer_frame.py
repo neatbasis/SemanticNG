@@ -110,7 +110,7 @@ def test_episode_serialization_supports_null_observer(tmp_path: Path, make_episo
 
 def test_observer_enforcement_hooks_limit_invariant_evaluation(make_episode, make_observer) -> None:
     ep = make_episode(
-        observer=make_observer(evaluation_invariants=["prediction_retrievability.v1"]),
+        observer=make_observer(evaluation_invariants=["evidence_link_completeness.v1"]),
     )
 
     gate = evaluate_invariant_gates(
@@ -128,7 +128,7 @@ def test_observer_enforcement_hooks_limit_invariant_evaluation(make_episode, mak
     assert invariant_artifact["observer_enforcement"]["enforced"] is True
     assert invariant_artifact["observer_enforcement"]["authorization_level"] == "baseline"
     assert invariant_artifact["observer_enforcement"]["requested_evaluation_invariants"] == [
-        "prediction_retrievability.v1"
+        "evidence_link_completeness.v1"
     ]
 
 def test_build_episode_attaches_stable_ids_from_feature_doc(tmp_path: Path, make_policy_decision) -> None:

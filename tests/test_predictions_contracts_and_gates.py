@@ -64,7 +64,7 @@ def test_post_write_gate_passes_when_evidence_and_projection_current() -> None:
 
     assert isinstance(gate, GateSuccessOutcome)
     assert gate.artifact.post_write
-    assert gate.artifact.post_write[0].code == "prediction_write_materialized"
+    assert gate.artifact.post_write[0].code == "evidence_links_complete"
 
 
 def test_post_write_gate_halts_when_append_evidence_missing(tmp_path: Path) -> None:
@@ -86,9 +86,9 @@ def test_post_write_gate_halts_when_append_evidence_missing(tmp_path: Path) -> N
 
     assert isinstance(gate, GateHaltOutcome)
     halt = gate.artifact
-    assert halt.stage == "post_write"
-    assert halt.violated_invariant_id == "prediction_retrievability.v1"
-    assert halt.reason == "Prediction append did not produce retrievable evidence."
+    assert halt.stage == "pre-decision"
+    assert halt.violated_invariant_id == "evidence_link_completeness.v1"
+    assert halt.reason == "Prediction append did not produce linked evidence."
     assert [e.model_dump(mode="json") for e in halt.evidence_refs] == [{"kind": "scope", "ref": pred.scope_key}]
     assert halt.retryable is True
 
@@ -130,25 +130,25 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
     }
     assert artifact["invariant_checks"] == [
         {
-            "gate_point": "pre_consume",
+            "gate_point": "pre-decision",
             "invariant_id": "prediction_availability.v1",
             "passed": True,
             "evidence": [],
             "reason": "current_prediction_available",
         },
         {
-            "gate_point": "post_write",
-            "invariant_id": "prediction_retrievability.v1",
+            "gate_point": "pre-decision",
+            "invariant_id": "evidence_link_completeness.v1",
             "passed": False,
             "evidence": [{"kind": "scope", "ref": pred.scope_key}],
-            "reason": "Prediction append did not produce retrievable evidence.",
+            "reason": "Prediction append did not produce linked evidence.",
         },
         {
             "gate_point": "halt_validation",
-            "invariant_id": "explainable_halt_completeness.v1",
+            "invariant_id": "explainable_halt_payload.v1",
             "passed": True,
             "evidence": [],
-            "reason": "halt_explainable",
+            "reason": "halt_payload_explainable",
         },
     ]
 
@@ -156,7 +156,7 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
     assert halt_observation["artifact_kind"] == "halt_observation"
     assert halt_observation["observation_type"] == "halt"
     assert halt_observation["halt_id"].startswith("halt:")
-    assert halt_observation["violated_invariant_id"] == "prediction_retrievability.v1"
+    assert halt_observation["violated_invariant_id"] == "evidence_link_completeness.v1"
 
 
 def test_append_prediction_and_projection_support_post_write_gate(tmp_path: Path) -> None:
@@ -180,7 +180,7 @@ def test_append_prediction_and_projection_support_post_write_gate(tmp_path: Path
     assert evidence["ref"].startswith("predictions.jsonl@")
     assert projected.current_predictions[pred.scope_key] == pred
     assert isinstance(gate, GateSuccessOutcome)
-    assert gate.artifact.post_write[0].code == "prediction_write_materialized"
+    assert gate.artifact.post_write[0].code == "evidence_links_complete"
 
 
 def test_pre_consume_gate_halts_without_any_projected_predictions(tmp_path: Path) -> None:

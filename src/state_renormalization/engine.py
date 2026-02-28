@@ -41,7 +41,7 @@ from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.invariants import (
     Flow as InvariantFlow,
     InvariantId,
-    NormalizedCheckerOutput,
+    CheckerResult,
     InvariantOutcome,
     REGISTRY,
     default_check_context,
@@ -100,7 +100,7 @@ GateDecision = GateSuccessOutcome | GateHaltOutcome
 @dataclass(frozen=True)
 class GateInvariantCheck:
     gate_point: str
-    output: NormalizedCheckerOutput
+    output: CheckerResult
 
 
 def _observer_allowed_invariants(observer: Optional[ObserverFrame]) -> Optional[set[InvariantId]]:
@@ -318,7 +318,7 @@ def _run_invariant(invariant_id: InvariantId, *, ctx) -> InvariantOutcome:
         just_written_prediction=ctx.just_written_prediction,
         halt_candidate=outcome,
     )
-    explainable_halt = REGISTRY[InvariantId.EXPLAINABLE_HALT_COMPLETENESS](h0_ctx)
+    explainable_halt = REGISTRY[InvariantId.EXPLAINABLE_HALT_PAYLOAD](h0_ctx)
     if explainable_halt.flow == InvariantFlow.STOP:
         return explainable_halt
     return outcome
@@ -331,6 +331,7 @@ def evaluate_invariant_gates(
     prediction_key: Optional[str],
     projection_state: ProjectionState,
     prediction_log_available: bool,
+    gate_point: str = "pre-decision",
     just_written_prediction: Optional[Mapping[str, Any]] = None,
     halt_log_path: str | Path = "halts.jsonl",
 ) -> GateDecision:
@@ -352,12 +353,12 @@ def evaluate_invariant_gates(
         )
         pre_outcome = _run_invariant(InvariantId.PREDICTION_AVAILABILITY, ctx=pre_ctx)
         pre_consume = (pre_outcome,)
-        gate_checks.append(GateInvariantCheck(gate_point="pre_consume", output=normalize_outcome(pre_outcome)))
+        gate_checks.append(GateInvariantCheck(gate_point=gate_point, output=normalize_outcome(pre_outcome, gate=gate_point)))
 
     post_write: Sequence[InvariantOutcome] = tuple()
     if just_written_prediction is not None and _observer_allows_invariant(
         observer=observer,
-        invariant_id=InvariantId.PREDICTION_RETRIEVABILITY,
+        invariant_id=InvariantId.EVIDENCE_LINK_COMPLETENESS,
     ):
         post_ctx = default_check_context(
             scope=scope,
@@ -366,19 +367,19 @@ def evaluate_invariant_gates(
             prediction_log_available=prediction_log_available,
             just_written_prediction=just_written_prediction,
         )
-        post_write = (_run_invariant(InvariantId.PREDICTION_RETRIEVABILITY, ctx=post_ctx),)
+        post_write = (_run_invariant(InvariantId.EVIDENCE_LINK_COMPLETENESS, ctx=post_ctx),)
         gate_checks.append(
-            GateInvariantCheck(gate_point="post_write", output=normalize_outcome(post_write[0]))
+            GateInvariantCheck(gate_point=gate_point, output=normalize_outcome(post_write[0], gate=gate_point))
         )
 
     halt_outcome: Optional[InvariantOutcome] = None
     halt_stage: Optional[str] = None
     if pre_outcome is not None and pre_outcome.flow == InvariantFlow.STOP:
         halt_outcome = pre_outcome
-        halt_stage = "pre_consume"
+        halt_stage = gate_point
     elif post_write and post_write[0].flow == InvariantFlow.STOP:
         halt_outcome = post_write[0]
-        halt_stage = "post_write"
+        halt_stage = gate_point
 
     halt_record: Optional[HaltRecord] = None
     if halt_outcome is not None and halt_stage is not None:
@@ -387,7 +388,7 @@ def evaluate_invariant_gates(
             GateInvariantCheck(
                 gate_point="halt_validation",
                 output=normalize_outcome(
-                    REGISTRY[InvariantId.EXPLAINABLE_HALT_COMPLETENESS](
+                    REGISTRY[InvariantId.EXPLAINABLE_HALT_PAYLOAD](
                         default_check_context(
                             scope=scope,
                             prediction_key=prediction_key,
@@ -396,7 +397,7 @@ def evaluate_invariant_gates(
                             just_written_prediction=just_written_prediction,
                             halt_candidate=halt_outcome,
                         )
-                    )
+                    ), gate=gate_point
                 ),
             )
         )
@@ -651,6 +652,7 @@ def run_mission_loop(
         },
     )
 
+    last_written_prediction = {"key": turn_prediction.scope_key, "evidence_refs": [turn_prediction_ref]}
     for pending in pending_predictions:
         pred = pending if isinstance(pending, PredictionRecord) else PredictionRecord.model_validate(pending)
         evidence_ref = append_prediction_record(
@@ -673,18 +675,7 @@ def run_mission_loop(
                 "projection_updated_at_iso": updated_projection.updated_at_iso,
             },
         )
-
-        gate = evaluate_invariant_gates(
-            ep=ep,
-            scope=pred.scope_key,
-            prediction_key=pred.scope_key,
-            projection_state=updated_projection,
-            prediction_log_available=True,
-            just_written_prediction={"key": pred.scope_key, "evidence_refs": [evidence_ref]},
-        )
-        if isinstance(gate, GateHaltOutcome):
-            return ep, belief, updated_projection
-
+        last_written_prediction = {"key": pred.scope_key, "evidence_refs": [evidence_ref]}
 
     active_scope = next(iter(updated_projection.current_predictions), "decision_stage")
     pre_decision_gate = evaluate_invariant_gates(
@@ -693,12 +684,37 @@ def run_mission_loop(
         prediction_key=None,
         projection_state=updated_projection,
         prediction_log_available=True,
+        gate_point="pre-decision",
     )
     if isinstance(pre_decision_gate, GateHaltOutcome):
         return ep, belief, updated_projection
 
     ep = ingest_observation(ep)
     updated_projection = _reconcile_predictions(ep, updated_projection, prediction_log_path=prediction_log_path)
+
+    post_observation_gate = evaluate_invariant_gates(
+        ep=ep,
+        scope=active_scope,
+        prediction_key=None,
+        projection_state=updated_projection,
+        prediction_log_available=True,
+        gate_point="post-observation",
+    )
+    if isinstance(post_observation_gate, GateHaltOutcome):
+        return ep, belief, updated_projection
+
+    pre_output_gate = evaluate_invariant_gates(
+        ep=ep,
+        scope=active_scope,
+        prediction_key=last_written_prediction.get("key"),
+        projection_state=updated_projection,
+        prediction_log_available=True,
+        gate_point="pre-output",
+        just_written_prediction=last_written_prediction,
+    )
+    if isinstance(pre_output_gate, GateHaltOutcome):
+        return ep, belief, updated_projection
+
     ep, belief = apply_utterance_interpretation(ep, belief)
     ep, belief = apply_schema_bubbling(ep, belief)
     return ep, belief, updated_projection

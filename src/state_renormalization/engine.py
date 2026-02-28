@@ -130,6 +130,31 @@ def _observer_allows_invariant(*, observer: Optional[ObserverFrame], invariant_i
     return invariant_id in allowed
 
 
+def _observer_has_capability(observer: Optional[ObserverFrame], capability: str) -> bool:
+    if observer is None:
+        return True
+    configured = getattr(observer, "capabilities", None) or []
+    return capability in configured
+
+
+def _observer_authorized_for_action(
+    *,
+    observer: Optional[ObserverFrame],
+    action: str,
+    required_capability: str,
+) -> tuple[bool, dict[str, Any]]:
+    authorized = _observer_has_capability(observer, required_capability)
+    context = {
+        "action": action,
+        "required_capability": required_capability,
+        "observer_role": getattr(observer, "role", None),
+        "authorization_level": getattr(observer, "authorization_level", None),
+        "observer_capabilities": list(getattr(observer, "capabilities", []) or []),
+        "authorized": authorized,
+    }
+    return authorized, context
+
+
 def _as_evidence_ref(item: Mapping[str, Any]) -> EvidenceRef:
     kind = str(item.get("kind") or "unknown")
     ref = item.get("ref")
@@ -160,6 +185,51 @@ def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltR
         evidence=[_as_evidence_ref(_to_dict(item)) for item in outcome.evidence],
         timestamp=_now_iso(),
         retryability=bool(outcome.action_hints),
+    )
+
+
+def _authorization_halt_record(*, stage: str, reason: str, context: Mapping[str, Any]) -> HaltRecord:
+    evidence = [
+        EvidenceRef(kind="authorization_scope", ref=f"action:{context.get('action', 'unknown')}"),
+        EvidenceRef(kind="required_capability", ref=str(context.get("required_capability") or "unknown")),
+    ]
+    return HaltRecord(
+        halt_id=f"halt:{sha1_text(f'{stage}|authorization.scope.v1|{reason}|{_to_dict(context)}')}",
+        stage=stage,
+        invariant_id="authorization.scope.v1",
+        reason=reason,
+        evidence=evidence,
+        timestamp=_now_iso(),
+        retryability=True,
+    )
+
+
+def _append_authorization_issue(ep: Episode, *, halt: HaltRecord, context: Mapping[str, Any]) -> None:
+    _append_episode_artifact(
+        ep,
+        {
+            "artifact_kind": "authorization_issue",
+            "issue_type": "authorization_scope_violation",
+            "halt_id": halt.halt_id,
+            "stage": halt.stage,
+            "invariant_id": halt.invariant_id,
+            "reason": halt.reason,
+            "observer": _to_dict(getattr(ep, "observer", None)),
+            "authorization_context": _to_dict(context),
+            "retryability": halt.retryability,
+            "timestamp": halt.timestamp,
+        },
+    )
+    if not hasattr(ep, "observations") or getattr(ep, "observations") is None:
+        setattr(ep, "observations", [])
+    ep.observations.append(
+        Observation(
+            observation_id=_new_id("obs:"),
+            t_observed_iso=_now_iso(),
+            type=ObservationType.HALT,
+            text=halt.reason,
+            source=f"authorization:{context.get('action', 'unknown')}",
+        )
     )
 
 
@@ -368,6 +438,36 @@ def evaluate_invariant_gates(
     halt_log_path: str | Path = "halts.jsonl",
 ) -> GateDecision:
     observer = getattr(ep, "observer", None) if ep is not None else None
+    is_authorized, auth_context = _observer_authorized_for_action(
+        observer=observer,
+        action="evaluate_invariant_gates",
+        required_capability="baseline.invariant_evaluation",
+    )
+    if ep is not None and not is_authorized:
+        halt = _authorization_halt_record(
+            stage=gate_point,
+            reason="observer is not authorized to evaluate invariant gates",
+            context=auth_context,
+        )
+        halt_evidence_ref = append_halt_record(halt, halt_log_path=halt_log_path, stable_ids=_episode_stable_ids(ep))
+        _append_authorization_issue(ep, halt=halt, context=auth_context)
+        _append_episode_artifact(
+            ep,
+            {
+                "artifact_kind": "halt_observation",
+                "observation_type": "halt",
+                "halt_id": halt.halt_id,
+                "stage": halt.stage,
+                "invariant_id": halt.invariant_id,
+                "reason": halt.reason,
+                "retryability": halt.retryability,
+                "timestamp": halt.timestamp,
+                "evidence": [_to_dict(e) for e in halt.evidence],
+                "halt_evidence_ref": halt_evidence_ref,
+            },
+        )
+        return halt
+
     current_predictions = {
         key: pred.prediction_id
         for key, pred in projection_state.current_predictions.items()
@@ -836,6 +936,9 @@ def ingest_observation(ep: Episode) -> Episode:
     obs_id = f"obs:{ep.episode_id}:0"
     t = _now_iso()
 
+    if not hasattr(ep, "observations") or getattr(ep, "observations") is None:
+        setattr(ep, "observations", [])
+
     if ep.ask.status == AskStatus.OK and (ep.ask.sentence or "").strip():
         ep.observations.append(
             Observation(
@@ -871,6 +974,20 @@ def attach_decision_effect(prev_ep: Optional[Episode], curr_ep: Episode) -> Epis
 
     decision_id = getattr(prev_ep.policy_decision, "decision_id", None)
     if not decision_id:
+        return curr_ep
+
+    is_authorized, auth_context = _observer_authorized_for_action(
+        observer=curr_ep.observer,
+        action="attach_decision_effect",
+        required_capability="baseline.evaluation",
+    )
+    if not is_authorized:
+        halt = _authorization_halt_record(
+            stage="decision-evaluation",
+            reason="observer is not authorized to attach decision effects",
+            context=auth_context,
+        )
+        _append_authorization_issue(curr_ep, halt=halt, context=auth_context)
         return curr_ep
 
     user_text = extract_user_utterance(curr_ep)
@@ -922,6 +1039,20 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
       - belief.pending_question (str)
       - belief.pending_attempts (int)
     """
+    is_authorized, auth_context = _observer_authorized_for_action(
+        observer=ep.observer,
+        action="apply_schema_bubbling",
+        required_capability="baseline.schema_selection",
+    )
+    if not is_authorized:
+        halt = _authorization_halt_record(
+            stage="policy-schema",
+            reason="observer is not authorized for schema bubbling",
+            context=auth_context,
+        )
+        _append_authorization_issue(ep, halt=halt, context=auth_context)
+        return ep, belief
+
     user_text = extract_user_utterance(ep)
     raw_selection: SchemaSelection = naive_schema_selector(user_text, error=ep.ask.error)
     sel = _validated_selection(raw_selection)
@@ -981,7 +1112,7 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
         ep,
         {
             "kind": "schema_selection",
-            "observer": _to_dict(ep.observer),
+            "observer": _to_dict(getattr(ep, "observer", None)),
             "schemas": [{"name": h.name, "score": h.score, "about": _to_dict(h.about)} for h in sel.schemas],
             "ambiguities": [_to_dict(a) for a in belief.ambiguities_active],
             "ambiguity_state": belief.ambiguity_state.value,
@@ -999,6 +1130,20 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
 
 
 def apply_utterance_interpretation(ep: Episode, belief: BeliefState) -> tuple[Episode, BeliefState]:
+    is_authorized, auth_context = _observer_authorized_for_action(
+        observer=ep.observer,
+        action="apply_utterance_interpretation",
+        required_capability="baseline.dialog",
+    )
+    if not is_authorized:
+        halt = _authorization_halt_record(
+            stage="policy-utterance",
+            reason="observer is not authorized for utterance interpretation",
+            context=auth_context,
+        )
+        _append_authorization_issue(ep, halt=halt, context=auth_context)
+        return ep, belief
+
     user_text = extract_user_utterance(ep)
     utype = classify_utterance(user_text, ep.ask.error)
 
@@ -1015,7 +1160,7 @@ def apply_utterance_interpretation(ep: Episode, belief: BeliefState) -> tuple[Ep
         ep,
         {
             "kind": "utterance_interpretation",
-            "observer": _to_dict(ep.observer),
+            "observer": _to_dict(getattr(ep, "observer", None)),
             "interpretation_frame": {
                 "observer_role": getattr(ep.observer, "role", None),
                 "authorization_level": getattr(ep.observer, "authorization_level", None),

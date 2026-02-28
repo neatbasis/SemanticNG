@@ -288,7 +288,12 @@ class ObserverFrame(BaseModel):
 def default_observer_frame() -> ObserverFrame:
     return ObserverFrame(
         role="assistant",
-        capabilities=["baseline.dialog", "baseline.schema_selection"],
+        capabilities=[
+            "baseline.dialog",
+            "baseline.schema_selection",
+            "baseline.invariant_evaluation",
+            "baseline.evaluation",
+        ],
         authorization_level="baseline",
         evaluation_invariants=[],
     )

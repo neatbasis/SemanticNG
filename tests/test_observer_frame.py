@@ -202,3 +202,41 @@ def test_build_episode_reads_stable_ids_from_nested_payload(make_policy_decision
     assert policy_artifact["feature_id"] == "feat_nested"
     assert policy_artifact["scenario_id"] == "scn_nested"
     assert policy_artifact["step_id"] == "stp_nested"
+
+
+def test_evaluate_invariant_gates_blocks_unauthorized_observer(make_episode, make_observer) -> None:
+    ep = make_episode(observer=make_observer(capabilities=["baseline.dialog"]))
+
+    gate = evaluate_invariant_gates(
+        ep=ep,
+        scope="scope:test",
+        prediction_key=None,
+        projection_state=ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+        prediction_log_available=True,
+    )
+
+    assert gate.invariant_id == "authorization.scope.v1"
+    issue = next(a for a in ep.artifacts if a.get("artifact_kind") == "authorization_issue")
+    assert issue["issue_type"] == "authorization_scope_violation"
+    assert issue["authorization_context"]["action"] == "evaluate_invariant_gates"
+
+
+def test_policy_functions_block_unauthorized_actions(make_episode, make_ask_result, make_observer) -> None:
+    observer = make_observer(capabilities=["baseline.invariant_evaluation"])
+    prev_ep = make_episode(observer=observer)
+    curr_ep = make_episode(observer=observer, ask=make_ask_result(sentence="hello"))
+
+    curr_ep = attach_decision_effect(prev_ep, curr_ep)
+    assert curr_ep.effects == []
+
+    curr_ep = ingest_observation(curr_ep)
+    curr_ep, belief = apply_schema_bubbling(curr_ep, BeliefState())
+    curr_ep, belief = apply_utterance_interpretation(curr_ep, belief)
+
+    issues = [a for a in curr_ep.artifacts if a.get("artifact_kind") == "authorization_issue"]
+    assert len(issues) == 3
+    assert {issue["authorization_context"]["action"] for issue in issues} == {
+        "attach_decision_effect",
+        "apply_schema_bubbling",
+        "apply_utterance_interpretation",
+    }

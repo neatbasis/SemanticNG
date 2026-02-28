@@ -213,24 +213,28 @@ def check_explainable_halt_payload(ctx: CheckContext) -> InvariantOutcome:
     if candidate is None or candidate.flow != Flow.STOP:
         return _ok(InvariantId.EXPLAINABLE_HALT_PAYLOAD, "halt_check_not_applicable")
 
-    has_details = bool(candidate.details)
-    has_evidence = bool(candidate.evidence)
-    if has_details and has_evidence:
+    has_invariant_id = bool(candidate.invariant_id.value)
+    has_details_field = candidate.details is not None
+    has_evidence_field = candidate.evidence is not None
+    if has_invariant_id and has_details_field and has_evidence_field:
         return _ok(InvariantId.EXPLAINABLE_HALT_PAYLOAD, "halt_payload_explainable")
 
     return InvariantOutcome(
         invariant_id=InvariantId.EXPLAINABLE_HALT_PAYLOAD,
         passed=False,
-        reason="Stop outcomes must include both details and evidence.",
+        reason="Stop outcomes must include invariant_id, details, and evidence fields.",
         flow=Flow.STOP,
         validity=Validity.DEGRADED,
         code="halt_payload_incomplete",
         details={
-            "message": "Stop outcomes must include both details and evidence.",
+            "message": "Stop outcomes must include invariant_id, details, and evidence fields.",
             "offending_invariant": candidate.invariant_id.value,
             "offending_code": candidate.code,
+            "has_invariant_id": has_invariant_id,
+            "has_details_field": has_details_field,
+            "has_evidence_field": has_evidence_field,
         },
-        action_hints=({"kind": "add_evidence", "invariant": candidate.invariant_id.value},),
+        action_hints=({"kind": "normalize_halt_payload", "invariant": candidate.invariant_id.value},),
     )
 
 

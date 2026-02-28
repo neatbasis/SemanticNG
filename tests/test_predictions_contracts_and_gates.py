@@ -140,8 +140,8 @@ def _build_stop_context_for_explainable_halt_payload() -> Any:
             flow=Flow.STOP,
             validity=Validity.INVALID,
             code="no_predictions_projected",
-            details={"message": "Action selection requires at least one projected current prediction."},
-            evidence=(),
+            details=None,  # type: ignore[arg-type]
+            evidence=None,  # type: ignore[arg-type]
             action_hints=({"kind": "rebuild_view", "scope": "scope:test"},),
         ),
     )

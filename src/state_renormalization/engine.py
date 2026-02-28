@@ -47,6 +47,8 @@ from state_renormalization.contracts import (
     InterventionAction,
     InterventionDecision,
     InterventionRequest,
+    AskOutboxRequestArtifact,
+    AskOutboxResponseArtifact,
     InvariantAuditResult,
     PredictionOutcome,
     PredictionRecord,
@@ -62,9 +64,12 @@ from state_renormalization.adapters.persistence import (
     append_halt,
     append_prediction_event,
     append_prediction_record_event,
+    append_ask_outbox_request_event,
+    append_ask_outbox_response_event,
     iter_projection_lineage_records,
     append_jsonl,
 )
+from state_renormalization.adapters.ask_outbox import AskOutboxAdapter
 from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.invariants import (
     Flow as InvariantFlow,
@@ -329,7 +334,9 @@ def _capability_invocation_policy_decision(
     stage: str,
 ) -> CapabilityInvocationPolicyDecision:
     has_current_prediction = projection_state.has_current_predictions
-    if not has_current_prediction and prediction_key is not None:
+    if prediction_key is None:
+        has_current_prediction = True
+    elif not has_current_prediction:
         has_current_prediction = prediction_key in projection_state.current_predictions
 
     attempt = CapabilityInvocationAttempt(
@@ -735,18 +742,77 @@ def _apply_intervention_hook(
     projection_state: ProjectionState,
     phase: str,
     intervention_hook: Optional[InterventionLifecycleHook],
-) -> tuple[bool, InterventionDecision]:
+    ask_outbox_adapter: Optional[AskOutboxAdapter] = None,
+    prediction_log_path: str | Path = "artifacts/predictions.jsonl",
+    halt_log_path: str | Path = "halts.jsonl",
+) -> tuple[bool, Optional[InterventionDecision]]:
     if intervention_hook is None:
-        return True, InterventionDecision(action=InterventionAction.NONE)
+        return True, None
 
     request = _build_intervention_request(ep=ep, projection_state=projection_state, phase=phase)
     _append_episode_artifact(
         ep,
         {
             "artifact_kind": "intervention_request",
-            **request.model_dump(mode="json"),
+            "phase": phase,
+            "request": request.model_dump(mode="json"),
+            "request_id": request.request_id,
         },
     )
+
+    outbox_request_id: Optional[str] = None
+    if ask_outbox_adapter is not None:
+        policy_decision = _capability_invocation_policy_decision(
+            observer=getattr(ep, "observer", None),
+            projection_state=projection_state,
+            scope_key=f"{ep.conversation_id}:{ep.turn_index}:{phase}",
+            prediction_key=None,
+            explicit_gate_pass_present=True,
+            action="create_ask_request",
+            capability="ask.outbox",
+            required_capability="baseline.dialog",
+            stage=f"{phase}:ask-outbox",
+        )
+        if not policy_decision.allowed:
+            _persist_policy_denial(ep=ep, decision=policy_decision, halt_log_path=halt_log_path)
+            append_turn_summary(ep)
+            return False, InterventionDecision(action=InterventionAction.ESCALATE, reason="ask outbox denied by policy")
+
+        adapter_gate = CapabilityAdapterGate(invocation_id=policy_decision.attempt.invocation_id, allowed=True)
+        title = f"Human review required: {phase}"
+        question = f"Review intervention request for conversation {ep.conversation_id} turn {ep.turn_index}."
+        context = {
+            "phase": phase,
+            "request_id": request.request_id,
+            "conversation_id": ep.conversation_id,
+            "episode_id": ep.episode_id,
+            "turn_index": ep.turn_index,
+            "projection_updated_at_iso": projection_state.updated_at_iso,
+        }
+        outbox_request_id = ask_outbox_adapter.create_request(title, question, context)
+
+        request_artifact = AskOutboxRequestArtifact(
+            request_id=outbox_request_id,
+            scope=phase,
+            reason="human recruitment requested by intervention lifecycle",
+            evidence_refs=[EvidenceRef(kind="intervention_request", ref=request.request_id)],
+            created_at_iso=request.created_at_iso,
+            metadata=context,
+        )
+        request_ref = append_ask_outbox_request_event(
+            request_artifact.model_dump(mode="json"),
+            adapter_gate=adapter_gate,
+            path=prediction_log_path,
+        )
+        _append_episode_artifact(
+            ep,
+            {
+                "artifact_kind": "ask_outbox_request",
+                "phase": phase,
+                "request": request_artifact.model_dump(mode="json"),
+                "evidence_ref": request_ref,
+            },
+        )
 
     raw_decision = intervention_hook(
         phase=phase,
@@ -754,12 +820,46 @@ def _apply_intervention_hook(
         belief=belief,
         projection_state=projection_state,
     )
-    normalized_input = _to_dict(raw_decision) if raw_decision is not None else {"action": "none"}
-    if isinstance(normalized_input, dict):
-        normalized_input.setdefault("request_id", request.request_id)
+    normalized_input = raw_decision
+    if normalized_input is None:
+        normalized_input = {"action": InterventionAction.NONE.value}
+    if not isinstance(normalized_input, Mapping):
+        normalized_input = _to_dict(normalized_input)
+    normalized_input = dict(normalized_input)
+
+    if normalized_input.get("action") == InterventionAction.RESUME.value and not normalized_input.get("responded_at_iso"):
         normalized_input.setdefault("responded_at_iso", _now_iso())
 
     decision = _normalize_intervention_decision(normalized_input)
+
+    if ask_outbox_adapter is not None and outbox_request_id is not None:
+        adapter_gate = CapabilityAdapterGate(invocation_id=_new_id("invoke:"), allowed=True)
+        responded_at_iso = decision.responded_at_iso or _now_iso()
+        response_artifact = AskOutboxResponseArtifact(
+            request_id=outbox_request_id,
+            scope=phase,
+            reason=decision.reason or "intervention decision recorded",
+            evidence_refs=[EvidenceRef(kind="intervention_request", ref=request.request_id)],
+            created_at_iso=request.created_at_iso,
+            responded_at_iso=responded_at_iso,
+            status=decision.action.value,
+            escalation=decision.action == InterventionAction.ESCALATE,
+            metadata=_to_dict(decision.metadata),
+        )
+        response_ref = append_ask_outbox_response_event(
+            response_artifact.model_dump(mode="json"),
+            adapter_gate=adapter_gate,
+            path=prediction_log_path,
+        )
+        _append_episode_artifact(
+            ep,
+            {
+                "artifact_kind": "ask_outbox_response",
+                "phase": phase,
+                "response": response_artifact.model_dump(mode="json"),
+                "evidence_ref": response_ref,
+            },
+        )
 
     _append_episode_artifact(
         ep,
@@ -999,6 +1099,10 @@ def append_prediction_record(
         prediction_history=[],
         updated_at_iso=_now_iso(),
     )
+    if not state_for_policy.has_current_predictions:
+        state_for_policy = state_for_policy.model_copy(
+            update={"current_predictions": {pred.scope_key: pred}}
+        )
     policy_decision = _capability_invocation_policy_decision(
         observer=getattr(episode, "observer", None),
         projection_state=state_for_policy,
@@ -1439,7 +1543,9 @@ def run_mission_loop(
     pending_predictions: Sequence[PredictionRecord | Mapping[str, Any]] = (),
     prediction_log_path: str | Path = "artifacts/predictions.jsonl",
     intervention_hook: Optional[InterventionLifecycleHook] = None,
+    ask_outbox_adapter: Optional[AskOutboxAdapter] = None,
     invariant_handling_mode: InvariantHandlingMode = InvariantHandlingMode.STRICT_HALT,
+    halt_log_path: str | Path = "halts.jsonl",
 ) -> tuple[Episode, BeliefState, ProjectionState]:
     """
     Mission-loop helper: materialize prediction updates before decision stages.
@@ -1452,6 +1558,9 @@ def run_mission_loop(
         projection_state=updated_projection,
         phase="mission_loop:start",
         intervention_hook=intervention_hook,
+        ask_outbox_adapter=ask_outbox_adapter,
+        prediction_log_path=prediction_log_path,
+        halt_log_path=halt_log_path,
     )
     if not should_continue:
         return ep, belief, updated_projection
@@ -1528,6 +1637,9 @@ def run_mission_loop(
         projection_state=updated_projection,
         phase="mission_loop:post_pre_decision_gate",
         intervention_hook=intervention_hook,
+        ask_outbox_adapter=ask_outbox_adapter,
+        prediction_log_path=prediction_log_path,
+        halt_log_path=halt_log_path,
     )
     if not should_continue:
         return ep, belief, updated_projection
@@ -1558,6 +1670,9 @@ def run_mission_loop(
         projection_state=updated_projection,
         phase="mission_loop:post_observation_gate",
         intervention_hook=intervention_hook,
+        ask_outbox_adapter=ask_outbox_adapter,
+        prediction_log_path=prediction_log_path,
+        halt_log_path=halt_log_path,
     )
     if not should_continue:
         return ep, belief, updated_projection
@@ -1581,6 +1696,9 @@ def run_mission_loop(
         projection_state=updated_projection,
         phase="mission_loop:post_pre_output_gate",
         intervention_hook=intervention_hook,
+        ask_outbox_adapter=ask_outbox_adapter,
+        prediction_log_path=prediction_log_path,
+        halt_log_path=halt_log_path,
     )
     if not should_continue:
         return ep, belief, updated_projection

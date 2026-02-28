@@ -351,6 +351,38 @@ class InterventionRequest(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
+class AskOutboxRequestArtifact(BaseModel):
+    """Canonical append-only human-recruitment request artifact."""
+
+    model_config = _CONTRACT_CONFIG
+
+    event_kind: Literal["ask_outbox_request"] = "ask_outbox_request"
+    request_id: str
+    scope: str
+    reason: str
+    evidence_refs: List[EvidenceRef] = Field(default_factory=list)
+    created_at_iso: str
+    timeout_at_iso: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class AskOutboxResponseArtifact(BaseModel):
+    """Canonical append-only human-recruitment response artifact."""
+
+    model_config = _CONTRACT_CONFIG
+
+    event_kind: Literal["ask_outbox_response"] = "ask_outbox_response"
+    request_id: str
+    scope: str
+    reason: str
+    evidence_refs: List[EvidenceRef] = Field(default_factory=list)
+    created_at_iso: str
+    responded_at_iso: str
+    status: str
+    escalation: bool = False
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
 class InterventionDecision(BaseModel):
     """HITL intervention signal emitted at lifecycle hooks in mission loop."""
 

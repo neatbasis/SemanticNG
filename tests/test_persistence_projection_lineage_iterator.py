@@ -104,3 +104,35 @@ def test_iter_projection_lineage_records_skips_malformed_json_lines_and_non_obje
 
     lineage = list(iter_projection_lineage_records(path))
     assert [row.get("prediction_id", row.get("halt_id")) for row in lineage] == ["pred:ok", "halt:ok"]
+
+
+def test_iter_projection_lineage_records_includes_ask_outbox_events_for_replay(tmp_path: Path) -> None:
+    path = tmp_path / "ask-outbox.jsonl"
+
+    request = {
+        "event_kind": "ask_outbox_request",
+        "request_id": "ask:1",
+        "scope": "mission_loop:start",
+        "reason": "human recruitment requested by intervention lifecycle",
+        "evidence_refs": [{"kind": "intervention_request", "ref": "hitl:1"}],
+        "created_at_iso": "2026-02-14T00:00:00+00:00",
+    }
+    response = {
+        "event_kind": "ask_outbox_response",
+        "request_id": "ask:1",
+        "scope": "mission_loop:start",
+        "reason": "operator timeout",
+        "evidence_refs": [{"kind": "intervention_request", "ref": "hitl:1"}],
+        "created_at_iso": "2026-02-14T00:00:00+00:00",
+        "responded_at_iso": "2026-02-14T00:00:05+00:00",
+        "status": "timeout",
+        "escalation": False,
+    }
+
+    append_jsonl(path, request)
+    append_jsonl(path, response)
+
+    lineage_once = list(iter_projection_lineage_records(path))
+    lineage_twice = list(iter_projection_lineage_records(path))
+
+    assert lineage_once == lineage_twice == [request, response]

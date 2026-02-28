@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 
@@ -16,6 +17,119 @@ MISSING_GOVERNANCE_HANDOFF_MARKER = "MILESTONE_VALIDATION_ERROR=MISSING_GOVERNAN
 def _load_manifest(rev: str) -> dict:
     raw = subprocess.check_output(["git", "show", f"{rev}:docs/dod_manifest.json"], text=True)
     return json.loads(raw)
+
+
+def _load_no_regression_policy() -> dict:
+    return json.loads(Path("docs/no_regression_budget.json").read_text(encoding="utf-8"))
+
+
+def _waiver_scope_covers_failure(waiver: dict, capability_id: str, command: str) -> bool:
+    scope = waiver.get("scope")
+    if not isinstance(scope, dict):
+        return False
+    if scope.get("capability_id") != capability_id:
+        return False
+
+    command_packs = scope.get("command_packs")
+    if command_packs == "*":
+        return True
+    if not isinstance(command_packs, list):
+        return False
+    normalized = {entry for entry in command_packs if isinstance(entry, str)}
+    return command in normalized
+
+
+def _policy_waiver_mismatches(policy: dict, today: date | None = None) -> list[str]:
+    mismatches: list[str] = []
+    today = today or date.today()
+
+    waivers = policy.get("waivers")
+    if waivers is None:
+        return mismatches
+    if not isinstance(waivers, list):
+        return ["no_regression_budget policy field 'waivers' must be a list when provided."]
+
+    required_fields = ["owner", "reason", "rollback_by", "scope"]
+    for idx, waiver in enumerate(waivers):
+        if not isinstance(waiver, dict):
+            mismatches.append(f"waivers[{idx}] must be an object.")
+            continue
+
+        for field in required_fields:
+            value = waiver.get(field)
+            if value is None or (isinstance(value, str) and not value.strip()):
+                mismatches.append(f"waivers[{idx}] missing required field '{field}'.")
+
+        rollback_by = waiver.get("rollback_by")
+        if not isinstance(rollback_by, str) or not rollback_by.strip():
+            continue
+        try:
+            rollback_date = date.fromisoformat(rollback_by)
+        except ValueError:
+            mismatches.append(f"waivers[{idx}] rollback_by must use ISO format YYYY-MM-DD (found '{rollback_by}').")
+            continue
+
+        if rollback_date < today:
+            waiver_id = waiver.get("id") or f"waivers[{idx}]"
+            mismatches.append(
+                f"{waiver_id}: waiver expired on {rollback_by}; rollback-by dates must not be in the past."
+            )
+
+    return mismatches
+
+
+def _done_capability_no_regression_budget_mismatches(
+    base_manifest: dict,
+    head_manifest: dict,
+    policy: dict,
+) -> list[str]:
+    mismatches: list[str] = []
+    done_capability_ids = set(policy.get("done_capability_ids", []))
+    waivers = policy.get("waivers") if isinstance(policy.get("waivers"), list) else []
+
+    base_by_id = {cap.get("id"): cap for cap in base_manifest.get("capabilities", [])}
+    for capability in head_manifest.get("capabilities", []):
+        cap_id = capability.get("id")
+        if cap_id not in done_capability_ids:
+            continue
+        if capability.get("status") != "done":
+            continue
+
+        base_capability = base_by_id.get(cap_id) or {}
+        base_evidence_by_command = {
+            entry.get("command"): entry.get("evidence")
+            for entry in base_capability.get("ci_evidence_links", [])
+            if isinstance(entry, dict) and isinstance(entry.get("command"), str)
+        }
+        head_links = [entry for entry in capability.get("ci_evidence_links", []) if isinstance(entry, dict)]
+        refreshed = False
+        for entry in head_links:
+            command = entry.get("command")
+            evidence = entry.get("evidence")
+            if not isinstance(command, str):
+                continue
+            if base_evidence_by_command.get(command) != evidence:
+                refreshed = True
+                break
+
+        if not refreshed:
+            continue
+
+        for entry in head_links:
+            command = entry.get("command")
+            if not isinstance(command, str):
+                continue
+            result = str(entry.get("result", "pass")).strip().lower()
+            if result != "fail":
+                continue
+
+            covered = any(_waiver_scope_covers_failure(waiver, cap_id, command) for waiver in waivers)
+            if not covered:
+                mismatches.append(
+                    f"{cap_id}: evidence refreshed with failing command pack and no active waiver for '{command}'."
+                )
+
+    return mismatches
 
 
 def _changed_files(base_sha: str, head_sha: str) -> list[str]:
@@ -578,8 +692,9 @@ def main() -> int:
         return 1
 
     changed_files = _changed_files(base_sha, head_sha)
-    if "docs/dod_manifest.json" not in changed_files:
-        print("No dod_manifest governance changes detected.")
+    governance_inputs = {"docs/dod_manifest.json", "docs/no_regression_budget.json"}
+    if not (governance_inputs & set(changed_files)):
+        print("No milestone governance changes detected.")
         return 0
 
     event_name = os.environ.get("GITHUB_EVENT_NAME", "")
@@ -594,6 +709,26 @@ def main() -> int:
 
     base_manifest = _load_manifest(base_sha)
     head_manifest = _load_manifest(head_sha)
+    policy = _load_no_regression_policy()
+
+    waiver_mismatches = _policy_waiver_mismatches(policy)
+    if waiver_mismatches:
+        print("No-regression budget waiver records are invalid.")
+        for mismatch in waiver_mismatches:
+            print(f"  - {mismatch}")
+        return 1
+
+    no_regression_mismatches = _done_capability_no_regression_budget_mismatches(
+        base_manifest,
+        head_manifest,
+        policy,
+    )
+    if no_regression_mismatches:
+        print("No-regression budget check failed for done capability evidence refresh.")
+        for mismatch in no_regression_mismatches:
+            print(f"  - {mismatch}")
+        return 1
+
     status_transitions = _status_transitions(base_manifest, head_manifest)
 
     if status_transitions:

@@ -10,7 +10,7 @@ from state_renormalization.contracts import (
     ProjectionState,
     VerbosityDecision,
 )
-from state_renormalization.engine import run_mission_loop
+from state_renormalization.engine import append_turn_summary, run_mission_loop
 
 
 def test_run_mission_loop_updates_projection_before_decision_stages(
@@ -51,9 +51,11 @@ def test_run_mission_loop_updates_projection_before_decision_stages(
 
     assert "room:kitchen:light" in projection_out.current_predictions
     assert any(a.get("artifact_kind") == "prediction_emit" for a in ep_out.artifacts)
+    assert any(a.get("artifact_kind") == "turn_summary" for a in ep_out.artifacts)
     assert any(a.get("artifact_kind") == "prediction_comparison" for a in ep_out.artifacts)
     assert any(a.get("artifact_kind") == "prediction_update" for a in ep_out.artifacts)
     assert ep_out.observations
+    assert any(a.get("artifact_kind") == "turn_summary" for a in ep_out.artifacts)
     assert projection_out.correction_metrics.get("comparisons", 0.0) >= 1.0
 
     events = [rec for _, rec in read_jsonl(tmp_path / "predictions.jsonl")]
@@ -82,3 +84,33 @@ def test_run_mission_loop_emits_turn_prediction_when_no_pending_predictions(
     assert len(ep_out.observations) == 1
     assert ep_out.observations[0].type.value == "user_utterance"
     assert any(a.get("artifact_kind") == "prediction_emit" for a in ep_out.artifacts)
+
+
+def test_append_turn_summary_includes_halts_for_operator_handoff(
+    make_episode: Callable[..., Episode],
+    make_policy_decision: Callable[..., VerbosityDecision],
+    make_ask_result: Callable[..., AskResult],
+) -> None:
+    ep = make_episode(
+        decision=make_policy_decision(),
+        ask=make_ask_result(sentence="turn on the kitchen light"),
+    )
+    ep.artifacts.append(
+        {
+            "artifact_kind": "halt_observation",
+            "halt_id": "halt:abc",
+            "stage": "pre-output",
+            "invariant_id": "evidence_link_completeness.v1",
+            "reason": "missing evidence",
+            "retryability": True,
+            "timestamp": "2026-02-13T00:00:00+00:00",
+            "halt_evidence_ref": {"kind": "jsonl", "ref": "halts.jsonl@1"},
+        }
+    )
+
+    append_turn_summary(ep)
+
+    summary = next(a for a in ep.artifacts if a.get("artifact_kind") == "turn_summary")
+    assert summary["halt_count"] == 1
+    assert summary["halts"][0]["halt_id"] == "halt:abc"
+    assert summary["operator_action"] == "review_halts_then_resume_next_turn"

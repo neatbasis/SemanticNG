@@ -5,7 +5,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Protocol
+from typing import AbstractSet, Any, Mapping, Optional, Protocol
 
 from state_renormalization.contracts import (
     AboutKind,
@@ -95,13 +95,30 @@ class SelectorContext:
     metadata: dict[str, object] = field(default_factory=dict)
 
 
+class SelectorCheckContext(Protocol):
+    @property
+    def raw(self) -> str: ...
+
+    @property
+    def normalized(self) -> str: ...
+
+    @property
+    def tokens(self) -> AbstractSet[str]: ...
+
+    @property
+    def error(self) -> Optional[CaptureOutcome]: ...
+
+    @property
+    def metadata(self) -> Mapping[str, Any]: ...
+
+
 class Rule(Protocol):
     @property
     def name(self) -> str: ...
 
-    def applies(self, ctx: SelectorContext) -> bool: ...
+    def applies(self, ctx: SelectorCheckContext) -> bool: ...
 
-    def emit(self, ctx: SelectorContext) -> SchemaSelection: ...
+    def emit(self, ctx: SelectorCheckContext) -> SchemaSelection: ...
 
 
 class SelectorDecisionStatus(str, Enum):
@@ -147,10 +164,10 @@ class SelectorDecisionOutcome:
 class BaseRule:
     name: str
 
-    def applies(self, ctx: SelectorContext) -> bool:
+    def applies(self, ctx: SelectorCheckContext) -> bool:
         raise NotImplementedError
 
-    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+    def emit(self, ctx: SelectorCheckContext) -> SchemaSelection:
         raise NotImplementedError
 
 
@@ -194,10 +211,10 @@ def _selection(*, schemas: list[SchemaHit], ambiguities: list[Ambiguity], notes:
 class NoResponseRule(BaseRule):
     name: str = "no_response"
 
-    def applies(self, ctx: SelectorContext) -> bool:
+    def applies(self, ctx: SelectorCheckContext) -> bool:
         return ctx.error is not None and ctx.error.status == CaptureStatus.NO_RESPONSE
 
-    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+    def emit(self, ctx: SelectorCheckContext) -> SchemaSelection:
         return _no_response_emit(ctx)
 
 
@@ -205,10 +222,10 @@ class NoResponseRule(BaseRule):
 class EmptyInputRule(BaseRule):
     name: str = "empty_input"
 
-    def applies(self, ctx: SelectorContext) -> bool:
+    def applies(self, ctx: SelectorCheckContext) -> bool:
         return ctx.error is None and not ctx.normalized.strip()
 
-    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+    def emit(self, ctx: SelectorCheckContext) -> SchemaSelection:
         return _empty_input_emit(ctx)
 
 
@@ -216,10 +233,10 @@ class EmptyInputRule(BaseRule):
 class ExitIntentRule(BaseRule):
     name: str = "exit_intent"
 
-    def applies(self, ctx: SelectorContext) -> bool:
+    def applies(self, ctx: SelectorCheckContext) -> bool:
         return ctx.error is None and is_exit_intent(ctx.normalized)
 
-    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+    def emit(self, ctx: SelectorCheckContext) -> SchemaSelection:
         return _exit_emit(ctx)
 
 
@@ -227,10 +244,10 @@ class ExitIntentRule(BaseRule):
 class VagueActorRule(BaseRule):
     name: str = "vague_actor"
 
-    def applies(self, ctx: SelectorContext) -> bool:
+    def applies(self, ctx: SelectorCheckContext) -> bool:
         return bool((ctx.tokens & VAGUE_PRONOUNS) and any(w in ctx.tokens for w in ARRIVAL_WORDS))
 
-    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+    def emit(self, ctx: SelectorCheckContext) -> SchemaSelection:
         return _vague_actor_emit(ctx)
 
 
@@ -238,10 +255,10 @@ class VagueActorRule(BaseRule):
 class UrlIntentRule(BaseRule):
     name: str = "url_intent"
 
-    def applies(self, ctx: SelectorContext) -> bool:
+    def applies(self, ctx: SelectorCheckContext) -> bool:
         return bool(ctx.metadata.get("has_url"))
 
-    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+    def emit(self, ctx: SelectorCheckContext) -> SchemaSelection:
         return _url_emit(ctx)
 
 
@@ -249,14 +266,14 @@ class UrlIntentRule(BaseRule):
 class TimerUnitRule(BaseRule):
     name: str = "timer_unit"
 
-    def applies(self, ctx: SelectorContext) -> bool:
+    def applies(self, ctx: SelectorCheckContext) -> bool:
         return (
             bool(ctx.metadata.get("mentions_timerish"))
             and bool(ctx.metadata.get("has_numberish"))
             and not bool(ctx.metadata.get("has_unit"))
         )
 
-    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+    def emit(self, ctx: SelectorCheckContext) -> SchemaSelection:
         return _timer_unit_emit(ctx)
 
 
@@ -264,10 +281,10 @@ class TimerUnitRule(BaseRule):
 class UncertaintyRule(BaseRule):
     name: str = "uncertainty"
 
-    def applies(self, ctx: SelectorContext) -> bool:
+    def applies(self, ctx: SelectorCheckContext) -> bool:
         return has_any_phrase(ctx.normalized, UNCERTAIN_PHRASES)
 
-    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+    def emit(self, ctx: SelectorCheckContext) -> SchemaSelection:
         return _uncertainty_emit(ctx)
 
 
@@ -275,14 +292,14 @@ class UncertaintyRule(BaseRule):
 class ActionableIntentRule(BaseRule):
     name: str = "actionable_intent"
 
-    def applies(self, ctx: SelectorContext) -> bool:
+    def applies(self, ctx: SelectorCheckContext) -> bool:
         return True
 
-    def emit(self, ctx: SelectorContext) -> SchemaSelection:
+    def emit(self, ctx: SelectorCheckContext) -> SchemaSelection:
         return _actionable_emit(ctx)
 
 
-def _no_response_emit(ctx: SelectorContext) -> SchemaSelection:
+def _no_response_emit(ctx: SelectorCheckContext) -> SchemaSelection:
     about = _about(AboutKind.SCHEMA, "channel.capture")
     amb = _amb(
         about=about,
@@ -303,7 +320,7 @@ def _no_response_emit(ctx: SelectorContext) -> SchemaSelection:
     )
 
 
-def _empty_input_emit(ctx: SelectorContext) -> SchemaSelection:
+def _empty_input_emit(ctx: SelectorCheckContext) -> SchemaSelection:
     about = _about(AboutKind.SCHEMA, "cli.input.empty")
     amb = _amb(
         about=about,
@@ -317,7 +334,7 @@ def _empty_input_emit(ctx: SelectorContext) -> SchemaSelection:
     )
 
 
-def _exit_emit(ctx: SelectorContext) -> SchemaSelection:
+def _exit_emit(ctx: SelectorCheckContext) -> SchemaSelection:
     about = _about(AboutKind.INTENT, "user.intent.exit", span_text=ctx.raw)
     return _selection(
         schemas=[SchemaHit(name="exit_intent", score=0.99, about=about)],
@@ -325,7 +342,7 @@ def _exit_emit(ctx: SelectorContext) -> SchemaSelection:
     )
 
 
-def _vague_actor_emit(ctx: SelectorContext) -> SchemaSelection:
+def _vague_actor_emit(ctx: SelectorCheckContext) -> SchemaSelection:
     about = _about(AboutKind.ENTITY, "event.actor", span_text=ctx.raw)
     amb = _amb(
         about=about,
@@ -348,7 +365,7 @@ def _vague_actor_emit(ctx: SelectorContext) -> SchemaSelection:
     )
 
 
-def _url_emit(ctx: SelectorContext) -> SchemaSelection:
+def _url_emit(ctx: SelectorCheckContext) -> SchemaSelection:
     about = _about(AboutKind.INTENT, "task.intent.link", span_text=ctx.raw)
     amb = _amb(
         about=about,
@@ -371,7 +388,7 @@ def _url_emit(ctx: SelectorContext) -> SchemaSelection:
     )
 
 
-def _timer_unit_emit(ctx: SelectorContext) -> SchemaSelection:
+def _timer_unit_emit(ctx: SelectorCheckContext) -> SchemaSelection:
     about = _about(AboutKind.PARAMETER, "timer.duration", span_text=ctx.raw)
     amb = _amb(
         about=about,
@@ -400,7 +417,7 @@ def _timer_unit_emit(ctx: SelectorContext) -> SchemaSelection:
     )
 
 
-def _uncertainty_emit(ctx: SelectorContext) -> SchemaSelection:
+def _uncertainty_emit(ctx: SelectorCheckContext) -> SchemaSelection:
     about = _about(AboutKind.GOAL, "user.goal", span_text=ctx.raw)
     amb = _amb(
         about=about,
@@ -423,7 +440,7 @@ def _uncertainty_emit(ctx: SelectorContext) -> SchemaSelection:
     )
 
 
-def _actionable_emit(ctx: SelectorContext) -> SchemaSelection:
+def _actionable_emit(ctx: SelectorCheckContext) -> SchemaSelection:
     about = _about(AboutKind.INTENT, "user.intent", span_text=ctx.raw)
     return _selection(
         schemas=[SchemaHit(name="actionable_intent", score=0.7, about=about)],
@@ -513,7 +530,7 @@ register_rule(phase="fallback", rule=ActionableIntentRule())
 RULES_BY_PHASE: dict[str, list[Rule]] = RULE_REGISTRY.clone_domain(domain="default")
 
 
-def _propose_candidates(ctx: SelectorContext, *, domain: str) -> list[HeuristicCandidate]:
+def _propose_candidates(ctx: SelectorCheckContext, *, domain: str) -> list[HeuristicCandidate]:
     candidates: list[HeuristicCandidate] = []
     for phase_index, phase in enumerate(RULE_PHASES):
         phase_rules = RULE_REGISTRY.phase_rules(phase=phase, domain=domain)

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, ClassVar, Dict, List, Literal, Mapping, Optional
+from typing import Any, ClassVar, Dict, List, Literal, Mapping, Optional, Self, cast
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
@@ -432,7 +432,7 @@ class InterventionDecision(BaseModel):
     override_source: Optional[InterventionOverrideSource] = None
 
     @model_validator(mode="after")
-    def _validate_override_provenance(self) -> "InterventionDecision":
+    def _validate_override_provenance(self) -> Self:
         if self.action != InterventionAction.RESUME:
             return self
 
@@ -574,7 +574,7 @@ class HaltRecord(BaseModel):
         timestamp: str,
     ) -> Dict[str, Any]:
         """Build and validate a canonical STOP payload shape used by all emitters."""
-        return cls.model_validate(
+        validated = cast("HaltRecord", cls.model_validate(
             {
                 "halt_id": halt_id,
                 "stage": stage,
@@ -585,7 +585,8 @@ class HaltRecord(BaseModel):
                 "retryability": retryability,
                 "timestamp": timestamp,
             }
-        ).to_canonical_payload()
+        ))
+        return validated.to_canonical_payload()
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "HaltRecord":
@@ -605,7 +606,7 @@ class HaltRecord(BaseModel):
             "timestamp": raw.get("timestamp", raw.get("timestamp_iso")),
         }
         try:
-            return cls.model_validate(canonical_candidate)
+            return cast("HaltRecord", cls.model_validate(canonical_candidate))
         except Exception as exc:
             raise HaltPayloadValidationError("halt payload is malformed or incomplete") from exc
 
@@ -834,7 +835,7 @@ class RepairResolutionEvent(BaseModel):
     rejection_reason: Optional[str] = None
 
     @model_validator(mode="after")
-    def _validate_decision_payload(self) -> "RepairResolutionEvent":
+    def _validate_decision_payload(self) -> Self:
         if self.decision == RepairResolution.ACCEPTED and self.accepted_prediction is None:
             raise ValueError("accepted repair resolution requires accepted_prediction")
         if self.decision == RepairResolution.REJECTED and not self.rejection_reason:

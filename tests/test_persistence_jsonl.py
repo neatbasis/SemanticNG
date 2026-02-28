@@ -183,3 +183,47 @@ def test_append_halt_rejects_conflicting_alias_fields(tmp_path: Path) -> None:
                 "timestamp": "2026-02-13T00:00:00+00:00",
             },
         )
+
+
+def test_append_halt_flow_parity_across_stop_and_continue_artifacts(tmp_path: Path) -> None:
+    p = tmp_path / "halts.jsonl"
+
+    stop_payload = {
+        "halt_id": "halt:stop",
+        "stage": "pre-decision:post_write",
+        "invariant_id": "evidence_link_completeness.v1",
+        "reason": "stop branch",
+        "evidence": [{"kind": "scope", "ref": "scope:test"}],
+        "retryability": True,
+        "timestamp": "2026-02-13T00:00:00+00:00",
+    }
+    continue_payload = {
+        "halt_id": "halt:continue",
+        "stable_halt_id": "halt:continue",
+        "stage": "pre-decision:pre_consume",
+        "invariant_id": "prediction_availability.v1",
+        "violated_invariant_id": "prediction_availability.v1",
+        "reason": "continue parity",
+        "evidence": [{"kind": "scope", "ref": "scope:test"}],
+        "evidence_refs": [{"kind": "scope", "ref": "scope:test"}],
+        "retryability": False,
+        "retryable": False,
+        "timestamp": "2026-02-13T00:00:01+00:00",
+        "timestamp_iso": "2026-02-13T00:00:01+00:00",
+        "flow": "continue",
+    }
+
+    append_halt(p, stop_payload)
+    append_halt(p, continue_payload)
+
+    rows = [rec for _, rec in read_jsonl(p)]
+    stop_rec, continue_rec = rows
+
+    for rec in (stop_rec, continue_rec):
+        assert rec["stable_halt_id"] == rec["halt_id"]
+        assert rec["violated_invariant_id"] == rec["invariant_id"]
+        assert rec["evidence_refs"] == rec["evidence"]
+        assert rec["retryable"] == rec["retryability"]
+        assert rec["timestamp_iso"] == rec["timestamp"]
+
+    assert continue_rec["flow"] == "continue"

@@ -564,3 +564,45 @@ def test_gate_deterministic_continue_outcome_has_stable_branches() -> None:
     assert isinstance(second, Success)
     assert [out.flow.value for out in first.artifact.combined] == ["continue", "continue"]
     assert [out.code for out in first.artifact.combined] == [out.code for out in second.artifact.combined]
+
+
+def test_gate_flow_parity_continue_and_stop_payloads(tmp_path: Path) -> None:
+    class DummyEpisode:
+        def __init__(self) -> None:
+            self.artifacts = []
+
+    pred = PredictionRecord.model_validate(FIXED_PREDICTION)
+    projected = project_current(
+        pred,
+        ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+    )
+
+    continue_ep = DummyEpisode()
+    continue_gate = evaluate_invariant_gates(
+        ep=continue_ep,
+        scope=pred.scope_key,
+        prediction_key=pred.scope_key,
+        projection_state=projected,
+        prediction_log_available=True,
+        just_written_prediction={
+            "key": pred.scope_key,
+            "evidence_refs": [e.model_dump(mode="json") for e in pred.evidence_links],
+        },
+    )
+    assert isinstance(continue_gate, Success)
+    assert [out.flow for out in continue_gate.artifact.combined] == [Flow.CONTINUE, Flow.CONTINUE]
+
+    stop_ep = DummyEpisode()
+    stop_gate = evaluate_invariant_gates(
+        ep=stop_ep,
+        scope=pred.scope_key,
+        prediction_key=pred.scope_key,
+        projection_state=projected,
+        prediction_log_available=True,
+        just_written_prediction={"key": pred.scope_key, "evidence_refs": []},
+        halt_log_path=tmp_path / "halts.jsonl",
+    )
+    assert isinstance(stop_gate, HaltRecord)
+    stop_checks = stop_ep.artifacts[0]["invariant_checks"]
+    assert [check["passed"] for check in stop_checks[:2]] == [True, False]
+    assert stop_gate.stage == "pre-decision:post_write"

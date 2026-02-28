@@ -212,7 +212,7 @@ def _authorization_halt_record(*, stage: str, reason: str, context: Mapping[str,
 
 
 def _halt_payload(halt: HaltRecord) -> Dict[str, Any]:
-    return halt.to_persistence_dict()
+    return halt.to_canonical_payload()
 
 def _append_authorization_issue(ep: Episode, *, halt: HaltRecord, context: Mapping[str, Any]) -> None:
     _append_episode_artifact(
@@ -477,33 +477,37 @@ def evaluate_invariant_gates(
     gate_checks: list[GateInvariantCheck] = []
     evaluations: list[GateInvariantEvaluation] = []
 
-    pre_outcome: Optional[InvariantOutcome] = None
-    if _observer_allows_invariant(observer=observer, invariant_id=InvariantId.PREDICTION_AVAILABILITY):
-        pre_ctx = default_check_context(
-            scope=scope,
-            prediction_key=prediction_key,
-            current_predictions=current_predictions,
-            prediction_log_available=prediction_log_available,
-        )
-        pre_outcome = _run_invariant(InvariantId.PREDICTION_AVAILABILITY, ctx=pre_ctx)
-        pre_consume = (pre_outcome,)
-        evaluations.append(GateInvariantEvaluation(phase="pre_consume", outcome=pre_outcome))
+    gate_specs: list[tuple[str, InvariantId, bool, Optional[Mapping[str, Any]]]] = [
+        (
+            "pre_consume",
+            InvariantId.PREDICTION_AVAILABILITY,
+            True,
+            None,
+        ),
+        (
+            "post_write",
+            InvariantId.EVIDENCE_LINK_COMPLETENESS,
+            just_written_prediction is not None,
+            just_written_prediction,
+        ),
+    ]
 
-    post_outcome: Optional[InvariantOutcome] = None
-    if just_written_prediction is not None and _observer_allows_invariant(
-        observer=observer,
-        invariant_id=InvariantId.EVIDENCE_LINK_COMPLETENESS,
-    ):
-        post_ctx = default_check_context(
+    for phase, invariant_id, is_enabled, phase_written_prediction in gate_specs:
+        if not is_enabled or not _observer_allows_invariant(observer=observer, invariant_id=invariant_id):
+            continue
+
+        phase_ctx = default_check_context(
             scope=scope,
             prediction_key=prediction_key,
             current_predictions=current_predictions,
             prediction_log_available=prediction_log_available,
-            just_written_prediction=just_written_prediction,
+            just_written_prediction=phase_written_prediction,
         )
-        post_outcome = _run_invariant(InvariantId.EVIDENCE_LINK_COMPLETENESS, ctx=post_ctx)
-        post_write = (post_outcome,)
-        evaluations.append(GateInvariantEvaluation(phase="post_write", outcome=post_outcome))
+        phase_outcome = _run_invariant(invariant_id, ctx=phase_ctx)
+        evaluations.append(GateInvariantEvaluation(phase=phase, outcome=phase_outcome))
+
+    pre_consume = tuple(ev.outcome for ev in evaluations if ev.phase == "pre_consume")
+    post_write = tuple(ev.outcome for ev in evaluations if ev.phase == "post_write")
 
     for evaluation in evaluations:
         gate_checks.append(
@@ -652,9 +656,9 @@ def append_halt_record(
     halt_log_path: str | Path = "halts.jsonl",
     stable_ids: Optional[Mapping[str, str]] = None,
 ) -> dict[str, str]:
-    payload: Any = halt.to_persistence_dict()
+    payload: Any = halt.to_canonical_payload()
     if stable_ids:
-        payload = {**dict(stable_ids), **halt.to_persistence_dict()}
+        payload = {**dict(stable_ids), **halt.to_canonical_payload()}
     return append_halt(halt_log_path, payload)
 
 

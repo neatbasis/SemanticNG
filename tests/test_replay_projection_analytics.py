@@ -260,3 +260,44 @@ def test_replay_projection_analytics_uses_lineage_iterator_and_ignores_runtime_o
     assert replay.records_processed == 1
     assert replay.analytics_snapshot.correction_count == 1
     assert replay.analytics_snapshot.correction_cost_total == 0.2
+
+
+def test_derive_projection_analytics_from_lineage_tracks_human_request_views() -> None:
+    lineage = [
+        {
+            "event_kind": "ask_outbox_request",
+            "request_id": "ask:open",
+            "scope": "after_invariants",
+            "reason": "human recruitment requested by intervention lifecycle",
+            "evidence_refs": [{"kind": "intervention_request", "ref": "hitl:open"}],
+            "created_at_iso": "2026-02-14T00:00:00+00:00",
+            "metadata": {"conversation_id": "conv:1"},
+        },
+        {
+            "event_kind": "ask_outbox_request",
+            "request_id": "ask:resolved",
+            "scope": "after_invariants",
+            "reason": "human recruitment requested by intervention lifecycle",
+            "evidence_refs": [{"kind": "intervention_request", "ref": "hitl:resolved"}],
+            "created_at_iso": "2026-02-14T00:01:00+00:00",
+            "metadata": {"conversation_id": "conv:1"},
+        },
+        {
+            "event_kind": "ask_outbox_response",
+            "request_id": "ask:resolved",
+            "scope": "after_invariants",
+            "reason": "intervention decision recorded",
+            "evidence_refs": [{"kind": "intervention_request", "ref": "hitl:resolved"}],
+            "created_at_iso": "2026-02-14T00:01:00+00:00",
+            "responded_at_iso": "2026-02-14T00:02:00+00:00",
+            "status": "resume",
+            "escalation": False,
+            "metadata": {"operator": "alice"},
+        },
+    ]
+
+    snapshot = derive_projection_analytics_from_lineage(lineage)
+
+    assert set(snapshot.outstanding_human_requests.keys()) == {"ask:open"}
+    assert set(snapshot.resolved_human_requests.keys()) == {"ask:resolved"}
+    assert snapshot.request_outcome_linkage == {"ask:resolved": "resume"}

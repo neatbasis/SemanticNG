@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Optional, Protocol
 
 from state_renormalization.contracts import (
@@ -100,6 +101,45 @@ class Rule(Protocol):
     def applies(self, ctx: SelectorContext) -> bool: ...
 
     def emit(self, ctx: SelectorContext) -> SchemaSelection: ...
+
+
+class SelectorDecisionStatus(str, Enum):
+    OK = "ok"
+    DEGRADED = "degraded"
+    HALT = "halt"
+
+
+@dataclass(frozen=True)
+class HeuristicCandidate:
+    phase: str
+    rule_name: str
+    phase_index: int
+    order_in_phase: int
+    rule: Rule
+    score: float
+
+
+@dataclass(frozen=True)
+class InvariantViolation:
+    code: str
+    message: str
+    details: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class PolicyFinding:
+    code: str
+    message: str
+    details: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SelectorDecisionOutcome:
+    status: SelectorDecisionStatus
+    chosen: Optional[HeuristicCandidate]
+    violations: list[InvariantViolation]
+    policy_findings: list[PolicyFinding]
+    heuristic_candidates: list[HeuristicCandidate]
 
 
 @dataclass(frozen=True)
@@ -474,6 +514,71 @@ register_rule(phase="fallback", rule=ActionableIntentRule())
 RULES_BY_PHASE: dict[str, list[Rule]] = RULE_REGISTRY.clone_domain(domain="default")
 
 
+def _propose_candidates(ctx: SelectorContext, *, domain: str) -> list[HeuristicCandidate]:
+    candidates: list[HeuristicCandidate] = []
+    for phase_index, phase in enumerate(RULE_PHASES):
+        phase_rules = RULE_REGISTRY.phase_rules(phase=phase, domain=domain)
+        for order_in_phase, rule in enumerate(phase_rules):
+            if not rule.applies(ctx):
+                continue
+            candidates.append(
+                HeuristicCandidate(
+                    phase=phase,
+                    rule_name=rule.name,
+                    phase_index=phase_index,
+                    order_in_phase=order_in_phase,
+                    rule=rule,
+                    score=float(-(phase_index * 1000 + order_in_phase)),
+                )
+            )
+    return candidates
+
+
+def _validate_selector_invariants(candidates: list[HeuristicCandidate]) -> list[InvariantViolation]:
+    violations: list[InvariantViolation] = []
+    if not candidates:
+        violations.append(
+            InvariantViolation(
+                code="selector.empty_candidate_set.v1",
+                message="Schema selector must always produce at least one applicable rule candidate.",
+            )
+        )
+    return violations
+
+
+def _decide_selection_policy(
+    candidates: list[HeuristicCandidate],
+    *,
+    violations: list[InvariantViolation],
+) -> SelectorDecisionOutcome:
+    if violations:
+        return SelectorDecisionOutcome(
+            status=SelectorDecisionStatus.HALT,
+            chosen=None,
+            violations=violations,
+            policy_findings=[],
+            heuristic_candidates=candidates,
+        )
+
+    ranked = sorted(candidates, key=lambda c: (c.phase_index, c.order_in_phase))
+    chosen = ranked[0]
+    findings: list[PolicyFinding] = []
+    if chosen.phase == "ambiguity-disambiguation":
+        findings.append(
+            PolicyFinding(
+                code="selector.prefer_clarification_on_ambiguity.v1",
+                message="Prefer clarification when ambiguity-specific rules are applicable.",
+            )
+        )
+    return SelectorDecisionOutcome(
+        status=SelectorDecisionStatus.OK,
+        chosen=chosen,
+        violations=violations,
+        policy_findings=findings,
+        heuristic_candidates=ranked,
+    )
+
+
 def _legacy_naive_schema_selector(text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
     """
     Frozen baseline implementation used by tests to verify refactors preserve behavior.
@@ -531,9 +636,10 @@ def naive_schema_selector(
 ) -> SchemaSelection:
     ctx = build_selector_context(text, error=error)
 
-    for phase in RULE_PHASES:
-        for rule in RULE_REGISTRY.phase_rules(phase=phase, domain=domain):
-            if rule.applies(ctx):
-                return rule.emit(ctx)
+    candidates = _propose_candidates(ctx, domain=domain)
+    violations = _validate_selector_invariants(candidates)
+    decision = _decide_selection_policy(candidates, violations=violations)
+    if decision.chosen is not None:
+        return decision.chosen.rule.emit(ctx)
 
     return SchemaSelection(schemas=[], ambiguities=[])

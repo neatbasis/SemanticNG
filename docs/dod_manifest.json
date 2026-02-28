@@ -22,6 +22,12 @@
       "contract_map_refs": [
         "Prediction append contract",
         "Projection view contract"
+      ],
+      "ci_evidence_links": [
+        {
+          "command": "pytest tests/test_stable_ids.py tests/test_persistence_jsonl.py tests/test_predictions_contracts_and_gates.py",
+          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+        }
       ]
     },
     {
@@ -39,6 +45,12 @@
       "contract_map_refs": [
         "Pending-obligation belief contract",
         "Channel-agnostic decision/effect contract"
+      ],
+      "ci_evidence_links": [
+        {
+          "command": "pytest tests/test_contracts_belief_state.py tests/test_contracts_decision_effect_shape.py tests/test_engine_pending_obligation.py tests/test_engine_pending_obligation_minimal.py",
+          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+        }
       ]
     },
     {
@@ -57,6 +69,12 @@
       "contract_map_refs": [
         "Ambiguity selection contract",
         "Pending-obligation belief contract"
+      ],
+      "ci_evidence_links": [
+        {
+          "command": "pytest tests/test_schema_selector.py tests/test_schema_bubbling_option_a.py tests/test_capture_outcome_states.py tests/test_engine_calls_selector_with_generic_error.py",
+          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+        }
       ]
     },
     {
@@ -75,6 +93,12 @@
       "contract_map_refs": [
         "Halt normalization contract",
         "Projection view contract"
+      ],
+      "ci_evidence_links": [
+        {
+          "command": "pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py",
+          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+        }
       ]
     },
     {
@@ -93,6 +117,16 @@
       ],
       "contract_map_refs": [
         "Observer authorization contract"
+      ],
+      "ci_evidence_links": [
+        {
+          "command": "pytest tests/test_observer_frame.py",
+          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+        },
+        {
+          "command": "pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py",
+          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+        }
       ]
     },
     {
@@ -113,6 +147,20 @@
       "contract_map_refs": [
         "Replay projection analytics contract",
         "Projection view contract"
+      ],
+      "ci_evidence_links": [
+        {
+          "command": "pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py",
+          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+        },
+        {
+          "command": "pytest tests/test_replay_projection_analytics.py tests/test_replay_projection_determinism.py tests/test_replay_projection_restart_contracts.py tests/test_prediction_outcome_binding.py",
+          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+        },
+        {
+          "command": "pytest tests/replay_projection_analytics/test_append_only_replay.py",
+          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+        }
       ]
     },
     {
@@ -130,6 +178,12 @@
       "contract_map_refs": [
         "Projection view contract",
         "Prediction append contract"
+      ],
+      "ci_evidence_links": [
+        {
+          "command": "pytest tests/test_predictions_contracts_and_gates.py",
+          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+        }
       ]
     },
     {
@@ -149,6 +203,16 @@
       "contract_map_refs": [
         "Channel-agnostic decision/effect contract",
         "Observer authorization contract"
+      ],
+      "ci_evidence_links": [
+        {
+          "command": "pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py",
+          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+        },
+        {
+          "command": "pytest tests/test_predictions_contracts_and_gates.py",
+          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+        }
       ]
     },
     {
@@ -168,6 +232,16 @@
       "contract_map_refs": [
         "Replay projection analytics contract",
         "Projection view contract"
+      ],
+      "ci_evidence_links": [
+        {
+          "command": "pytest tests/test_repair_mode_projection.py tests/test_repair_events_auditability.py",
+          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+        },
+        {
+          "command": "pytest tests/test_predictions_contracts_and_gates.py",
+          "evidence": "https://github.com/<org>/<repo>/actions/runs/<run_id>"
+        }
       ]
     }
   ]

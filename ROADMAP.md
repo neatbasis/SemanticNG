@@ -31,36 +31,27 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
   - Files: `src/state_renormalization/adapters/schema_selector.py`, `src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`
   - Tests: `tests/test_schema_selector.py`, `tests/test_schema_bubbling_option_a.py`, `tests/test_capture_outcome_states.py`, `tests/test_engine_calls_selector_with_generic_error.py`
 
-## Next (active refactors: gate/halt unification + halt persistence)
-
-### 1) Unified gate pipeline (pre-consume + post-write invariants)
-- **Owner area/module:** Engine + Invariants (`src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`)
+### 4) Unified gate pipeline and halt persistence (`status: done`)
+- **Owner area/module:** Engine + Invariants + Contracts + Persistence (`src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`, `src/state_renormalization/contracts.py`, `src/state_renormalization/adapters/persistence.py`)
 - **Success criteria (test outcomes):**
-  - `pytest tests/test_predictions_contracts_and_gates.py` passes with explicit assertions for both `Flow.CONTINUE` and `Flow.STOP` branches.
-  - Tests validate parity of behavior before/after refactor for core gate scenarios (`prediction_write_materialized`, `prediction_append_unverified`).
+  - `pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py` passes.
+  - Outcomes verify unified gate behavior (`Flow.CONTINUE`/`Flow.STOP`) and durable explainable halt records.
 - **Related files/tests:**
-  - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`
-  - Tests: `tests/test_predictions_contracts_and_gates.py`
+  - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`, `src/state_renormalization/contracts.py`, `src/state_renormalization/adapters/persistence.py`
+  - Tests: `tests/test_predictions_contracts_and_gates.py`, `tests/test_engine_projection_mission_loop.py`, `tests/test_persistence_jsonl.py`, `tests/test_contracts_halt_record.py`
 
-### 2) Explainable halt contract unification and durable halt records
-- **Owner area/module:** Invariants + Contracts + Persistence (`src/state_renormalization/invariants.py`, `src/state_renormalization/contracts.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/engine.py`)
-- **Success criteria (test outcomes):**
-  - `pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py` passes with assertions that every STOP includes machine-readable `details`, `evidence`, and invariant identity.
-  - New/updated tests assert halt artifacts are persisted and replayable without loss of explainability fields.
-- **Related files/tests:**
-  - Files: `src/state_renormalization/invariants.py`, `src/state_renormalization/contracts.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/engine.py`
-  - Tests: `tests/test_predictions_contracts_and_gates.py`, `tests/test_persistence_jsonl.py`
-
-### 3) Invariant matrix completion (all registered invariants exhaustively tested)
+### 5) Invariant matrix coverage (`status: done`)
 - **Owner area/module:** Invariants + Test harness (`src/state_renormalization/invariants.py`, `tests/test_predictions_contracts_and_gates.py`)
 - **Success criteria (test outcomes):**
-  - `pytest tests/test_predictions_contracts_and_gates.py` passes with parameterized coverage across all `InvariantId` branches.
-  - Test suite proves each invariant can deterministically emit either admissible continuation or explainable stop.
+  - `pytest tests/test_predictions_contracts_and_gates.py` passes with parameterized coverage across all registered `InvariantId` branches.
+  - Outcomes show deterministic explainable-stop behavior and non-applicable markers for each invariant path.
 - **Related files/tests:**
-  - Files: `src/state_renormalization/invariants.py`
+  - Files: `src/state_renormalization/invariants.py`, `tests/test_predictions_contracts_and_gates.py`
   - Tests: `tests/test_predictions_contracts_and_gates.py`
 
-### 4) Observer authorization contract
+## Next (planned capabilities)
+
+### 1) Observer authorization contract (`status: planned`)
 - **Owner area/module:** Contracts + Engine + Invariants (`src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`)
 - **Success criteria (test outcomes):**
   - `pytest tests/test_observer_frame.py` passes, validating `ObserverFrame` authorization shape and defaults.
@@ -69,9 +60,15 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
   - Files: `src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`
   - Tests: `tests/test_observer_frame.py`, `tests/test_predictions_contracts_and_gates.py`, `tests/test_invariants.py`
 
+## Capability status alignment (manifest source-of-truth sync)
+
+- `done`: `prediction_persistence_baseline`, `channel_agnostic_pending_obligation`, `schema_selection_ambiguity_baseline`, `gate_halt_unification`, `invariant_matrix_coverage`.
+- `in_progress`: `replay_projection_analytics`.
+- `planned`: `observer_authorization_contract`, `capability_invocation_governance`, `repair_aware_projection_evolution`.
+
 ## Later (larger architecture goals)
 
-### 1) Replay projection analytics contract (replay-grade projection engine and longitudinal correction analytics)
+### 1) Replay projection analytics contract (replay-grade projection engine and longitudinal correction analytics; `status: in_progress`)
 - **Owner area/module:** Engine + Persistence + Correction artifacts (`src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`)
 - **Success criteria (test outcomes):**
   - New replay tests pass, proving `ProjectionState` reconstructed from append-only logs is deterministic across repeated runs and independent process restarts.
@@ -82,7 +79,7 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
   - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`
   - Tests: extend `tests/test_predictions_contracts_and_gates.py`; add replay/correction-focused tests under `tests/`.
 
-### 2) Capability-invocation governance (policy-aware external actions)
+### 2) Capability-invocation governance (policy-aware external actions; `status: planned`)
 - **Owner area/module:** Engine + Contracts + Capability adapters (`src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, adapter modules under `src/state_renormalization/adapters/`)
 - **Success criteria (test outcomes):**
   - New capability-gating tests pass, showing no externally consequential action executes without a current valid prediction and explicit gate pass.
@@ -91,7 +88,7 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
   - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, capability adapter files (as added)
   - Tests: add capability governance suites under `tests/` (prediction + halt + side-effect guards).
 
-### 3) Evolution path toward repair-aware projection (without silent mutation)
+### 3) Evolution path toward repair-aware projection (without silent mutation; `status: planned`)
 - **Owner area/module:** Invariants + Engine (`src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py`)
 - **Success criteria (test outcomes):**
   - Prototype repair-mode tests pass where repair proposals are emitted as explicit auditable events (never implicit state mutation).
@@ -108,9 +105,9 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 
 ## Backlog dependency tags
 
-- `Later` item 1 (Replay projection analytics contract): `requires gate_halt_unification`, `requires invariant matrix complete`
-- `Later` item 2 (Capability-invocation governance): `requires gate_halt_unification`, `requires invariant matrix complete`
-- `Later` item 3 (Repair-aware projection evolution): `requires gate_halt_unification`, `requires invariant matrix complete`
+- `Later` item 1 (Replay projection analytics contract): `in_progress` with no `Next` dependency blocker currently recorded in manifest governance files.
+- `Later` item 2 (Capability-invocation governance): `planned`; sequence after observer authorization contract to keep authorization semantics stable before external side-effect policy gating.
+- `Later` item 3 (Repair-aware projection evolution): `planned`; sequence after replay analytics baselines are stable to preserve auditable repair-event lineage.
 
 ## Planning cadence
 
@@ -128,7 +125,7 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 
 | capability_id | invariant_id | failures (7d) | recurrence rank | mapped roadmap section | owner | action |
 | --- | --- | --- | --- | --- | --- | --- |
-| `observer_authorization` | `observer_not_authorized` | 6 | 1 | `Next` | contracts/engine | land authorization gating + explainable halt persistence follow-up |
+| `observer_authorization_contract` | `observer_not_authorized` | 6 | 1 | `Next` | contracts/engine | land authorization gating + explainable halt persistence follow-up |
 | `replay_projection_analytics` | `prediction_missing_for_effect` | 2 | 4 | `Later` | engine/persistence | keep design prep only until sequencing gate dependencies are met |
 
 #### Recurring-cause tracking and roadmap mapping
@@ -169,10 +166,10 @@ Use this short table at each planning checkpoint to pick exactly one next PR sco
 
 | Capability ID | Dependency status (met/blocked) | Governance readiness (manifest+roadmap+contract-map aligned) | Test evidence completeness | Risk-reduction score | Recommended next action |
 | --- | --- | --- | --- | --- | --- |
-| `replay_projection_analytics` | blocked (`gate_halt_unification`, `invariant matrix complete`) | blocked | partial | 3/5 | Finish remaining `Next` gate/halt and invariant matrix work; reassess after CI is fully green. |
-| `observer_authorization` | met | partial | partial | 4/5 | Prioritize a focused PR that lands authorization allowlist/runtime gating with persisted explainable halt coverage. |
-| `capability_invocation_governance` | blocked (`gate_halt_unification`, `invariant matrix complete`) | blocked | missing | 5/5 | Keep design/doc prep only; defer merge work until sequencing gate dependencies are marked met. |
-| `repair_aware_projection` | blocked (`gate_halt_unification`, `invariant matrix complete`) | blocked | missing | 3/5 | Draft explicit auditable repair-event contract tests while keeping strict halt-only behavior as default. |
+| `replay_projection_analytics` | met (`status=in_progress`) | partial | partial | 3/5 | Continue focused in-progress replay PRs while preserving append-only and explainable-halt contracts. |
+| `observer_authorization_contract` | met (`status=planned`) | partial | partial | 4/5 | Prioritize the next PR to land runtime authorization gating + persisted explainable halt coverage. |
+| `capability_invocation_governance` | blocked (sequence after observer authorization) | blocked | missing | 5/5 | Keep design/doc prep only; defer merge work until observer authorization is done. |
+| `repair_aware_projection_evolution` | blocked (sequence after replay analytics hardening) | blocked | missing | 3/5 | Draft explicit auditable repair-event contract tests while keeping strict halt-only behavior as default. |
 
 ## Guardrails (unchanged until Next milestones are complete)
 

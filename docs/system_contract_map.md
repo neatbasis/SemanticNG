@@ -40,16 +40,14 @@ Reference convention:
 1. Validate contract behavior against milestone pytest commands from `docs/dod_manifest.json`.
 2. Promote `prototype` → `operational` once default-path runtime + gate behavior are covered in CI.
 3. Promote `operational` → `proven` once replay and halt/audit paths are repeatedly validated across milestone regressions.
-4. Keep a changelog entry in this file whenever a maturity value changes, using `- YYYY-MM-DD (Milestone): <contract> <from> -> <to>; rationale.`
+4. Keep a changelog entry in this file whenever a maturity value changes, using `- YYYY-MM-DD (Milestone): <contract> <from> -> <to>; rationale. https://<evidence-link>` (must include at least one `https://` URL).
 
 ### Changelog format
 
-- Required entry style: `- YYYY-MM-DD (Milestone): <contract> <from> -> <to>; rationale.`
+- Required entry style: `- YYYY-MM-DD (Milestone): <contract> <from> -> <to>; rationale. https://<evidence-link>`
 
 ### Changelog
 
-- 2026-02-28 (Now): Promoted **Halt normalization contract** from `Next/proven` milestone placement to `Now/proven`; rationale: `gate_halt_unification` acceptance command is green (`92 passed, 4 skipped`) and the halt path is no longer a forward milestone risk.
-- 2026-02-28 (Now): Revalidated **Halt normalization contract** at `proven`; rationale: current gate/unification regression remained green and parity/durability coverage was reconfirmed in `tests/test_predictions_contracts_and_gates.py` (`Flow.CONTINUE` + `Flow.STOP` assertions) and `tests/test_persistence_jsonl.py` (halt payload `details`/`evidence`/`invariant_id` durability).
-- 2026-02-28 (Next): Promoted **Halt normalization contract** from `operational` to `proven`; rationale: merged milestone-gate + halt/gate hardening outcomes enforce canonical halt payloads end-to-end (gate stop path, mission-loop early return, persistence, and replay/restart validation) across the dedicated regression suite (`tests/test_predictions_contracts_and_gates.py`, `tests/test_engine_projection_mission_loop.py`, `tests/test_persistence_jsonl.py`, `tests/test_contracts_halt_record.py`).
-- 2026-02-28 (Now): Promoted **Prediction append contract** from `operational` to `proven`; rationale: deterministic persistence and gate-consumption behavior is repeatedly validated in baseline + invariant/gate regressions (`tests/test_persistence_jsonl.py`, `tests/test_predictions_contracts_and_gates.py`) and no longer treated as an evolving contract surface.
-- 2026-02-28 (Next): Promoted **Halt normalization contract** from `prototype` to `operational` after deterministic invariant matrix coverage added for all registered invariants, including explicit non-applicable gate markers and registry guard tests.
+- 2026-02-28 (Now): Halt normalization contract operational -> proven; merged gate + halt hardening enforces canonical halt payloads end-to-end across mission-loop, persistence, and replay/restart validation. https://github.com/<org>/<repo>/actions/runs/<run_id>
+- 2026-02-28 (Now): Prediction append contract operational -> proven; deterministic persistence and gate-consumption behavior is repeatedly validated in baseline and invariant/gate regressions. https://github.com/<org>/<repo>/actions/runs/<run_id>
+- 2026-02-28 (Next): Halt normalization contract prototype -> operational; deterministic invariant-matrix coverage added explicit non-applicable markers and registry guard assertions. https://github.com/<org>/<repo>/actions/runs/<run_id>

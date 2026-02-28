@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from state_renormalization.adapters.persistence import read_jsonl
+from state_renormalization.adapters.persistence import append_jsonl, read_jsonl
 from collections.abc import Callable
 
-from state_renormalization.contracts import AskResult, AskStatus, BeliefState, Episode, PredictionRecord, ProjectionState
-from state_renormalization.engine import replay_projection_analytics, run_mission_loop
+from state_renormalization.contracts import AskResult, AskStatus, BeliefState, Episode, HaltRecord, PredictionRecord, ProjectionState
+from state_renormalization.engine import evaluate_invariant_gates, replay_projection_analytics, run_mission_loop, to_jsonable_episode
 
 
 FIXED_PREDICTION = {
@@ -84,3 +84,33 @@ def test_replay_projection_analytics_exposes_correction_lineage_from_append_only
     rows = [record for _, record in read_jsonl(log_path)]
     corrected_rows = [row for row in rows if row.get("scope_key") == "turn:1" and row.get("was_corrected")]
     assert corrected_rows[-1]["correction_root_prediction_id"] == "pred:base"
+
+
+def test_halt_explainability_fields_survive_episode_persistence_roundtrip(
+    make_episode: Callable[..., Episode],
+    make_observer,
+    tmp_path: Path,
+) -> None:
+    episode_path = tmp_path / "episodes.jsonl"
+
+    ep = make_episode(observer=make_observer(capabilities=["baseline.dialog"]))
+    gate = evaluate_invariant_gates(
+        ep=ep,
+        scope="scope:test",
+        prediction_key=None,
+        projection_state=ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+        prediction_log_available=True,
+        halt_log_path=tmp_path / "halts.jsonl",
+    )
+
+    assert isinstance(gate, HaltRecord)
+    expected = gate.to_canonical_payload()
+
+    append_jsonl(episode_path, to_jsonable_episode(ep))
+    (_, persisted), = list(read_jsonl(episode_path))
+
+    authorization_issue = next(a for a in persisted["artifacts"] if a.get("artifact_kind") == "authorization_issue")
+    halt_observation = next(a for a in persisted["artifacts"] if a.get("artifact_kind") == "halt_observation")
+
+    assert HaltRecord.from_payload(authorization_issue).to_canonical_payload() == expected
+    assert HaltRecord.from_payload(halt_observation).to_canonical_payload() == expected

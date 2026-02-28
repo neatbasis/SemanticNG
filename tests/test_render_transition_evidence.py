@@ -56,7 +56,12 @@ def test_transitioned_capability_commands_filters_to_transitioned_and_non_empty_
     }
 
 
-def test_render_block_includes_expected_markers_and_evidence_lines() -> None:
+def test_render_block_includes_expected_markers_and_evidence_lines(monkeypatch) -> None:
+    monkeypatch.delenv("MILESTONE_EVIDENCE_URL", raising=False)
+    monkeypatch.delenv("GITHUB_SERVER_URL", raising=False)
+    monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
+    monkeypatch.delenv("GITHUB_RUN_ID", raising=False)
+
     block = render_transition_evidence._render_block(
         {
             "cap_a": ["pytest tests/test_alpha.py"],
@@ -69,6 +74,14 @@ def test_render_block_includes_expected_markers_and_evidence_lines() -> None:
     assert "#### cap_a" in block
     assert "pytest tests/test_alpha.py" in block
     assert "Evidence: https://github.com/<org>/<repo>/actions/runs/<run_id>#capability-cap_a-1" in block
+
+
+def test_render_block_uses_explicit_evidence_url_override(monkeypatch) -> None:
+    monkeypatch.setenv("MILESTONE_EVIDENCE_URL", "https://example.test/runs/123")
+
+    block = render_transition_evidence._render_block({"cap_a": ["pytest tests/test_alpha.py"]})
+
+    assert "Evidence: https://example.test/runs/123#capability-cap_a-1" in block
 
 
 def test_render_block_reports_no_transitions_message_when_empty() -> None:
@@ -169,3 +182,49 @@ def test_main_emits_deterministic_block_for_same_base_and_head(monkeypatch, caps
     second = capsys.readouterr().out
 
     assert first == second
+
+
+def test_check_pr_template_autogen_section_accepts_legacy_equivalent_command_grouping(monkeypatch, tmp_path) -> None:
+    manifest_path = tmp_path / "dod_manifest.json"
+    template_path = tmp_path / "pull_request_template.md"
+
+    manifest = {
+        "capabilities": [
+            {
+                "id": "cap_a",
+                "status": "planned",
+                "pytest_commands": [
+                    "pytest tests/test_one.py tests/test_two.py tests/test_three.py"
+                ],
+            }
+        ]
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    template_path.write_text(
+        "\n".join(
+            [
+                render_transition_evidence.AUTOGEN_BEGIN,
+                "## AUTOGEN milestone command/evidence pairs (do not edit by hand)",
+                "",
+                "### Capability command/evidence blocks (generated from `docs/dod_manifest.json`)",
+                "",
+                "#### Capability: `cap_a` (status: `planned`)",
+                "```text",
+                "pytest tests/test_one.py tests/test_two.py",
+                "https://github.com/<org>/<repo>/actions/runs/<run_id>",
+                "",
+                "pytest tests/test_three.py",
+                "https://github.com/<org>/<repo>/actions/runs/<run_id>",
+                "",
+                "```",
+                render_transition_evidence.AUTOGEN_END,
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(render_transition_evidence, "MANIFEST_PATH", manifest_path)
+    monkeypatch.setattr(render_transition_evidence, "PR_TEMPLATE_PATH", template_path)
+
+    assert render_transition_evidence.check_pr_template_autogen_section() == 0

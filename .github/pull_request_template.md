@@ -19,10 +19,7 @@ For every status-transition capability in this PR, include the exact `pytest` co
 
 #### Capability: `capability_invocation_governance` (status: `planned`)
 ```text
-pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py
-https://github.com/<org>/<repo>/actions/runs/<run_id>
-
-pytest tests/test_predictions_contracts_and_gates.py
+pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_predictions_contracts_and_gates.py
 https://github.com/<org>/<repo>/actions/runs/<run_id>
 
 ```

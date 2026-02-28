@@ -69,6 +69,16 @@ Status transitions from `in_progress` to `done` must include all of the followin
 
 1. Passing evidence for that capability's manifest-listed `pytest_commands`.
 2. Documentation updates in `README.md` and/or `docs/*.md` beyond `docs/dod_manifest.json`.
+3. PR checklist links to CI evidence for each listed command (workflow/job URL or attached command output).
+
+### Merge expectations for milestone and maturity updates
+
+PRs that change capability status in `docs/dod_manifest.json` or contract maturity in `docs/system_contract_map.md` are merge-ready only when all of the following are true:
+
+- `State Renormalization Milestone Gate` is green in CI.
+- The PR body includes exact manifest command strings plus passing evidence links for each command.
+- `ROADMAP.md` and `docs/system_contract_map.md` are updated for status transitions.
+- Contract maturity promotions include a dated changelog entry under `docs/system_contract_map.md`.
 
 CI enforces these milestone rules for PRs and merge queues that touch `src/state_renormalization/`, `docs/dod_manifest.json`, or the milestone gate workflow.
 

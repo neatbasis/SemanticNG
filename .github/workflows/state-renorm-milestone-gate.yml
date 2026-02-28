@@ -88,6 +88,7 @@ jobs:
           changed_files_cmd = ["git", "diff", "--name-only", base_sha, head_sha]
           changed_files_out = subprocess.check_output(changed_files_cmd, text=True)
           changed_files = [line.strip() for line in changed_files_out.splitlines() if line.strip()]
+          touches_state_renorm = any(path.startswith("src/state_renormalization/") for path in changed_files)
 
           print("Changed files:")
           for path in changed_files:
@@ -101,7 +102,7 @@ jobs:
                   continue
 
               capability_paths = capability.get("code_paths", [])
-              capability_changed = manifest_changed or any(
+              capability_changed = touches_state_renorm or manifest_changed or any(
                   _matches_code_path(changed, code_path)
                   for changed in changed_files
                   for code_path in capability_paths

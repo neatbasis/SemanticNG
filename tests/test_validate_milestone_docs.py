@@ -132,3 +132,56 @@ def test_maturity_promotion_evidence_mismatches_requires_entry_and_url() -> None
 
     assert "Contract A: changelog promotion entry must include an evidence URL (http:// or https://)." in mismatches
     assert "Contract B: missing changelog entry for maturity promotion operational -> proven." in mismatches
+
+
+def test_maturity_transition_changelog_mismatches_requires_dated_https_entry() -> None:
+    updates = [("Contract A", "in_progress", "operational")]
+    changelog_lines = ["- Contract A in_progress -> operational; no date and no link"]
+
+    mismatches = validate_milestone_docs._maturity_transition_changelog_mismatches(updates, changelog_lines)
+
+    assert (
+        "Contract A: changelog entry for maturity transition in_progress -> operational must start with '- YYYY-MM-DD (Milestone):'."
+        in mismatches
+    )
+    assert (
+        "Contract A: changelog entry for maturity transition in_progress -> operational must include at least one https:// evidence link."
+        in mismatches
+    )
+
+
+def test_ci_evidence_links_command_mismatches_detects_order_drift() -> None:
+    manifest = {
+        "capabilities": [
+            {
+                "id": "cap_a",
+                "pytest_commands": [
+                    "pytest tests/test_alpha.py",
+                    "pytest tests/test_beta.py",
+                ],
+                "ci_evidence_links": [
+                    {"command": "pytest tests/test_beta.py"},
+                    {"command": "pytest tests/test_alpha.py"},
+                ],
+            }
+        ]
+    }
+
+    mismatches = validate_milestone_docs._ci_evidence_links_command_mismatches(manifest, {"cap_a"})
+
+    assert len(mismatches) == 1
+    assert "cap_a: ci_evidence_links.command values must exactly match pytest_commands in the same order" in mismatches[0]
+
+
+def test_commands_missing_evidence_by_capability_reports_capability_id() -> None:
+    pr_body = "pytest tests/test_alpha.py\nEvidence: https://ci.example/run/1"
+    commands_by_capability = {
+        "cap_a": ["pytest tests/test_alpha.py"],
+        "cap_b": ["pytest tests/test_beta.py"],
+    }
+
+    mismatches = validate_milestone_docs._commands_missing_evidence_by_capability(pr_body, commands_by_capability)
+
+    assert len(mismatches) == 1
+    assert mismatches[0].startswith("cap_b:")
+    assert "pytest tests/test_beta.py" in mismatches[0]

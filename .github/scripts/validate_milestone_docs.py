@@ -217,6 +217,97 @@ def _maturity_promotion_evidence_mismatches(
     return promotion_mismatches
 
 
+def _maturity_transition_changelog_mismatches(
+    maturity_updates: list[tuple[str, str, str]], changelog_lines: list[str]
+) -> list[str]:
+    mismatches: list[str] = []
+    dated_line_pattern = re.compile(r"^- \d{4}-\d{2}-\d{2} \([^)]+\): ")
+    https_link_pattern = re.compile(r"https://\S+")
+
+    for contract_name, before, after in maturity_updates:
+        matching_entries = [
+            line
+            for line in changelog_lines
+            if contract_name in line and f"{before} -> {after}" in line
+        ]
+        if not matching_entries:
+            mismatches.append(
+                f"{contract_name}: missing changelog entry for maturity transition {before} -> {after}."
+            )
+            continue
+
+        if not any(dated_line_pattern.match(line) for line in matching_entries):
+            mismatches.append(
+                f"{contract_name}: changelog entry for maturity transition {before} -> {after} must start with '- YYYY-MM-DD (Milestone):'."
+            )
+
+        if not any(https_link_pattern.search(line) for line in matching_entries):
+            mismatches.append(
+                f"{contract_name}: changelog entry for maturity transition {before} -> {after} must include at least one https:// evidence link."
+            )
+
+    return mismatches
+
+
+def _transitioned_capability_commands(head_manifest: dict, transitioned_cap_ids: set[str]) -> dict[str, list[str]]:
+    commands_by_capability: dict[str, list[str]] = {}
+    for capability in head_manifest.get("capabilities", []):
+        cap_id = capability.get("id")
+        if cap_id not in transitioned_cap_ids:
+            continue
+        pytest_commands = capability.get("pytest_commands") or []
+        commands = [command for command in pytest_commands if isinstance(command, str) and command.strip()]
+        commands_by_capability[cap_id] = commands
+    return commands_by_capability
+
+
+def _ci_evidence_links_command_mismatches(head_manifest: dict, transitioned_cap_ids: set[str]) -> list[str]:
+    mismatches: list[str] = []
+    for capability in head_manifest.get("capabilities", []):
+        cap_id = capability.get("id", "<unknown>")
+        if cap_id not in transitioned_cap_ids:
+            continue
+
+        pytest_commands = capability.get("pytest_commands") or []
+        normalized_pytest_commands = [
+            command for command in pytest_commands if isinstance(command, str) and command.strip()
+        ]
+
+        ci_evidence_links = capability.get("ci_evidence_links")
+        if not isinstance(ci_evidence_links, list):
+            mismatches.append(
+                f"{cap_id}: ci_evidence_links must be a list for transitioned capabilities and commands must exactly match pytest_commands."
+            )
+            continue
+
+        ci_commands: list[str] = []
+        malformed_entries: list[int] = []
+        for idx, entry in enumerate(ci_evidence_links):
+            if not isinstance(entry, dict):
+                malformed_entries.append(idx)
+                continue
+            command = entry.get("command")
+            if not isinstance(command, str) or not command.strip():
+                malformed_entries.append(idx)
+                continue
+            ci_commands.append(command)
+
+        if malformed_entries:
+            joined_indexes = ", ".join(str(idx) for idx in malformed_entries)
+            mismatches.append(
+                f"{cap_id}: ci_evidence_links entries at indexes [{joined_indexes}] must be objects containing a non-empty 'command' string."
+            )
+            continue
+
+        if ci_commands != normalized_pytest_commands:
+            mismatches.append(
+                f"{cap_id}: ci_evidence_links.command values must exactly match pytest_commands in the same order. "
+                f"pytest_commands={normalized_pytest_commands}; ci_evidence_links.command={ci_commands}."
+            )
+
+    return mismatches
+
+
 def _commands_missing_evidence(pr_body: str, commands: list[str]) -> list[str]:
     lines = pr_body.splitlines()
     invalid: list[str] = []
@@ -240,6 +331,19 @@ def _commands_missing_evidence(pr_body: str, commands: list[str]) -> list[str]:
 def _commands_with_invalid_evidence_format(pr_body: str, commands: list[str]) -> list[str]:
     """Backward-compatible alias for older tests/callers."""
     return _commands_missing_evidence(pr_body, commands)
+
+
+def _commands_missing_evidence_by_capability(
+    pr_body: str, commands_by_capability: dict[str, list[str]]
+) -> list[str]:
+    missing: list[str] = []
+    for cap_id, commands in sorted(commands_by_capability.items()):
+        for command in _commands_missing_evidence(pr_body, commands):
+            missing.append(
+                f"{cap_id}: command must be present as an exact line and immediately followed by "
+                f"'Evidence: https://...' or 'Evidence: artifact://...': {command}"
+            )
+    return missing
 
 
 def _load_pr_body() -> str:
@@ -280,30 +384,29 @@ def main() -> int:
                 print(f"  - {path}")
             return 1
 
+        ci_command_mismatches = _ci_evidence_links_command_mismatches(head_manifest, set(status_transitions))
+        if ci_command_mismatches:
+            print(
+                "Transitioned capabilities must keep ci_evidence_links.command exactly synchronized with pytest_commands."
+            )
+            for mismatch in sorted(ci_command_mismatches):
+                print(f"  - {mismatch}")
+            return 1
+
         if event_name == "pull_request":
             pr_body = _load_pr_body()
-            head_caps = {cap["id"]: cap for cap in head_manifest.get("capabilities", [])}
-            required_commands: list[str] = []
-            for cap_id in status_transitions:
-                required_commands.extend(head_caps.get(cap_id, {}).get("pytest_commands", []))
-
-            missing_commands = [command for command in required_commands if command not in pr_body]
-            if missing_commands:
-                print("PR description must include exact milestone pytest commands for capability status transitions.")
-                for command in sorted(set(missing_commands)):
-                    print(f"  - Missing command in PR body: {command}")
-                return 1
-
-            invalid_format_commands = _commands_missing_evidence(pr_body, sorted(set(required_commands)))
-            if invalid_format_commands:
-                print("PR description must use deterministic command/evidence pairs for milestone commands.")
+            commands_by_capability = _transitioned_capability_commands(head_manifest, set(status_transitions))
+            missing_evidence = _commands_missing_evidence_by_capability(pr_body, commands_by_capability)
+            if missing_evidence:
+                print(
+                    "PR description must include adjacency evidence for every required transitioned-capability command."
+                )
                 print(
                     "Immediately follow each exact command line with one evidence line in either "
-                    "'Evidence: http(s)://...' or 'Evidence: artifact://...' format;"
+                    "'Evidence: https://...' or 'Evidence: artifact://...' format."
                 )
-                print("accepted evidence tokens: http://..., https://..., or artifact://...")
-                for command in invalid_format_commands:
-                    print(f"  - Missing deterministic evidence line for command: {command}")
+                for error in missing_evidence:
+                    print(f"  - {error}")
                 return 1
 
     head_map_text = Path("docs/system_contract_map.md").read_text(encoding="utf-8")
@@ -377,23 +480,14 @@ def main() -> int:
         )
         maturity_updates = _maturity_transitions(base_map_text, head_map_text)
         if maturity_updates:
-            changelog_entries = _added_changelog_entries(base_sha, head_sha)
-            if not changelog_entries:
-                print("Maturity changes in docs/system_contract_map.md require changelog entries.")
-                for contract_name, before, after in maturity_updates:
-                    print(f"  - {contract_name}: {before} -> {after}")
-                print("Add one or more entries under '### Changelog' in the format:")
-                print("- YYYY-MM-DD (Milestone): ...")
-                return 1
-
-            promotion_mismatches = _maturity_promotion_evidence_mismatches(
+            transition_changelog_mismatches = _maturity_transition_changelog_mismatches(
                 maturity_updates,
                 _extract_changelog_lines(head_map_text),
             )
-            if promotion_mismatches:
-                print("Maturity promotions require a changelog promotion entry with an evidence URL.")
+            if transition_changelog_mismatches:
+                print("Maturity transitions require dated changelog entries with https:// evidence links.")
                 print("Use format: - YYYY-MM-DD (Milestone): <contract> <from> -> <to>; rationale. https://...")
-                for mismatch in sorted(promotion_mismatches):
+                for mismatch in sorted(transition_changelog_mismatches):
                     print(f"  - {mismatch}")
                 return 1
 

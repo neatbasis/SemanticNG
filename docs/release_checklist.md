@@ -10,10 +10,9 @@ This document is the canonical source for active release/integration workflow ex
 - Use milestone gate + manifest evidence as merge prerequisites for milestone/maturity changes.
 - Treat `docs/integration_notes.md` as historical context only unless its explicit activation criteria are met.
 
-- [ ] **Milestone gate pass links recorded:** Include links to the latest successful `State Renormalization Milestone Gate` CI run(s) for this release candidate.
-- [ ] **Manifest is canonical:** Capability status, code paths, and command coverage are updated directly in `docs/dod_manifest.json`.
-- [ ] **Status transition commands captured in manifest:** Each transitioned capability has complete `pytest_commands` and synchronized `ci_evidence_links.command` entries in manifest order.
-- [ ] **Milestone gate pass links recorded:** CI run links are captured in manifest `ci_evidence_links` and/or release notes as needed (PR-body duplication is optional).
+- [ ] **Milestone gate pass requirement:** Include link(s) to the latest successful `State Renormalization Milestone Gate` CI run(s) for this release candidate.
+- [ ] **Manifest evidence mapping requirement:** `docs/dod_manifest.json` remains canonical, and each transitioned capability has complete `pytest_commands` entries synchronized with `ci_evidence_links.command` in manifest order.
+- [ ] **Optional evidence duplication guidance:** Duplicate gate-pass links in PR body and/or release notes only when extra visibility is useful; manifest evidence remains the source of truth.
 
 
 ## Governance enforcement requirements

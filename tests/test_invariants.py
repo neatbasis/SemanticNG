@@ -5,9 +5,9 @@ from state_renormalization.invariants import (
     InvariantId,
     InvariantOutcome,
     Validity,
-    check_explainable_halt_completeness,
+    check_explainable_halt_payload,
     check_prediction_availability,
-    check_prediction_retrievability,
+    check_evidence_link_completeness,
     default_check_context,
     normalize_outcome,
 )
@@ -39,7 +39,7 @@ def test_prediction_availability_invariant_pass_and_fail() -> None:
 
 
 def test_prediction_retrievability_invariant_pass_and_fail() -> None:
-    failing = check_prediction_retrievability(
+    failing = check_evidence_link_completeness(
         default_check_context(
             scope="scope:test",
             prediction_key="scope:test",
@@ -48,10 +48,10 @@ def test_prediction_retrievability_invariant_pass_and_fail() -> None:
             just_written_prediction={"key": "scope:test", "evidence_refs": []},
         )
     )
-    assert failing.invariant_id is InvariantId.PREDICTION_RETRIEVABILITY
+    assert failing.invariant_id is InvariantId.EVIDENCE_LINK_COMPLETENESS
     assert failing.passed is False
 
-    passing = check_prediction_retrievability(
+    passing = check_evidence_link_completeness(
         default_check_context(
             scope="scope:test",
             prediction_key="scope:test",
@@ -64,7 +64,7 @@ def test_prediction_retrievability_invariant_pass_and_fail() -> None:
         )
     )
     normalized = normalize_outcome(passing)
-    assert normalized.invariant_id == "prediction_retrievability.v1"
+    assert normalized.invariant_id == "evidence_link_completeness.v1"
     assert normalized.passed is True
 
 
@@ -79,7 +79,7 @@ def test_explainable_halt_completeness_invariant_pass_and_fail() -> None:
         evidence=(),
         details={},
     )
-    failing = check_explainable_halt_completeness(
+    failing = check_explainable_halt_payload(
         default_check_context(
             scope="scope:test",
             prediction_key="scope:test",
@@ -88,7 +88,7 @@ def test_explainable_halt_completeness_invariant_pass_and_fail() -> None:
             halt_candidate=bad_halt,
         )
     )
-    assert failing.invariant_id is InvariantId.EXPLAINABLE_HALT_COMPLETENESS
+    assert failing.invariant_id is InvariantId.EXPLAINABLE_HALT_PAYLOAD
     assert failing.passed is False
 
     good_halt = InvariantOutcome(
@@ -101,7 +101,7 @@ def test_explainable_halt_completeness_invariant_pass_and_fail() -> None:
         evidence=({"kind": "scope", "value": "scope:test"},),
         details={"message": "has details"},
     )
-    passing = check_explainable_halt_completeness(
+    passing = check_explainable_halt_payload(
         default_check_context(
             scope="scope:test",
             prediction_key="scope:test",
@@ -111,5 +111,5 @@ def test_explainable_halt_completeness_invariant_pass_and_fail() -> None:
         )
     )
     normalized = normalize_outcome(passing)
-    assert normalized.invariant_id == "explainable_halt_completeness.v1"
+    assert normalized.invariant_id == "explainable_halt_payload.v1"
     assert normalized.passed is True

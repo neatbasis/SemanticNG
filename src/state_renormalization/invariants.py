@@ -8,8 +8,8 @@ from typing import Any, Callable, Mapping, Optional, Protocol, Sequence
 
 class InvariantId(str, Enum):
     PREDICTION_AVAILABILITY = "prediction_availability.v1"
-    PREDICTION_RETRIEVABILITY = "prediction_retrievability.v1"
-    EXPLAINABLE_HALT_COMPLETENESS = "explainable_halt_completeness.v1"
+    EVIDENCE_LINK_COMPLETENESS = "evidence_link_completeness.v1"
+    EXPLAINABLE_HALT_PAYLOAD = "explainable_halt_payload.v1"
 
 
 class Flow(str, Enum):
@@ -37,11 +37,13 @@ class InvariantOutcome:
 
 
 @dataclass(frozen=True)
-class NormalizedCheckerOutput:
+class CheckerResult:
+    gate: str
     invariant_id: str
     passed: bool
+    reason: str
     evidence: Sequence[Mapping[str, Any]] = field(default_factory=tuple)
-    reason: str = ""
+    code: str = ""
 
 
 class CheckContext(Protocol):
@@ -116,14 +118,14 @@ def check_prediction_availability(ctx: CheckContext) -> InvariantOutcome:
     return _ok(InvariantId.PREDICTION_AVAILABILITY, "current_prediction_available", {"prediction_key": key})
 
 
-def check_prediction_retrievability(ctx: CheckContext) -> InvariantOutcome:
+def check_evidence_link_completeness(ctx: CheckContext) -> InvariantOutcome:
     written = ctx.just_written_prediction
     if written is None:
-        return _ok(InvariantId.PREDICTION_RETRIEVABILITY, "retrievability_not_applicable")
+        return _ok(InvariantId.EVIDENCE_LINK_COMPLETENESS, "evidence_check_not_applicable")
 
     if not ctx.prediction_log_available:
         return InvariantOutcome(
-            invariant_id=InvariantId.PREDICTION_RETRIEVABILITY,
+            invariant_id=InvariantId.EVIDENCE_LINK_COMPLETENESS,
             passed=False,
             reason="Prediction write attempted without an available append log.",
             flow=Flow.STOP,
@@ -136,51 +138,51 @@ def check_prediction_retrievability(ctx: CheckContext) -> InvariantOutcome:
     evidence_refs = written.get("evidence_refs")
     if not evidence_refs:
         return InvariantOutcome(
-            invariant_id=InvariantId.PREDICTION_RETRIEVABILITY,
+            invariant_id=InvariantId.EVIDENCE_LINK_COMPLETENESS,
             passed=False,
-            reason="Prediction append did not produce retrievable evidence.",
+            reason="Prediction append did not produce linked evidence.",
             flow=Flow.STOP,
             validity=Validity.INVALID,
-            code="prediction_append_unverified",
+            code="missing_evidence_links",
             evidence=({"kind": "scope", "value": ctx.scope},),
-            details={"message": "Prediction append did not produce retrievable evidence."},
+            details={"message": "Prediction append did not produce linked evidence."},
             action_hints=({"kind": "retry_append", "scope": ctx.scope},),
         )
 
     key = str(written.get("key") or ctx.prediction_key or "")
     if key and key not in ctx.current_predictions:
         return InvariantOutcome(
-            invariant_id=InvariantId.PREDICTION_RETRIEVABILITY,
+            invariant_id=InvariantId.EVIDENCE_LINK_COMPLETENESS,
             passed=False,
-            reason="Prediction write did not materialize into current predictions.",
+            reason="Prediction write did not materialize into current projections.",
             flow=Flow.STOP,
             validity=Validity.INVALID,
             code="write_before_use_violation",
             evidence=({"kind": "prediction_key", "value": key},),
-            details={"message": "Prediction write did not materialize into current predictions."},
+            details={"message": "Prediction write did not materialize into current projections."},
             action_hints=({"kind": "rebuild_view", "scope": ctx.scope},),
         )
 
-    return _ok(InvariantId.PREDICTION_RETRIEVABILITY, "prediction_write_materialized", {"prediction_key": key or None})
+    return _ok(InvariantId.EVIDENCE_LINK_COMPLETENESS, "evidence_links_complete", {"prediction_key": key or None})
 
 
-def check_explainable_halt_completeness(ctx: CheckContext) -> InvariantOutcome:
+def check_explainable_halt_payload(ctx: CheckContext) -> InvariantOutcome:
     candidate = ctx.halt_candidate
     if candidate is None or candidate.flow != Flow.STOP:
-        return _ok(InvariantId.EXPLAINABLE_HALT_COMPLETENESS, "halt_check_not_applicable")
+        return _ok(InvariantId.EXPLAINABLE_HALT_PAYLOAD, "halt_check_not_applicable")
 
     has_details = bool(candidate.details)
     has_evidence = bool(candidate.evidence)
     if has_details and has_evidence:
-        return _ok(InvariantId.EXPLAINABLE_HALT_COMPLETENESS, "halt_explainable")
+        return _ok(InvariantId.EXPLAINABLE_HALT_PAYLOAD, "halt_payload_explainable")
 
     return InvariantOutcome(
-        invariant_id=InvariantId.EXPLAINABLE_HALT_COMPLETENESS,
+        invariant_id=InvariantId.EXPLAINABLE_HALT_PAYLOAD,
         passed=False,
         reason="Stop outcomes must include both details and evidence.",
         flow=Flow.STOP,
         validity=Validity.DEGRADED,
-        code="halt_not_explainable",
+        code="halt_payload_incomplete",
         details={
             "message": "Stop outcomes must include both details and evidence.",
             "offending_invariant": candidate.invariant_id.value,
@@ -192,8 +194,8 @@ def check_explainable_halt_completeness(ctx: CheckContext) -> InvariantOutcome:
 
 REGISTRY: dict[InvariantId, Checker] = {
     InvariantId.PREDICTION_AVAILABILITY: check_prediction_availability,
-    InvariantId.PREDICTION_RETRIEVABILITY: check_prediction_retrievability,
-    InvariantId.EXPLAINABLE_HALT_COMPLETENESS: check_explainable_halt_completeness,
+    InvariantId.EVIDENCE_LINK_COMPLETENESS: check_evidence_link_completeness,
+    InvariantId.EXPLAINABLE_HALT_PAYLOAD: check_explainable_halt_payload,
 }
 
 
@@ -217,12 +219,18 @@ def default_check_context(
     )
 
 
-def normalize_outcome(outcome: InvariantOutcome) -> NormalizedCheckerOutput:
-    return NormalizedCheckerOutput(
+def run_checkers(*, gate: str, ctx: CheckContext, invariant_ids: Sequence[InvariantId]) -> tuple[InvariantOutcome, ...]:
+    return tuple(REGISTRY[invariant_id](ctx) for invariant_id in invariant_ids)
+
+
+def normalize_outcome(outcome: InvariantOutcome, *, gate: str = "") -> CheckerResult:
+    return CheckerResult(
+        gate=gate,
         invariant_id=outcome.invariant_id.value,
         passed=outcome.passed,
-        evidence=tuple(_normalize_evidence_item(item) for item in outcome.evidence),
         reason=outcome.reason,
+        evidence=tuple(_normalize_evidence_item(item) for item in outcome.evidence),
+        code=outcome.code,
     )
 
 

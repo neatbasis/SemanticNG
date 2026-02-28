@@ -89,8 +89,10 @@ def test_render_pr_template_autogen_section_is_sorted_and_wrapped() -> None:
 
     assert section.startswith(render_transition_evidence.AUTOGEN_BEGIN)
     assert section.endswith(render_transition_evidence.AUTOGEN_END)
-    assert section.index("# Capability: alpha") < section.index("# Capability: zeta")
-    assert "# Capability: empty" not in section
+    assert "```text" in section
+    assert "Evidence URL: https://github.com/<org>/<repo>/actions/runs/<run_id>" in section
+    assert section.index("#### Capability: `alpha`") < section.index("#### Capability: `zeta`")
+    assert "#### Capability: `empty`" not in section
 
 
 def test_replace_between_markers_replaces_only_autogen_block() -> None:

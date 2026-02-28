@@ -80,9 +80,7 @@ jobs:
           echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
 
       - name: Verify PR template AUTOGEN section is current
-        run: |
-          python .github/scripts/render_transition_evidence.py --regenerate-pr-template
-          git diff --exit-code .github/pull_request_template.md
+        run: python .github/scripts/render_transition_evidence.py --check-pr-template-autogen
 
       - name: Render transition evidence block
         id: render_transition_evidence

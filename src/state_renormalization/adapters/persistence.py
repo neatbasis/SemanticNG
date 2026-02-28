@@ -197,8 +197,13 @@ def append_halt(path: PathLike, record: Any) -> JsonObj:
     if isinstance(record, HaltRecord):
         payload = record.to_canonical_payload()
     elif isinstance(record, dict):
-        normalized = HaltRecord.from_payload(record).to_canonical_payload()
-        payload = {**record, **normalized}
+        canonical = HaltRecord.from_payload(record).to_canonical_payload()
+        stable_ids = {
+            key: value
+            for key in ("feature_id", "scenario_id", "step_id")
+            if isinstance((value := record.get(key)), str)
+        }
+        payload = {**stable_ids, **canonical}
 
     append_jsonl(p, payload)
     return {"kind": "jsonl", "ref": f"{p.name}@{next_offset}"}

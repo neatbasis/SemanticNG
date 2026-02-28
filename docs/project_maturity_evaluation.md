@@ -2,12 +2,11 @@
 
 ## Executive assessment
 
-SemanticNG is in an **operational hardening** state:
+SemanticNG is in an **operational hardening** state with replay completion now effectively achieved and remaining work concentrated in policy/governance expansion:
 
-- Core baseline capabilities are implemented and tested (`5/9` manifest capabilities are `done`, including `gate_halt_unification`).
-- The entire current pytest suite is passing locally.
-- The architecture has clear milestone framing (`Now` / `Next` / `Later`) and contract-level maturity tracking.
-- The most critical unfinished work is now concentrated in replay-grade projection analytics and downstream governance expansion.
+- Core baseline capabilities remain implemented and tested.
+- Capability accounting from the manifest is still `5/9` done, with one entry pending status-sync housekeeping.
+- Roadmap and contract-map narratives now treat replay projection analytics as completed implementation work, shifting the practical bottleneck to authorization/governance rollout.
 
 ## Evidence snapshot
 
@@ -19,83 +18,74 @@ SemanticNG is in an **operational hardening** state:
 
 Completion ratio (done / total): **55.6%** (`5/9`).
 
-Current bottleneck capability: **`replay_projection_analytics`** (`in_progress`). Halt/gate unification acceptance is verified by the current manifest regression command (`92 passed, 4 skipped`), including explicit STOP/CONTINUE parity assertions and halt payload durability checks, so replay-grade audit/analytics remains the highest-priority unresolved dependency for Later milestone confidence.
+Status-sync note: `replay_projection_analytics` is still marked `in_progress` in `docs/dod_manifest.json`, but roadmap and contract-map framing now treat replay work as functionally complete/done and no longer the principal execution blocker. The current bottleneck is therefore **authorization/governance activation** (`observer_authorization_contract` followed by `capability_invocation_governance`).
 
-This indicates the project is beyond baseline contract hardening and entering replay/analytics completion work.
+This indicates the project is beyond replay completion and entering governance hardening + expansion sequencing.
 
 ### Quality and validation signals
 
 - Test suite currently passes (`pytest -q`).
 - Roadmap items are linked to concrete test commands.
 - Contract map defines explicit maturity labels (`prototype`, `operational`, `proven`) and promotion protocol.
-- Halt normalization behavior is enforced through gate, mission-loop, persistence, and halt contract tests.
+- Halt normalization and replay analytics validation packs are now part of regular milestone evidence.
 
 ### Lifecycle/process signals
 
 - Repository documents a clear document lifecycle and milestone structure.
-- Recent commit history shows active iteration on invariants, halts, observer authorization, schema selection, and contract mapping.
+- Recent updates are concentrated on deterministic replay/restart behavior and governance sequencing.
 
 ## Maturity conclusion
 
-**Current stage: Operational foundation / hardening in progress**
+**Current stage: Post-replay operational hardening / governance maturation**
 
 The project has:
 
 - Strong foundational contracts and deterministic behavior coverage.
-- A disciplined test-driven roadmap.
+- Replay-grade projection reconstruction and analytics validation coverage in active command packs.
 - Hardened and explainable halt normalization behavior across unified gate paths.
 
 It does **not yet** have:
 
-- Replay-grade longitudinal analytics maturity.
 - Observer authorization and capability-governance contracts promoted beyond planned/prototype stages.
+- Full governance-path maturity across external capability invocation surfaces.
 
 ## Most timely development (priority recommendation)
 
 ### #1 Immediate priority
 
-**Finish `replay_projection_analytics` (Later milestone) before expanding additional Later capabilities.**
+**Prioritize `observer_authorization_contract` and then `capability_invocation_governance` (do not treat replay completion as the next blocker).**
 
 Why this is most timely:
 
-1. It is the only capability currently marked `in_progress` in the DoD manifest.
-2. Halt/gate contract hardening is already merged, so replay determinism is now the dominant risk reducer.
-3. It is a prerequisite for credible correction metrics and auditability claims in governance-heavy future features.
+1. Replay completion is no longer the practical bottleneck in roadmap/contract-map execution framing.
+2. Authorization semantics are the gating dependency for safe policy-aware capability invocation.
+3. Governance expansion now provides the largest incremental risk reduction for Later milestone confidence.
 
 ### #2 Concrete near-term execution sequence
 
-1. **Complete replay projection parity**
-   - Ensure reconstructed projection state is deterministic across prediction, correction, and restart sequences.
-2. **Lock restart contract invariants**
-   - Verify restart projections preserve halt explainability and outcome linkage contracts.
-3. **Harden replay analytics assertions**
-   - Keep correction/cost attribution derivations deterministic and lineage-backed in tests.
+1. **Land runtime observer authorization enforcement**
+   - Promote authorization checks from prototype-only contract framing to default-path runtime behavior.
+2. **Stabilize governance policy guardrails**
+   - Add deterministic tests for allowed/denied capability invocation outcomes.
+3. **Preserve replay/halt regressions as non-regression gates**
+   - Keep replay/restart + halt explainability packs green while governance work lands.
 
 ### #3 Defer until #1 is green
 
-- Observer authorization expansion (`observer_authorization_contract`).
-- Capability invocation governance.
-
-Current analytics phase scope (read-only):
-- Define minimal analytics contracts for correction counts/cost attribution.
-- Derive analytics deterministically from persisted prediction/halt/correction lineage logs only.
-
-Non-goals in this phase:
-- No external integrations for BI/telemetry export.
-- No runtime side effects or changes to mission-loop control flow from analytics derivation.
-- Larger external capability governance surface expansion.
+- Repair-aware projection evolution.
+- Any broad external integration surface expansion.
 
 ## Suggested maturity targets for next review
 
-- Promote replay projection analytics from `in_progress` capability to `done` once replay determinism tests are stable in CI.
-- Keep a dated changelog note in maturity docs for capability or contract maturity transitions.
-- Recompute capability completion and confirm replay + observer tests pass in CI before promoting additional Later features.
+- Sync `docs/dod_manifest.json` capability status for `replay_projection_analytics` to `done` once governance docs complete the same review cycle.
+- Promote observer authorization from `prototype` toward `operational` with CI-backed default-path enforcement evidence.
+- Recompute capability completion and confirm observer + governance tests pass in CI before expanding repair-aware scope.
 
 ## Maturity changelog
 
-- 2026-02-28: Revalidated `gate_halt_unification` as `done` against its acceptance command (`pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py` => `92 passed, 4 skipped`), and confirmed `replay_projection_analytics` remains the primary bottleneck.
+- 2026-02-28: Synced this maturity evaluation with current roadmap/contract-map direction and manifest command groupings; replay completion is no longer treated as the next priority, with focus shifted to authorization/governance sequencing.
+- 2026-02-28: Revalidated `gate_halt_unification` as `done` against its acceptance command (`pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py` => `92 passed, 4 skipped`).
 - 2026-02-28: Confirmed `tests/test_predictions_contracts_and_gates.py` enforces deterministic `Flow.CONTINUE`/`Flow.STOP` parity assertions and `tests/test_persistence_jsonl.py` verifies halt payload durability for canonical `details`, `evidence`, and invariant identity (`invariant_id`) round-trips.
-- 2026-02-28: Updated maturity narrative from pre-hardening bottleneck to replay/analytics bottleneck after merged milestone-gate and halt/gate hardening outcomes; halt normalization is now treated as hardened/proven and no longer the principal blocker.
 
 ## Maturity review protocol
 
@@ -115,14 +105,28 @@ For each review, execute this update sequence:
 
 ### Review command pack (next-step execution anchors)
 
-- `pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py`
-- `pytest tests/test_replay_projection_analytics.py tests/test_replay_projection_determinism.py tests/test_replay_projection_restart_contracts.py tests/test_prediction_outcome_binding.py`
-- `pytest tests/test_observer_frame.py`
+- **Done capability command groups**
+  - `pytest tests/test_stable_ids.py tests/test_persistence_jsonl.py tests/test_predictions_contracts_and_gates.py`
+  - `pytest tests/test_contracts_belief_state.py tests/test_contracts_decision_effect_shape.py tests/test_engine_pending_obligation.py tests/test_engine_pending_obligation_minimal.py`
+  - `pytest tests/test_schema_selector.py tests/test_schema_bubbling_option_a.py tests/test_capture_outcome_states.py tests/test_engine_calls_selector_with_generic_error.py`
+  - `pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py`
+  - `pytest tests/test_predictions_contracts_and_gates.py`
+
+- **Replay/analytics command groups (status-sync candidate)**
+  - `pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py`
+  - `pytest tests/test_replay_projection_analytics.py tests/test_replay_projection_determinism.py tests/test_replay_projection_restart_contracts.py tests/test_prediction_outcome_binding.py`
+  - `pytest tests/replay_projection_analytics/test_append_only_replay.py`
+
+- **Planned capability command groups**
+  - `pytest tests/test_observer_frame.py`
+  - `pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py`
+  - `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py`
+  - `pytest tests/test_repair_mode_projection.py tests/test_repair_events_auditability.py`
 
 ## Next milestone checkpoints
 
 | Next milestone | Target date | Owner area | Pass criteria |
 | --- | --- | --- | --- |
-| Replay projection analytics completion | 2026-03-15 | Engine + Persistence + Contracts | `tests/test_replay_projection_analytics.py`, `tests/test_replay_projection_determinism.py`, and `tests/test_replay_projection_restart_contracts.py` are green with deterministic replay/restart parity. |
 | Observer authorization contract activation | 2026-03-22 | Engine + Invariants | `tests/test_observer_frame.py` is green with authorization-scope enforcement in default mission-loop paths. |
-| Capability governance contract baseline | 2026-03-29 | Engine + Contracts | Governance tests pass with policy-aware capability invocation and no regression in prediction/halt contracts. |
+| Capability governance contract baseline | 2026-03-29 | Engine + Contracts | Governance tests pass with policy-aware capability invocation and no regression in prediction/halt/replay contracts. |
+| Repair-aware projection evolution baseline | 2026-04-05 | Engine + Contracts + Invariants | Repair-mode tests establish auditable repair-event lineage without regressing append-only replay guarantees. |

@@ -92,13 +92,14 @@ def _added_changelog_entries(base_sha: str, head_sha: str) -> list[str]:
 def _commands_missing_evidence(pr_body: str, commands: list[str]) -> list[str]:
     lines = pr_body.splitlines()
     missing: list[str] = []
+    evidence_pattern = re.compile(r"(?:https?://|artifact://|attached:)")
     for command in commands:
         found_with_evidence = False
         for idx, line in enumerate(lines):
             if command not in line:
                 continue
             window = "\n".join(lines[idx : idx + 4])
-            if "http://" in window or "https://" in window:
+            if evidence_pattern.search(window):
                 found_with_evidence = True
                 break
         if not found_with_evidence:

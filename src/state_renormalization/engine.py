@@ -35,6 +35,11 @@ from state_renormalization.contracts import (
     ProjectionReplayResult,
     ProjectionAnalyticsSnapshot,
     CorrectionCostAttribution,
+    CapabilityAdapterGate,
+    CapabilityInvocationAttempt,
+    CapabilityInvocationPolicyCode,
+    CapabilityInvocationPolicyDecision,
+    CapabilityPolicyHaltPayload,
     InterventionAction,
     InterventionDecision,
     InterventionRequest,
@@ -301,6 +306,118 @@ def _authorization_halt_record(*, stage: str, reason: str, context: Mapping[str,
             retryability=True,
         )
     )
+
+
+def _capability_invocation_policy_decision(
+    *,
+    observer: Optional[ObserverFrame],
+    projection_state: ProjectionState,
+    scope_key: str,
+    prediction_key: Optional[str],
+    explicit_gate_pass_present: bool,
+    action: str,
+    capability: str,
+    required_capability: str,
+    stage: str,
+) -> CapabilityInvocationPolicyDecision:
+    has_current_prediction = projection_state.has_current_predictions
+    if not has_current_prediction and prediction_key is not None:
+        has_current_prediction = prediction_key in projection_state.current_predictions
+
+    attempt = CapabilityInvocationAttempt(
+        invocation_id=_new_id("invoke:"),
+        capability=capability,
+        action=action,
+        stage=stage,
+        scope_key=scope_key,
+        prediction_key=prediction_key,
+        required_capability=required_capability,
+        explicit_gate_pass_present=explicit_gate_pass_present,
+        current_prediction_available=has_current_prediction,
+        observer_role=getattr(observer, "role", None),
+        observer_authorization_level=getattr(observer, "authorization_level", None),
+        observer_capabilities=list(getattr(observer, "capabilities", []) or []),
+    )
+
+    code: CapabilityInvocationPolicyCode | None = None
+    reason: str | None = None
+    if not has_current_prediction:
+        code = CapabilityInvocationPolicyCode.CURRENT_PREDICTION_REQUIRED
+        reason = "capability invocation denied: current valid prediction is required"
+    elif not explicit_gate_pass_present:
+        code = CapabilityInvocationPolicyCode.EXPLICIT_GATE_PASS_REQUIRED
+        reason = "capability invocation denied: explicit gate pass is required"
+    elif not _observer_has_capability(observer, required_capability):
+        code = CapabilityInvocationPolicyCode.OBSERVER_SCOPE_DENIED
+        reason = "capability invocation denied: observer scope does not permit action"
+
+    if code is None or reason is None:
+        return CapabilityInvocationPolicyDecision(attempt=attempt, allowed=True)
+
+    details = {
+        "policy_code": code.value,
+        "attempt": attempt.model_dump(mode="json"),
+    }
+    halt_payload = CapabilityPolicyHaltPayload(
+        halt_id=f"halt:{sha1_text(f'{stage}|capability.invocation.policy.v1|{code.value}|{attempt.invocation_id}')}",
+        stage=stage,
+        invariant_id="capability.invocation.policy.v1",
+        reason=reason,
+        details=details,
+        evidence=[
+            EvidenceRef(kind="capability", ref=capability),
+            EvidenceRef(kind="action", ref=action),
+            EvidenceRef(kind="policy_code", ref=code.value),
+        ],
+        retryability=True,
+        timestamp=_now_iso(),
+    )
+    return CapabilityInvocationPolicyDecision(
+        attempt=attempt,
+        allowed=False,
+        denial_code=code,
+        denial_reason=reason,
+        halt_payload=halt_payload,
+    )
+
+
+def _persist_policy_denial(
+    *,
+    ep: Optional[Episode],
+    decision: CapabilityInvocationPolicyDecision,
+    halt_log_path: str | Path,
+) -> HaltRecord:
+    if decision.halt_payload is None:
+        raise HaltPayloadValidationError("policy denial must provide halt payload")
+
+    halt = HaltRecord.from_payload(decision.halt_payload.model_dump(mode="json"))
+    halt_evidence_ref = append_halt_record(
+        halt,
+        halt_log_path=halt_log_path,
+        stable_ids=_episode_stable_ids(ep) if ep is not None else None,
+    )
+    if ep is not None:
+        _append_episode_artifact(
+            ep,
+            {
+                "artifact_kind": "capability_policy_denial",
+                "attempt": decision.attempt.model_dump(mode="json"),
+                "denial_code": decision.denial_code.value if decision.denial_code else None,
+                "denial_reason": decision.denial_reason,
+                **_halt_payload(halt),
+                "halt_evidence_ref": halt_evidence_ref,
+            },
+        )
+        _append_episode_artifact(
+            ep,
+            {
+                "artifact_kind": "halt_observation",
+                "observation_type": "halt",
+                **_halt_payload(halt),
+                "halt_evidence_ref": halt_evidence_ref,
+            },
+        )
+    return halt
 
 
 def _evaluate_invariant_gate_pipeline(
@@ -865,12 +982,37 @@ def append_prediction_record(
     prediction_log_path: str | Path = "artifacts/predictions.jsonl",
     stable_ids: Optional[Mapping[str, str]] = None,
     episode: Optional[Episode] = None,
-) -> dict[str, str]:
+    projection_state: Optional[ProjectionState] = None,
+    explicit_gate_pass_present: bool = True,
+    halt_log_path: str | Path = "halts.jsonl",
+) -> dict[str, str] | HaltRecord:
+    state_for_policy = projection_state or ProjectionState(
+        current_predictions={pred.scope_key: pred},
+        prediction_history=[],
+        updated_at_iso=_now_iso(),
+    )
+    policy_decision = _capability_invocation_policy_decision(
+        observer=getattr(episode, "observer", None),
+        projection_state=state_for_policy,
+        scope_key=pred.scope_key,
+        prediction_key=pred.prediction_key,
+        explicit_gate_pass_present=explicit_gate_pass_present,
+        action="append_prediction_record_event",
+        capability="prediction.persistence",
+        required_capability="baseline.invariant_evaluation",
+        stage="capability-invocation",
+    )
+    if not policy_decision.allowed:
+        return _persist_policy_denial(ep=episode, decision=policy_decision, halt_log_path=halt_log_path)
+
     payload: Any = pred.model_dump(mode="json")
     if stable_ids:
         payload = {**dict(stable_ids), **payload}
+
+    adapter_gate = CapabilityAdapterGate(invocation_id=policy_decision.attempt.invocation_id, allowed=True)
     return append_prediction_record_event(
         payload,
+        adapter_gate=adapter_gate,
         path=prediction_log_path,
         episode_id=getattr(episode, "episode_id", None),
         conversation_id=getattr(episode, "conversation_id", None),
@@ -1058,7 +1200,15 @@ def _reconcile_predictions(
         error_total += outcome.absolute_error
         compared_at = outcome.recorded_at_iso
         current_predictions[scope_key] = updated_pred
-        append_prediction_record(updated_pred, prediction_log_path=prediction_log_path, stable_ids=_episode_stable_ids(ep), episode=ep)
+        persist_result = append_prediction_record(
+            updated_pred,
+            prediction_log_path=prediction_log_path,
+            stable_ids=_episode_stable_ids(ep),
+            episode=ep,
+            projection_state=projection_state,
+        )
+        if isinstance(persist_result, HaltRecord):
+            continue
 
         binding_ctx = default_check_context(
             scope=scope_key,
@@ -1174,7 +1324,11 @@ def run_mission_loop(
         prediction_log_path=prediction_log_path,
         stable_ids=_episode_stable_ids(ep),
         episode=ep,
+        projection_state=updated_projection,
     )
+    if isinstance(turn_prediction_ref, HaltRecord):
+        append_turn_summary(ep)
+        return ep, belief, updated_projection
     updated_projection = project_current(turn_prediction, updated_projection)
     _append_episode_artifact(
         ep,
@@ -1196,7 +1350,11 @@ def run_mission_loop(
             prediction_log_path=prediction_log_path,
             stable_ids=_episode_stable_ids(ep),
             episode=ep,
+            projection_state=updated_projection,
         )
+        if isinstance(evidence_ref, HaltRecord):
+            append_turn_summary(ep)
+            return ep, belief, updated_projection
         updated_projection = project_current(pred, updated_projection)
         _append_episode_artifact(
             ep,

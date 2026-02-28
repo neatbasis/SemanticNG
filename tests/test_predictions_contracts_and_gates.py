@@ -848,6 +848,37 @@ def test_append_prediction_record_persists_supplied_stable_ids(tmp_path: Path) -
     assert rec["step_id"] == "stp_1"
 
 
+def test_gate_invariants_remain_stable_when_capability_policy_denies_side_effect(tmp_path: Path) -> None:
+    pred = PredictionRecord.model_validate(FIXED_PREDICTION)
+    projected = project_current(
+        pred,
+        ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+    )
+    gate = evaluate_invariant_gates(
+        ep=None,
+        scope=pred.scope_key,
+        prediction_key=pred.scope_key,
+        projection_state=projected,
+        prediction_log_available=True,
+        just_written_prediction={"key": pred.scope_key, "evidence_refs": [e.model_dump(mode="json") for e in pred.evidence_links]},
+    )
+    assert isinstance(gate, Success)
+
+    denied = append_prediction_record(
+        pred,
+        prediction_log_path=tmp_path / "predictions.jsonl",
+        halt_log_path=tmp_path / "halts.jsonl",
+        projection_state=projected,
+        explicit_gate_pass_present=False,
+    )
+    assert isinstance(denied, HaltRecord)
+    assert denied.invariant_id == "capability.invocation.policy.v1"
+
+    halt_rows = [row for _, row in read_jsonl(tmp_path / "halts.jsonl")]
+    assert halt_rows[0]["details"]["policy_code"] == "explicit_gate_pass_required"
+    assert not (tmp_path / "predictions.jsonl").exists()
+
+
 def test_evaluate_invariant_gates_persists_halt_with_episode_stable_ids(tmp_path: Path) -> None:
     class DummyEpisode:
         def __init__(self) -> None:

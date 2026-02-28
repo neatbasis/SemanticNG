@@ -67,6 +67,8 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
 - **Success criteria (test outcomes):**
   - New replay tests pass, proving `ProjectionState` reconstructed from append-only logs is deterministic across repeated runs and independent process restarts.
   - Multi-episode tests pass, demonstrating correction/cost attribution can be computed from persisted lineage without side channels.
+  - Phase scope remains read-only: analytics are derived from persisted prediction/halt/correction lineage only (no side effects, no external integrations).
+  - Non-goal for this phase: no policy changes to gating behavior and no online cost accounting mutations during mission execution.
 - **Related files/tests:**
   - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/contracts.py`
   - Tests: extend `tests/test_predictions_contracts_and_gates.py`; add replay/correction-focused tests under `tests/`.

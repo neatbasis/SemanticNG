@@ -24,7 +24,7 @@ Maturity levels:
 
 ## Milestone: Next
 
-_No contracts currently staged in `Next`; Observer authorization is fully promoted in Milestone `Now` and tracked as a completed dependency for downstream governance capabilities._
+_No contracts currently staged in `Next`; `observer_authorization_contract` is fully promoted in Milestone `Now` and tracked as a completed dependency for `capability_invocation_governance` and `repair_aware_projection_evolution`._
 
 ## Maturity update protocol (apply each milestone review)
 
@@ -35,17 +35,17 @@ Reference convention:
 
 1. Validate contract behavior against milestone pytest commands from `docs/dod_manifest.json`.
 2. Promote `prototype` → `operational` once default-path runtime + gate behavior are covered in CI.
-3. Promote `operational` → `proven` once replay and halt/audit paths are repeatedly validated across milestone regressions.
-4. Keep a changelog entry in this file whenever a maturity value changes, using `- YYYY-MM-DD (Milestone): <contract> <from> -> <to>; rationale. https://<evidence-link>` (must include at least one `https://` URL).
+3. Promote `operational` → `proven` only when the transition is tied to explicit manifest capability IDs and replay/halt/audit paths are repeatedly validated.
+4. Keep a changelog entry in this file whenever a maturity value changes, using `- YYYY-MM-DD (Milestone): capability_id=<id>; <contract> <from> -> <to>; rationale. https://<evidence-link>` (must include at least one `https://` URL).
 
 ### Changelog format
 
-- Required entry style: `- YYYY-MM-DD (Milestone): <contract> <from> -> <to>; rationale. https://<evidence-link>`
+- Required entry style: `- YYYY-MM-DD (Milestone): capability_id=<id>; <contract> <from> -> <to>; rationale. https://<evidence-link>`
 
 ### Changelog
 
-- 2026-02-28 (Now): Replay projection analytics contract in_progress -> operational; replay reconstruction/determinism/restart and append-only replay suites now serve as the baseline evidence set, aligned with manifest transition to `done`. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
-- 2026-02-28 (Now): Observer authorization contract prototype -> operational; authorization scope gating and invariant allowlist behavior are validated in default runtime contract and gate suites, and milestone posture is locked to `Now` as completed dependency coverage. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
-- 2026-02-28 (Now): Halt normalization contract operational -> proven; merged gate + halt hardening enforces canonical halt payloads end-to-end across mission-loop, persistence, and replay/restart validation. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
-- 2026-02-28 (Now): Prediction append contract operational -> proven; deterministic persistence and gate-consumption behavior is repeatedly validated in baseline and invariant/gate regressions. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
-- 2026-02-28 (Next): Halt normalization contract prototype -> operational; deterministic invariant-matrix coverage added explicit non-applicable markers and registry guard assertions. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
+- 2026-02-28 (Now): capability_id=replay_projection_analytics; Replay projection analytics contract in_progress -> operational; replay reconstruction/determinism/restart and append-only replay suites now serve as the baseline evidence set, aligned with manifest transition to `done`. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
+- 2026-02-28 (Now): capability_id=observer_authorization_contract; Observer authorization contract prototype -> operational; authorization scope gating and invariant allowlist behavior are validated in default runtime contract and gate suites, and milestone posture is locked to `Now` as completed dependency coverage. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
+- 2026-02-28 (Now): capability_id=gate_halt_unification; Halt normalization contract operational -> proven; merged gate + halt hardening enforces canonical halt payloads end-to-end across mission-loop, persistence, and replay/restart validation. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
+- 2026-02-28 (Now): capability_id=prediction_persistence_baseline; Prediction append contract operational -> proven; deterministic persistence and gate-consumption behavior is repeatedly validated in baseline and invariant/gate regressions. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
+- 2026-02-28 (Next): capability_id=invariant_matrix_coverage; Halt normalization contract prototype -> operational; deterministic invariant-matrix coverage added explicit non-applicable markers and registry guard assertions. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201

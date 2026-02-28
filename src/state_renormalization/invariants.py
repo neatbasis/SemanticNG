@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Mapping, Optional, Protocol, Sequence
 
+from state_renormalization.contracts import EvidenceRef
+
 
 class InvariantId(str, Enum):
     PREDICTION_AVAILABILITY = "prediction_availability.v1"
@@ -37,7 +39,7 @@ class InvariantOutcome:
     flow: Flow
     validity: Validity
     code: str
-    evidence: Sequence[Mapping[str, Any]] = field(default_factory=tuple)
+    evidence: Sequence[EvidenceRef] = field(default_factory=tuple)
     details: Mapping[str, Any] = field(default_factory=dict)
     action_hints: Optional[Sequence[Mapping[str, Any]]] = None
 
@@ -51,7 +53,7 @@ class CheckerResult:
     flow: str
     validity: str
     code: str
-    evidence: Sequence[Mapping[str, Any]] = field(default_factory=tuple)
+    evidence: Sequence[EvidenceRef] = field(default_factory=tuple)
     details: Mapping[str, Any] = field(default_factory=dict)
     action_hints: Sequence[Mapping[str, Any]] = field(default_factory=tuple)
 
@@ -126,7 +128,7 @@ def check_prediction_availability(ctx: CheckContext) -> InvariantOutcome:
             flow=Flow.STOP,
             validity=Validity.INVALID,
             code="no_predictions_projected",
-            evidence=({"kind": "scope", "value": ctx.scope},),
+            evidence=(EvidenceRef(kind="scope", ref=ctx.scope),),
             details={"message": "Action selection requires at least one projected current prediction."},
             action_hints=({"kind": "rebuild_view", "scope": ctx.scope},),
         )
@@ -143,7 +145,7 @@ def check_prediction_availability(ctx: CheckContext) -> InvariantOutcome:
             flow=Flow.STOP,
             validity=Validity.INVALID,
             code="no_current_prediction",
-            evidence=({"kind": "scope", "value": ctx.scope}, {"kind": "prediction_key", "value": key}),
+            evidence=(EvidenceRef(kind="scope", ref=ctx.scope), EvidenceRef(kind="prediction_key", ref=key)),
             details={"message": "Action selection attempted to consume a missing current prediction."},
             action_hints=({"kind": "rebuild_view", "scope": ctx.scope},),
         )
@@ -177,7 +179,7 @@ def check_evidence_link_completeness(ctx: CheckContext) -> InvariantOutcome:
             flow=Flow.STOP,
             validity=Validity.INVALID,
             code="missing_evidence_links",
-            evidence=({"kind": "scope", "value": ctx.scope},),
+            evidence=(EvidenceRef(kind="scope", ref=ctx.scope),),
             details={"message": "Prediction append did not produce linked evidence."},
             action_hints=({"kind": "retry_append", "scope": ctx.scope},),
         )
@@ -191,7 +193,7 @@ def check_evidence_link_completeness(ctx: CheckContext) -> InvariantOutcome:
             flow=Flow.STOP,
             validity=Validity.INVALID,
             code="write_before_use_violation",
-            evidence=({"kind": "prediction_key", "value": key},),
+            evidence=(EvidenceRef(kind="prediction_key", ref=key),),
             details={"message": "Prediction write did not materialize into current projections."},
             action_hints=({"kind": "rebuild_view", "scope": ctx.scope},),
         )
@@ -227,7 +229,7 @@ def check_prediction_outcome_binding(ctx: CheckContext) -> InvariantOutcome:
             flow=Flow.STOP,
             validity=Validity.INVALID,
             code="non_numeric_error_metric",
-            evidence=({"kind": "prediction_id", "value": prediction_id},),
+            evidence=(EvidenceRef(kind="prediction_id", ref=prediction_id),),
             details={"message": "Prediction outcome must include numeric error_metric."},
             action_hints=({"kind": "repair_outcome", "scope": ctx.scope},),
         )

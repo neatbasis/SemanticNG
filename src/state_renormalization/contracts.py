@@ -7,13 +7,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, ClassVar, Dict, List, Literal, Mapping, Optional, Self, cast
+from typing import Any, ClassVar, Dict, Iterable, List, Literal, Mapping, Optional, Protocol, cast
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
+from typing_extensions import Self
+
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class HaltPayloadValidationError(ValueError):
     """Raised when a halt payload cannot be normalized into canonical halt fields."""
+
+
+class EvidenceRefLike(Protocol):
+    kind: str
+    ref: str
 
 # ------------------------------------------------------------------------------
 # Shared BaseModel config helpers
@@ -338,9 +345,18 @@ class InvariantAuditResult(BaseModel):
     flow: str = "continue"
     validity: str = "valid"
     code: str = ""
-    evidence: List[Dict[str, Any]] = Field(default_factory=list)
+    evidence: List[EvidenceRef] = Field(default_factory=list)
     details: Dict[str, Any] = Field(default_factory=dict)
     action_hints: List[Dict[str, Any]] = Field(default_factory=list)
+
+    @field_validator("evidence", mode="before")
+    @classmethod
+    def _normalize_evidence(cls, value: object) -> List[EvidenceRef]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise TypeError("evidence must be a list")
+        return EvidenceRef.parse_many(value)
 
 
 class GateInvariantOutcomeBundle(BaseModel):
@@ -400,6 +416,15 @@ class AskOutboxRequestArtifact(BaseModel):
     timeout_at_iso: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("evidence_refs", mode="before")
+    @classmethod
+    def _normalize_evidence_refs(cls, value: object) -> List[EvidenceRef]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise TypeError("evidence_refs must be a list")
+        return EvidenceRef.parse_many(value)
+
 
 class AskOutboxResponseArtifact(BaseModel):
     """Canonical append-only human-recruitment response artifact."""
@@ -416,6 +441,15 @@ class AskOutboxResponseArtifact(BaseModel):
     status: str
     escalation: bool = False
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("evidence_refs", mode="before")
+    @classmethod
+    def _normalize_evidence_refs(cls, value: object) -> List[EvidenceRef]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise TypeError("evidence_refs must be a list")
+        return EvidenceRef.parse_many(value)
 
 
 class InterventionDecision(BaseModel):
@@ -486,6 +520,31 @@ class EvidenceRef(BaseModel):
     kind: str = Field(min_length=1)
     ref: str = Field(min_length=1)
 
+    @classmethod
+    def from_raw(cls, payload: object) -> "EvidenceRef":
+        """Normalize a raw evidence payload into a canonical typed reference."""
+        if isinstance(payload, cls):
+            return payload
+
+        if isinstance(payload, Mapping):
+            raw_kind = payload.get("kind")
+            raw_ref = payload.get("ref", payload.get("value"))
+            return cast(
+                "EvidenceRef",
+                cls.model_validate({"kind": str(raw_kind or "unknown"), "ref": "" if raw_ref is None else str(raw_ref)}),
+            )
+
+        maybe_kind = getattr(payload, "kind", None)
+        maybe_ref = getattr(payload, "ref", None)
+        if isinstance(maybe_kind, str) and isinstance(maybe_ref, str):
+            return cast("EvidenceRef", cls.model_validate({"kind": maybe_kind, "ref": maybe_ref}))
+
+        raise TypeError("evidence payload must be a mapping or an object with string kind/ref")
+
+    @classmethod
+    def parse_many(cls, payloads: Iterable[object]) -> List["EvidenceRef"]:
+        return [cls.from_raw(payload) for payload in payloads]
+
 
 class HaltRecord(BaseModel):
     model_config = _CONTRACT_CONFIG
@@ -515,6 +574,13 @@ class HaltRecord(BaseModel):
     evidence: List[EvidenceRef] = Field(validation_alias=AliasChoices("evidence", "evidence_refs"))
     retryability: bool = Field(validation_alias=AliasChoices("retryability", "retryable"))
     timestamp: str = Field(min_length=1, validation_alias=AliasChoices("timestamp", "timestamp_iso"))
+
+    @field_validator("evidence", mode="before")
+    @classmethod
+    def _normalize_evidence(cls, value: object) -> List[EvidenceRef]:
+        if not isinstance(value, list):
+            raise TypeError("evidence must be a list")
+        return EvidenceRef.parse_many(value)
 
     @staticmethod
     def _enforce_alias_consistency(data: Any) -> Any:
@@ -569,7 +635,7 @@ class HaltRecord(BaseModel):
         invariant_id: str,
         reason: str,
         details: Mapping[str, Any],
-        evidence: list[Mapping[str, Any]] | list[EvidenceRef],
+        evidence: list[EvidenceRef | EvidenceRefLike],
         retryability: bool,
         timestamp: str,
     ) -> Dict[str, Any]:
@@ -581,7 +647,7 @@ class HaltRecord(BaseModel):
                 "invariant_id": invariant_id,
                 "reason": reason,
                 "details": dict(details),
-                "evidence": list(evidence),
+                "evidence": [EvidenceRef.from_raw(item) for item in evidence],
                 "retryability": retryability,
                 "timestamp": timestamp,
             }
@@ -685,6 +751,15 @@ class PredictionRecord(BaseModel):
     assumptions: List[str] = Field(default_factory=list, validation_alias=AliasChoices("assumptions", "invariants_assumed"))
     evidence_refs: List[EvidenceRef] = Field(default_factory=list, validation_alias=AliasChoices("evidence_refs", "evidence_links"))
 
+    @field_validator("evidence_refs", mode="before")
+    @classmethod
+    def _normalize_evidence_refs(cls, value: object) -> List[EvidenceRef]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise TypeError("evidence_refs must be a list")
+        return EvidenceRef.parse_many(value)
+
     @property
     def variable(self) -> str:
         return self.target_variable
@@ -746,6 +821,13 @@ class CapabilityPolicyHaltPayload(BaseModel):
     reason: str
     details: Dict[str, Any]
     evidence: List[EvidenceRef]
+
+    @field_validator("evidence", mode="before")
+    @classmethod
+    def _normalize_evidence(cls, value: object) -> List[EvidenceRef]:
+        if not isinstance(value, list):
+            raise TypeError("evidence must be a list")
+        return EvidenceRef.parse_many(value)
     retryability: bool
     timestamp: str
 

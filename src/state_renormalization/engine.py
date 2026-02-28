@@ -403,14 +403,6 @@ def _observer_authorized_for_action(
     return authorized, context
 
 
-def _as_evidence_ref(item: Mapping[str, Any]) -> EvidenceRef:
-    kind = str(item.get("kind") or "unknown")
-    ref = item.get("ref")
-    if ref is None and "value" in item:
-        ref = item["value"]
-    return EvidenceRef(kind=kind, ref=str(ref) if ref is not None else "")
-
-
 def _stable_halt_id(*, stage: str, outcome: InvariantOutcome) -> str:
     basis = "|".join(
         [
@@ -435,7 +427,7 @@ def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltR
             invariant_id=outcome.invariant_id.value,
             reason=reason,
             details=dict(outcome.details),
-            evidence=[_as_evidence_ref(_to_dict(item)) for item in outcome.evidence],
+            evidence=list(outcome.evidence),
             timestamp=_now_iso(),
             retryability=bool(outcome.action_hints),
         )
@@ -871,7 +863,7 @@ def _invariant_audit_result_from_checker(gate_point: str, normalized: CheckerRes
         flow=normalized.flow,
         validity=normalized.validity,
         code=normalized.code,
-        evidence=[_to_dict(item) for item in normalized.evidence],
+        evidence=list(normalized.evidence),
         details=_to_dict(normalized.details) or {},
         action_hints=[_to_dict(item) for item in normalized.action_hints],
     )

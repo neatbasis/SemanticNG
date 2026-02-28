@@ -147,17 +147,44 @@ def test_replay_preserves_correction_lineage_fields_for_analytics(
         prediction_log_path=prediction_log,
     )
 
-    replayed_prediction = replay_projection_analytics(prediction_log).projection_state.current_predictions["turn:1"]
+    result = replay_projection_analytics(prediction_log)
+    replayed_prediction = result.projection_state.current_predictions["turn:1"]
     assert replayed_prediction.was_corrected is True
     assert replayed_prediction.correction_root_prediction_id == "pred:base"
     assert replayed_prediction.correction_parent_prediction_id == "pred:base"
     assert replayed_prediction.correction_revision == 1
 
-    rows = [row for _, row in read_jsonl(prediction_log) if row.get("event_kind") == "prediction_record"]
-    corrected_rows = [row for row in rows if row.get("scope_key") == "turn:1" and row.get("was_corrected")]
-    assert corrected_rows
+    attribution = result.analytics_snapshot.correction_cost_attribution["pred:base"]
+    assert attribution.correction_count == 1
+    assert attribution.correction_cost_total == 0.25
 
-    latest = corrected_rows[-1]
-    assert latest["correction_root_prediction_id"] == "pred:base"
-    assert latest["correction_parent_prediction_id"] == "pred:base"
-    assert latest["correction_revision"] == 1
+
+def test_replay_analytics_snapshot_matches_across_consumer_paths_for_same_log(tmp_path: Path) -> None:
+    prediction_log = tmp_path / "predictions.jsonl"
+
+    append_jsonl(
+        prediction_log,
+        {
+            "event_kind": "prediction_record",
+            **FIXED_PENDING_PREDICTION,
+            "expectation": 0.5,
+            "was_corrected": True,
+            "absolute_error": 0.25,
+            "compared_at_iso": "2026-02-13T00:01:00+00:00",
+            "corrected_at_iso": "2026-02-13T00:01:00+00:00",
+            "correction_root_prediction_id": "pred:base",
+            "correction_parent_prediction_id": "pred:base",
+            "correction_revision": 1,
+        },
+    )
+
+    replay_for_analytics = replay_projection_analytics(prediction_log)
+    replay_for_projection = replay_projection_analytics(prediction_log)
+
+    analytics_consumer = replay_for_analytics.analytics_snapshot
+    projection_consumer = replay_for_projection.projection_state
+    projected_analytics = replay_for_projection.analytics_snapshot
+
+    assert analytics_consumer.model_dump(mode="json") == projected_analytics.model_dump(mode="json")
+    assert projection_consumer.current_predictions["turn:1"].correction_revision == 1
+    assert analytics_consumer.correction_cost_attribution["pred:base"].correction_count == 1

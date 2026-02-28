@@ -85,7 +85,7 @@ def test_post_write_gate_halts_when_append_evidence_missing(tmp_path: Path) -> N
 
     assert isinstance(gate, HaltRecord)
     halt = gate
-    assert halt.stage == "pre-decision"
+    assert halt.stage == "pre-decision:post_write"
     assert halt.invariant_id == "evidence_link_completeness.v1"
     assert halt.reason == "Prediction append did not produce linked evidence."
     assert [e.model_dump(mode="json") for e in halt.evidence] == [{"kind": "scope", "ref": pred.scope_key}]
@@ -129,14 +129,14 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
     }
     assert artifact["invariant_checks"] == [
         {
-            "gate_point": "pre-decision",
+            "gate_point": "pre-decision:pre_consume",
             "invariant_id": "prediction_availability.v1",
             "passed": True,
             "evidence": [],
             "reason": "current_prediction_available",
         },
         {
-            "gate_point": "pre-decision",
+            "gate_point": "pre-decision:post_write",
             "invariant_id": "evidence_link_completeness.v1",
             "passed": False,
             "evidence": [{"kind": "scope", "ref": pred.scope_key}],
@@ -239,3 +239,57 @@ def test_evaluate_invariant_gates_persists_halt_with_episode_stable_ids(tmp_path
     assert rec["feature_id"] == "feat_1"
     assert rec["scenario_id"] == "scn_1"
     assert rec["step_id"] == "stp_1"
+
+
+def test_gate_branch_parity_and_deterministic_halt_selection(tmp_path: Path) -> None:
+    projected = ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00")
+
+    gate = evaluate_invariant_gates(
+        ep=None,
+        scope="scope:test",
+        prediction_key="scope:test",
+        projection_state=projected,
+        prediction_log_available=True,
+        just_written_prediction={"key": "scope:test", "evidence_refs": []},
+        halt_log_path=tmp_path / "halts.jsonl",
+    )
+
+    assert isinstance(gate, HaltRecord)
+    assert gate.stage == "pre-decision:pre_consume"
+    assert gate.invariant_id == "prediction_availability.v1"
+
+
+def test_gate_deterministic_continue_outcome_has_stable_branches() -> None:
+    pred = PredictionRecord.model_validate(FIXED_PREDICTION)
+    projected = project_current(
+        pred,
+        ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+    )
+
+    first = evaluate_invariant_gates(
+        ep=None,
+        scope=pred.scope_key,
+        prediction_key=pred.scope_key,
+        projection_state=projected,
+        prediction_log_available=True,
+        just_written_prediction={
+            "key": pred.scope_key,
+            "evidence_refs": [e.model_dump(mode="json") for e in pred.evidence_links],
+        },
+    )
+    second = evaluate_invariant_gates(
+        ep=None,
+        scope=pred.scope_key,
+        prediction_key=pred.scope_key,
+        projection_state=projected,
+        prediction_log_available=True,
+        just_written_prediction={
+            "key": pred.scope_key,
+            "evidence_refs": [e.model_dump(mode="json") for e in pred.evidence_links],
+        },
+    )
+
+    assert isinstance(first, Success)
+    assert isinstance(second, Success)
+    assert [out.flow.value for out in first.artifact.combined] == ["continue", "continue"]
+    assert [out.code for out in first.artifact.combined] == [out.code for out in second.artifact.combined]

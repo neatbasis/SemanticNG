@@ -107,6 +107,12 @@ class GateInvariantCheck:
     output: CheckerResult
 
 
+@dataclass(frozen=True)
+class GateInvariantEvaluation:
+    phase: str
+    outcome: InvariantOutcome
+
+
 def _observer_allowed_invariants(observer: Optional[ObserverFrame]) -> Optional[set[InvariantId]]:
     if observer is None:
         return None
@@ -475,7 +481,10 @@ def evaluate_invariant_gates(
     }
 
     pre_consume: Sequence[InvariantOutcome] = tuple()
+    post_write: Sequence[InvariantOutcome] = tuple()
     gate_checks: list[GateInvariantCheck] = []
+    evaluations: list[GateInvariantEvaluation] = []
+
     pre_outcome: Optional[InvariantOutcome] = None
     if _observer_allows_invariant(observer=observer, invariant_id=InvariantId.PREDICTION_AVAILABILITY):
         pre_ctx = default_check_context(
@@ -486,9 +495,9 @@ def evaluate_invariant_gates(
         )
         pre_outcome = _run_invariant(InvariantId.PREDICTION_AVAILABILITY, ctx=pre_ctx)
         pre_consume = (pre_outcome,)
-        gate_checks.append(GateInvariantCheck(gate_point=gate_point, output=normalize_outcome(pre_outcome, gate=gate_point)))
+        evaluations.append(GateInvariantEvaluation(phase="pre_consume", outcome=pre_outcome))
 
-    post_write: Sequence[InvariantOutcome] = tuple()
+    post_outcome: Optional[InvariantOutcome] = None
     if just_written_prediction is not None and _observer_allows_invariant(
         observer=observer,
         invariant_id=InvariantId.EVIDENCE_LINK_COMPLETENESS,
@@ -500,19 +509,25 @@ def evaluate_invariant_gates(
             prediction_log_available=prediction_log_available,
             just_written_prediction=just_written_prediction,
         )
-        post_write = (_run_invariant(InvariantId.EVIDENCE_LINK_COMPLETENESS, ctx=post_ctx),)
+        post_outcome = _run_invariant(InvariantId.EVIDENCE_LINK_COMPLETENESS, ctx=post_ctx)
+        post_write = (post_outcome,)
+        evaluations.append(GateInvariantEvaluation(phase="post_write", outcome=post_outcome))
+
+    for evaluation in evaluations:
         gate_checks.append(
-            GateInvariantCheck(gate_point=gate_point, output=normalize_outcome(post_write[0], gate=gate_point))
+            GateInvariantCheck(
+                gate_point=f"{gate_point}:{evaluation.phase}",
+                output=normalize_outcome(evaluation.outcome, gate=gate_point),
+            )
         )
 
     halt_outcome: Optional[InvariantOutcome] = None
     halt_stage: Optional[str] = None
-    if pre_outcome is not None and pre_outcome.flow == InvariantFlow.STOP:
-        halt_outcome = pre_outcome
-        halt_stage = gate_point
-    elif post_write and post_write[0].flow == InvariantFlow.STOP:
-        halt_outcome = post_write[0]
-        halt_stage = gate_point
+    for evaluation in evaluations:
+        if evaluation.outcome.flow == InvariantFlow.STOP:
+            halt_outcome = evaluation.outcome
+            halt_stage = f"{gate_point}:{evaluation.phase}"
+            break
 
     halt_record: Optional[HaltRecord] = None
     if halt_outcome is not None and halt_stage is not None:
@@ -651,9 +666,9 @@ def append_halt_record(
     halt_log_path: str | Path = "halts.jsonl",
     stable_ids: Optional[Mapping[str, str]] = None,
 ) -> dict[str, str]:
-    payload: Any = halt.model_dump(mode="json")
+    payload: Any = halt.to_persistence_dict()
     if stable_ids:
-        payload = {**dict(stable_ids), **halt.model_dump(mode="json")}
+        payload = {**dict(stable_ids), **halt.to_persistence_dict()}
     return append_halt(halt_log_path, payload)
 
 

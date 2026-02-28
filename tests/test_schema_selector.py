@@ -11,8 +11,9 @@ from state_renormalization.adapters.schema_selector import (
     _legacy_naive_schema_selector,
     build_selector_context,
     naive_schema_selector,
+    register_rule,
+    RULE_REGISTRY,
     RULE_PHASES,
-    RULES_BY_PHASE,
 )
 from state_renormalization.contracts import CaptureOutcome, CaptureStatus, SchemaHit, SchemaSelection
 
@@ -99,8 +100,9 @@ def test_rule_phases_and_rule_units_are_structured_for_extension() -> None:
     assert RULE_PHASES == ("hard-stop", "ambiguity-disambiguation", "fallback")
 
     for phase in RULE_PHASES:
-        assert RULES_BY_PHASE[phase], f"Expected rules for phase {phase}"
-        for rule in RULES_BY_PHASE[phase]:
+        phase_rules = RULE_REGISTRY.phase_rules(phase=phase)
+        assert phase_rules, f"Expected rules for phase {phase}"
+        for rule in phase_rules:
             assert isinstance(rule.name, str) and rule.name
             assert callable(rule.applies)
             assert callable(rule.emit)
@@ -119,15 +121,53 @@ def test_variant_addition_can_be_localized_to_a_single_phase_rule() -> None:
                 ambiguities=[],
             )
 
-    fallback = RULES_BY_PHASE["fallback"]
+    fallback = RULE_REGISTRY._rules_by_domain["home-assistant"]["fallback"]
     original = list(fallback)
     try:
-        fallback.insert(0, KitchenLightsRule(name="kitchen_lights"))
+        register_rule(
+            phase="fallback",
+            rule=KitchenLightsRule(name="kitchen_lights"),
+            domain="home-assistant",
+            prepend=True,
+        )
 
-        localized = naive_schema_selector("turn on kitchen lights", error=None)
-        baseline = naive_schema_selector("turn on bedroom lights", error=None)
+        localized = naive_schema_selector("turn on kitchen lights", error=None, domain="home-assistant")
+        baseline = naive_schema_selector("turn on bedroom lights", error=None, domain="home-assistant")
+        default_domain = naive_schema_selector("turn on kitchen lights", error=None)
 
         assert [hit.name for hit in localized.schemas] == ["lights.kitchen"]
         assert [hit.name for hit in baseline.schemas] == ["actionable_intent"]
+        assert [hit.name for hit in default_domain.schemas] == ["actionable_intent"]
     finally:
         fallback[:] = original
+
+
+def test_regression_stays_stable_as_non_matching_rules_grow() -> None:
+    class NeverAppliesRule(BaseRule):
+        name: str = "never"
+
+        def applies(self, ctx: SelectorContext) -> bool:
+            return False
+
+        def emit(self, ctx: SelectorContext) -> SchemaSelection:
+            raise AssertionError("should never emit")
+
+    snapshot_before = [
+        naive_schema_selector(text=text, error=error).model_dump(mode="json")
+        for text, error in SELECTOR_FIXTURES
+    ]
+
+    fallback = RULE_REGISTRY._rules_by_domain["default"]["fallback"]
+    original = list(fallback)
+    try:
+        for i in range(25):
+            register_rule(phase="fallback", rule=NeverAppliesRule(name=f"never-{i}"))
+
+        snapshot_after = [
+            naive_schema_selector(text=text, error=error).model_dump(mode="json")
+            for text, error in SELECTOR_FIXTURES
+        ]
+    finally:
+        fallback[:] = original
+
+    assert snapshot_after == snapshot_before

@@ -63,17 +63,18 @@
       "id": "gate_halt_unification",
       "title": "Unified gate pipeline and halt persistence",
       "status": "done",
-      "roadmap_section": "Next",
+      "roadmap_section": "Now",
       "code_paths": [
         "src/state_renormalization/contracts.py",
         "src/state_renormalization/engine.py",
         "src/state_renormalization/adapters/persistence.py"
       ],
       "pytest_commands": [
-        "pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py"
+        "pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py"
       ],
       "contract_map_refs": [
-        "Halt normalization contract"
+        "Halt normalization contract",
+        "Projection view contract"
       ]
     },
     {

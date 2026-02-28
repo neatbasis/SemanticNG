@@ -2,6 +2,8 @@
 
 SemanticNG exists to make consequential system behavior predict-first, evidence-grounded, contract-bounded, and replayable so decisions remain safe, auditable, and continuously improvable over time.
 
+The normative architecture/planning axiom set that operationalizes this north star lives in `docs/AXIOMS.md` and should be treated as the boundary for design changes.
+
 ## North-Star Principles (current enforcement targets)
 
 1. **Prediction precedes action (`engine.py` + `invariants.py`)**  

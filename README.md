@@ -19,6 +19,8 @@ Exploratory → Opportunity → Roadmap → Canonical
 
 SemanticNG is a Python project focused on state renormalization, schema selection, and behavior-driven test scenarios. See `MISSION.md` for mission, north-star principles, and phase non-goals.
 
+Architecture and planning constraints are codified in `docs/AXIOMS.md` (normative axiom set and PR usage requirements).
+
 Guardrail classification guidance for contributors (invariants vs policies vs heuristics) is documented in `docs/guardrails_and_invariants.md`.
 
 ## Requirements

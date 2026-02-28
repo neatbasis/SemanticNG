@@ -2,6 +2,8 @@
 
 This map tracks the core runtime contracts, their invariants, and where each contract is produced/consumed.
 
+For canonical completion-layer criteria and capability enablement dependencies, see `docs/definition_of_complete.md`.
+
 Maturity levels:
 - `prototype`: implemented but still evolving, partial hardening.
 - `operational`: active in default runtime with targeted automated tests.

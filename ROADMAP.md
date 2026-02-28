@@ -2,6 +2,8 @@
 
 This roadmap translates the architecture in `ARCHITECTURE.md` into an execution plan organized by horizon and validated by tests. It is intentionally future-leaning while preserving the fail-closed principles already implemented: prediction-first gating, explainable halts, and deterministic projection/replay.
 
+Canonical completion gates and enablement dependencies are defined in `docs/definition_of_complete.md`.
+
 ## Now (already implemented + verified tests)
 
 ### 1) Prediction-first contracts and deterministic persistence baseline

@@ -54,6 +54,8 @@ python -m pip install -e ".[test,bdd]"
 
 A machine-readable status inventory lives at `docs/dod_manifest.json` with capability IDs, status (`done`/`in_progress`/`planned`), code paths, and test commands.
 
+Canonical completion criteria across capability/integration/system layers are defined in `docs/definition_of_complete.md`.
+
 Validate this inventory in tests:
 
 ```bash

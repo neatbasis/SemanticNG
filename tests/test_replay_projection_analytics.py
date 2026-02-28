@@ -111,6 +111,9 @@ def test_halt_explainability_fields_survive_episode_persistence_roundtrip(
 
     authorization_issue = next(a for a in persisted["artifacts"] if a.get("artifact_kind") == "authorization_issue")
     halt_observation = next(a for a in persisted["artifacts"] if a.get("artifact_kind") == "halt_observation")
+    (_, persisted_halt), = list(read_jsonl(tmp_path / "halts.jsonl"))
 
     assert HaltRecord.from_payload(authorization_issue).to_canonical_payload() == expected
     assert HaltRecord.from_payload(halt_observation).to_canonical_payload() == expected
+    assert HaltRecord.from_payload(persisted_halt).to_canonical_payload() == expected
+    assert set(expected).issuperset(HaltRecord.required_explainability_fields())

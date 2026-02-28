@@ -6,6 +6,7 @@ from state_renormalization.contracts import HaltPayloadValidationError, HaltReco
 
 
 def test_halt_record_required_payload_fields_declared() -> None:
+    assert HaltRecord.required_explainability_fields() == ("invariant_id", "details", "evidence")
     assert HaltRecord.required_payload_fields() == (
         "halt_id",
         "stage",
@@ -80,6 +81,20 @@ def test_halt_record_rejects_missing_details_field() -> None:
             }
         )
 
+
+def test_halt_record_from_payload_rejects_missing_evidence_field() -> None:
+    with pytest.raises(HaltPayloadValidationError, match="malformed or incomplete"):
+        HaltRecord.from_payload(
+            {
+                "halt_id": "halt:1",
+                "stage": "pre-decision:pre_consume",
+                "invariant_id": "prediction_availability.v1",
+                "reason": "evidence missing",
+                "details": {"message": "evidence missing"},
+                "retryability": True,
+                "timestamp": "2026-02-13T00:00:00+00:00",
+            }
+        )
 
 def test_halt_record_from_payload_raises_typed_error_for_malformed_payload() -> None:
     with pytest.raises(HaltPayloadValidationError, match="malformed or incomplete"):

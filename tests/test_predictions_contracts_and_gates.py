@@ -758,3 +758,34 @@ def test_gate_flow_parity_continue_and_stop_payloads(tmp_path: Path) -> None:
     ]
     assert stop_gate.stage == "pre-decision:post_write"
     assert stop_gate.invariant_id == InvariantId.EVIDENCE_LINK_COMPLETENESS.value
+
+
+def test_evaluate_invariant_gates_rejects_malformed_halt_outcome_payload(monkeypatch) -> None:
+    malformed = InvariantOutcome(
+        invariant_id=InvariantId.PREDICTION_AVAILABILITY,
+        passed=False,
+        reason="malformed",
+        flow=Flow.STOP,
+        validity=Validity.INVALID,
+        code="malformed",
+        details=None,  # type: ignore[arg-type]
+        evidence=None,  # type: ignore[arg-type]
+        action_hints=(),
+    )
+
+    monkeypatch.setattr(
+        "state_renormalization.engine._run_invariant",
+        lambda invariant_id, *, ctx: malformed,
+    )
+
+    with pytest.raises(Exception, match="malformed or incomplete"):
+        evaluate_invariant_gates(
+            ep=None,
+            scope="scope:test",
+            prediction_key="scope:test",
+            projection_state=ProjectionState(
+                current_predictions={"scope:test": PredictionRecord.model_validate(FIXED_PREDICTION)},
+                updated_at_iso="2026-02-13T00:00:00+00:00",
+            ),
+            prediction_log_available=True,
+        )

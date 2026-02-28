@@ -328,6 +328,12 @@ class EvidenceRef(BaseModel):
 class HaltRecord(BaseModel):
     model_config = _CONTRACT_CONFIG
 
+    REQUIRED_EXPLAINABILITY_FIELDS: ClassVar[tuple[str, ...]] = (
+        "invariant_id",
+        "details",
+        "evidence",
+    )
+
     REQUIRED_PAYLOAD_FIELDS: ClassVar[tuple[str, ...]] = (
         "halt_id",
         "stage",
@@ -344,7 +350,7 @@ class HaltRecord(BaseModel):
     invariant_id: str = Field(min_length=1, validation_alias=AliasChoices("invariant_id", "violated_invariant_id"))
     reason: str = Field(min_length=1)
     details: Dict[str, Any]
-    evidence: List[EvidenceRef] = Field(default_factory=list, validation_alias=AliasChoices("evidence", "evidence_refs"))
+    evidence: List[EvidenceRef] = Field(validation_alias=AliasChoices("evidence", "evidence_refs"))
     retryability: bool = Field(validation_alias=AliasChoices("retryability", "retryable"))
     timestamp: str = Field(min_length=1, validation_alias=AliasChoices("timestamp", "timestamp_iso"))
 
@@ -369,6 +375,10 @@ class HaltRecord(BaseModel):
     @classmethod
     def required_payload_fields(cls) -> tuple[str, ...]:
         return cls.REQUIRED_PAYLOAD_FIELDS
+
+    @classmethod
+    def required_explainability_fields(cls) -> tuple[str, ...]:
+        return cls.REQUIRED_EXPLAINABILITY_FIELDS
 
     @classmethod
     def canonical_payload_schema(cls) -> Dict[str, str]:
@@ -397,7 +407,7 @@ class HaltRecord(BaseModel):
             "invariant_id": raw.get("invariant_id", raw.get("violated_invariant_id")),
             "reason": raw.get("reason"),
             "details": raw.get("details"),
-            "evidence": raw.get("evidence", raw.get("evidence_refs", [])),
+            "evidence": raw.get("evidence", raw.get("evidence_refs")),
             "retryability": raw.get("retryability", raw.get("retryable")),
             "timestamp": raw.get("timestamp", raw.get("timestamp_iso")),
         }

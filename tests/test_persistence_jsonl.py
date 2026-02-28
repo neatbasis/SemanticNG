@@ -152,6 +152,24 @@ def test_append_halt_reprojects_alias_payload_to_canonical_shape(tmp_path: Path)
     assert rec["retryability"] is True
 
 
+def test_append_halt_rejects_missing_explainability_fields(tmp_path: Path) -> None:
+    p = tmp_path / "halts.jsonl"
+
+    with pytest.raises(Exception):
+        append_halt(
+            p,
+            {
+                "halt_id": "halt:missing-evidence",
+                "stage": "pre-decision",
+                "invariant_id": "prediction_availability.v1",
+                "reason": "missing evidence",
+                "details": {"message": "missing evidence"},
+                "retryability": True,
+                "timestamp": "2026-02-13T00:00:00+00:00",
+            },
+        )
+
+
 def test_append_halt_rejects_incomplete_payloads(tmp_path: Path) -> None:
     p = tmp_path / "halts.jsonl"
 

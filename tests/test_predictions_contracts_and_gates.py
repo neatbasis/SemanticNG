@@ -50,6 +50,7 @@ FIXED_PREDICTION = {
 }
 
 REGISTERED_INVARIANTS = tuple(REGISTRY.keys())
+REPLAY_ANALYTICS_SCOPE_REQUIRES_COMPLETE_MATRIX = True
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,7 @@ class InvariantScenario:
     build_context: Callable[[], Any]
     expected_passed: bool
     expected_flow: Flow
+    expected_code: str
     rationale: str
     gate_inputs: dict[str, Any] | None = None
 
@@ -181,6 +183,7 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 build_context=_build_allow_context_for_prediction_availability,
                 expected_passed=True,
                 expected_flow=Flow.CONTINUE,
+                expected_code="current_prediction_available",
                 rationale="Projected prediction exists for the selected prediction_key.",
                 gate_inputs={"just_written_prediction": None, "has_projected_prediction": True},
             ),
@@ -189,6 +192,7 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 build_context=_build_stop_context_for_prediction_availability,
                 expected_passed=False,
                 expected_flow=Flow.STOP,
+                expected_code="no_predictions_projected",
                 rationale="No projected predictions exist, so pre-consume must halt.",
                 gate_inputs={"just_written_prediction": None, "has_projected_prediction": False},
             ),
@@ -202,6 +206,7 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 build_context=_build_allow_context_for_evidence_link_completeness,
                 expected_passed=True,
                 expected_flow=Flow.CONTINUE,
+                expected_code="evidence_links_complete",
                 rationale="Post-write append has evidence links and projection is current.",
                 gate_inputs={
                     "just_written_prediction": {"key": "scope:test", "evidence_refs": [{"kind": "jsonl", "ref": "predictions.jsonl@1"}]},
@@ -213,6 +218,7 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 build_context=_build_stop_context_for_evidence_link_completeness,
                 expected_passed=False,
                 expected_flow=Flow.STOP,
+                expected_code="missing_evidence_links",
                 rationale="Prediction append without evidence links must halt.",
                 gate_inputs={"just_written_prediction": {"key": "scope:test", "evidence_refs": []}, "has_projected_prediction": True},
             ),
@@ -226,6 +232,7 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 build_context=_build_allow_context_for_prediction_outcome_binding,
                 expected_passed=True,
                 expected_flow=Flow.CONTINUE,
+                expected_code="prediction_outcome_bound",
                 rationale="Outcome is bound with prediction_id and numeric error_metric.",
             ),
             InvariantScenario(
@@ -233,6 +240,7 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 build_context=_build_stop_context_for_prediction_outcome_binding,
                 expected_passed=False,
                 expected_flow=Flow.STOP,
+                expected_code="missing_prediction_id",
                 rationale="Outcome without prediction_id is invalid and must halt.",
             ),
         ),
@@ -248,6 +256,7 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 build_context=_build_allow_context_for_explainable_halt_payload,
                 expected_passed=True,
                 expected_flow=Flow.CONTINUE,
+                expected_code="halt_payload_explainable",
                 rationale="STOP candidate provides explainable payload fields.",
             ),
             InvariantScenario(
@@ -255,6 +264,7 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 build_context=_build_stop_context_for_explainable_halt_payload,
                 expected_passed=False,
                 expected_flow=Flow.STOP,
+                expected_code="halt_payload_incomplete",
                 rationale="STOP candidate missing details/evidence must halt as degraded payload.",
             ),
         ),
@@ -421,6 +431,15 @@ def test_invariant_matrix_guard_fails_when_registry_gains_uncovered_invariant() 
     )
 
 
+def test_replay_analytics_scope_requires_complete_invariant_matrix() -> None:
+    missing_coverage = set(REGISTERED_INVARIANTS) - set(INVARIANT_RELEASE_GATE_MATRIX)
+    assert REPLAY_ANALYTICS_SCOPE_REQUIRES_COMPLETE_MATRIX is True
+    assert not missing_coverage, (
+        "Replay analytics scope expansion is blocked until invariant matrix coverage is complete for: "
+        + ", ".join(sorted(invariant.value for invariant in missing_coverage))
+    )
+
+
 @pytest.mark.parametrize("invariant_id,scenario", ADMISSIBLE_CASES)
 def test_invariant_admissible_branch_is_deterministic(
     invariant_id: InvariantId,
@@ -463,6 +482,7 @@ def test_invariant_outcomes_are_deterministic_and_contract_compliant(
     assert first.invariant_id == invariant_id
     assert first.passed is scenario.expected_passed
     assert first.flow == scenario.expected_flow
+    assert first.code == scenario.expected_code
 
     normalized = normalize_outcome(first, gate=f"test:{scenario.name}")
     assert normalized.invariant_id == invariant_id.value
@@ -470,6 +490,40 @@ def test_invariant_outcomes_are_deterministic_and_contract_compliant(
     assert normalized.passed is scenario.expected_passed
     assert isinstance(normalized.reason, str)
     assert isinstance(normalized.evidence, tuple)
+
+
+@pytest.mark.parametrize("invariant_id,scenario", MATRIX_CASES)
+def test_invariant_matrix_emits_deterministic_artifact_per_branch(
+    invariant_id: InvariantId,
+    scenario: InvariantScenario,
+) -> None:
+    checker = REGISTRY[invariant_id]
+    first = checker(scenario.build_context())
+    second = checker(scenario.build_context())
+
+    first_artifact = {
+        "invariant_id": invariant_id.value,
+        "scenario": scenario.name,
+        "branch": "stop" if first.flow == Flow.STOP else "continue",
+        "passed": first.passed,
+        "flow": first.flow.value,
+        "code": first.code,
+        "normalized": normalize_outcome(first, gate=f"matrix:{scenario.name}").__dict__,
+    }
+    second_artifact = {
+        "invariant_id": invariant_id.value,
+        "scenario": scenario.name,
+        "branch": "stop" if second.flow == Flow.STOP else "continue",
+        "passed": second.passed,
+        "flow": second.flow.value,
+        "code": second.code,
+        "normalized": normalize_outcome(second, gate=f"matrix:{scenario.name}").__dict__,
+    }
+
+    assert first_artifact == second_artifact
+    assert first_artifact["flow"] == scenario.expected_flow.value
+    assert first_artifact["passed"] is scenario.expected_passed
+    assert first_artifact["code"] == scenario.expected_code
 
 
 @pytest.mark.parametrize("invariant_id,scenario", MATRIX_CASES)
@@ -607,6 +661,12 @@ def test_gate_matrix_explicitly_marks_non_applicable_gate_coverage() -> None:
         else:
             assert coverage.gate_non_applicable is not None, f"{invariant_id.value} must declare non-applicable gate rationale"
             assert coverage.gate_non_applicable.rationale
+
+
+@pytest.mark.parametrize("invariant_id", REGISTERED_INVARIANTS, ids=lambda invariant_id: invariant_id.value)
+def test_each_registered_invariant_is_exercised_by_matrix_parameterization(invariant_id: InvariantId) -> None:
+    coverage = INVARIANT_RELEASE_GATE_MATRIX[invariant_id]
+    assert tuple(sorted(s.name for s in coverage.scenarios)) == ("pass", "stop")
 
 
 def test_post_write_gate_passes_when_evidence_and_projection_current() -> None:

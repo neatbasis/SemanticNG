@@ -211,20 +211,18 @@ def _authorization_halt_record(*, stage: str, reason: str, context: Mapping[str,
     )
 
 
+def _halt_payload(halt: HaltRecord) -> Dict[str, Any]:
+    return halt.to_persistence_dict()
+
 def _append_authorization_issue(ep: Episode, *, halt: HaltRecord, context: Mapping[str, Any]) -> None:
     _append_episode_artifact(
         ep,
         {
             "artifact_kind": "authorization_issue",
             "issue_type": "authorization_scope_violation",
-            "halt_id": halt.halt_id,
-            "stage": halt.stage,
-            "invariant_id": halt.invariant_id,
-            "reason": halt.reason,
+            **_halt_payload(halt),
             "observer": _to_dict(getattr(ep, "observer", None)),
             "authorization_context": _to_dict(context),
-            "retryability": halt.retryability,
-            "timestamp": halt.timestamp,
         },
     )
     if not hasattr(ep, "observations") or getattr(ep, "observations") is None:
@@ -463,13 +461,7 @@ def evaluate_invariant_gates(
             {
                 "artifact_kind": "halt_observation",
                 "observation_type": "halt",
-                "halt_id": halt.halt_id,
-                "stage": halt.stage,
-                "invariant_id": halt.invariant_id,
-                "reason": halt.reason,
-                "retryability": halt.retryability,
-                "timestamp": halt.timestamp,
-                "evidence": [_to_dict(e) for e in halt.evidence],
+                **_halt_payload(halt),
                 "halt_evidence_ref": halt_evidence_ref,
             },
         )
@@ -602,7 +594,7 @@ def evaluate_invariant_gates(
                 ],
                 "kind": result_kind,
                 "prediction": _to_dict(result.artifact) if isinstance(result, Success) else None,
-                "halt": _to_dict(result) if isinstance(result, HaltRecord) else None,
+                "halt": _halt_payload(result) if isinstance(result, HaltRecord) else None,
                 "halt_evidence_ref": halt_evidence_ref,
             },
         )
@@ -625,13 +617,7 @@ def evaluate_invariant_gates(
                     "artifact_kind": "halt_observation",
                     "observation_type": "halt",
                     "observation_id": halt_observation.observation_id,
-                    "halt_id": halt.halt_id,
-                    "stage": halt.stage,
-                    "invariant_id": halt.invariant_id,
-                    "reason": halt.reason,
-                    "retryability": halt.retryability,
-                    "timestamp": halt.timestamp,
-                    "evidence": [_to_dict(e) for e in halt.evidence],
+                    **_halt_payload(halt),
                     "halt_evidence_ref": halt_evidence_ref,
                 },
             )

@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, ClassVar, Dict, List, Mapping, Optional
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 # ------------------------------------------------------------------------------
 # Shared BaseModel config helpers
@@ -317,20 +317,67 @@ class Episode(BaseModel):
 
 class EvidenceRef(BaseModel):
     model_config = _CONTRACT_CONFIG
-    kind: str
-    ref: str
+    kind: str = Field(min_length=1)
+    ref: str = Field(min_length=1)
 
 
 class HaltRecord(BaseModel):
     model_config = _CONTRACT_CONFIG
 
-    halt_id: str = Field(validation_alias=AliasChoices("halt_id", "stable_halt_id"))
-    stage: str
-    invariant_id: str = Field(validation_alias=AliasChoices("invariant_id", "violated_invariant_id"))
-    reason: str
+    REQUIRED_PAYLOAD_FIELDS: ClassVar[tuple[str, ...]] = (
+        "halt_id",
+        "stage",
+        "invariant_id",
+        "reason",
+        "evidence",
+        "retryability",
+        "timestamp",
+    )
+
+    halt_id: str = Field(min_length=1, validation_alias=AliasChoices("halt_id", "stable_halt_id"))
+    stage: str = Field(min_length=1)
+    invariant_id: str = Field(min_length=1, validation_alias=AliasChoices("invariant_id", "violated_invariant_id"))
+    reason: str = Field(min_length=1)
     evidence: List[EvidenceRef] = Field(default_factory=list, validation_alias=AliasChoices("evidence", "evidence_refs"))
     retryability: bool = Field(validation_alias=AliasChoices("retryability", "retryable"))
-    timestamp: str = Field(validation_alias=AliasChoices("timestamp", "timestamp_iso"))
+    timestamp: str = Field(min_length=1, validation_alias=AliasChoices("timestamp", "timestamp_iso"))
+
+    @model_validator(mode="before")
+    @classmethod
+    def _validate_alias_consistency(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        alias_pairs = (
+            ("halt_id", "stable_halt_id"),
+            ("invariant_id", "violated_invariant_id"),
+            ("evidence", "evidence_refs"),
+            ("retryability", "retryable"),
+            ("timestamp", "timestamp_iso"),
+        )
+        for canonical, alias in alias_pairs:
+            if canonical in data and alias in data and data[canonical] != data[alias]:
+                raise ValueError(f"halt payload field mismatch: {canonical} != {alias}")
+        return data
+
+    @classmethod
+    def required_payload_fields(cls) -> tuple[str, ...]:
+        return cls.REQUIRED_PAYLOAD_FIELDS
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "HaltRecord":
+        raw = dict(payload)
+        cls._validate_alias_consistency(raw)
+        canonical_candidate = {
+            "halt_id": raw.get("halt_id", raw.get("stable_halt_id")),
+            "stage": raw.get("stage"),
+            "invariant_id": raw.get("invariant_id", raw.get("violated_invariant_id")),
+            "reason": raw.get("reason"),
+            "evidence": raw.get("evidence", raw.get("evidence_refs", [])),
+            "retryability": raw.get("retryability", raw.get("retryable")),
+            "timestamp": raw.get("timestamp", raw.get("timestamp_iso")),
+        }
+        return cls.model_validate(canonical_candidate)
 
     @property
     def stable_halt_id(self) -> str:

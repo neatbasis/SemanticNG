@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+
+import pytest
 from pathlib import Path
 
 from state_renormalization.adapters.persistence import append_halt, append_jsonl, read_jsonl
@@ -121,3 +123,63 @@ def test_append_jsonl_propagates_stable_ids_to_embedding_and_ontology_records(tm
     assert rec["embedding"]["feature_id"] == "feat_1"
     assert rec["ontology_alignment"]["scenario_id"] == "scn_1"
     assert rec["elasticsearch_documents"][0]["step_id"] == "stp_1"
+
+
+def test_append_halt_preserves_existing_halt_payload_fields_exactly(tmp_path: Path) -> None:
+    p = tmp_path / "halts.jsonl"
+
+    payload = {
+        "halt_id": "halt:exact",
+        "stable_halt_id": "halt:exact",
+        "stage": "pre-decision:post_write",
+        "invariant_id": "evidence_link_completeness.v1",
+        "violated_invariant_id": "evidence_link_completeness.v1",
+        "reason": "missing evidence",
+        "evidence": [{"kind": "scope", "ref": "scope:test"}],
+        "evidence_refs": [{"kind": "scope", "ref": "scope:test"}],
+        "retryability": True,
+        "retryable": True,
+        "timestamp": "2026-02-13T00:00:00+00:00",
+        "timestamp_iso": "2026-02-13T00:00:00+00:00",
+    }
+
+    append_halt(p, payload)
+
+    (_, rec), = list(read_jsonl(p))
+    assert rec == payload
+
+
+def test_append_halt_rejects_incomplete_payloads(tmp_path: Path) -> None:
+    p = tmp_path / "halts.jsonl"
+
+    with pytest.raises(Exception):
+        append_halt(
+            p,
+            {
+                "halt_id": "halt:incomplete",
+                "stage": "pre-decision",
+                "invariant_id": "prediction_availability.v1",
+                "reason": "missing timestamp",
+                "evidence": [{"kind": "scope", "ref": "scope:test"}],
+                "retryability": True,
+            },
+        )
+
+
+def test_append_halt_rejects_conflicting_alias_fields(tmp_path: Path) -> None:
+    p = tmp_path / "halts.jsonl"
+
+    with pytest.raises(Exception):
+        append_halt(
+            p,
+            {
+                "halt_id": "halt:canonical",
+                "stable_halt_id": "halt:alias-mismatch",
+                "stage": "pre-decision",
+                "invariant_id": "prediction_availability.v1",
+                "reason": "mismatch",
+                "evidence": [{"kind": "scope", "ref": "scope:test"}],
+                "retryability": True,
+                "timestamp": "2026-02-13T00:00:00+00:00",
+            },
+        )

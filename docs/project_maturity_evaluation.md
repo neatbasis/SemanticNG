@@ -2,11 +2,11 @@
 
 ## Executive assessment
 
-SemanticNG is in an **operational hardening** state with replay completion achieved and remaining work concentrated in authorization-first governance expansion:
+SemanticNG is in an **authorization-first governance hardening** state:
 
 - Core baseline capabilities remain implemented and tested.
-- Capability accounting from the manifest is now `6/9` done.
-- Roadmap sequencing and contract-map maturity framing place the critical path on promoting observer authorization from `prototype` toward `operational` before `Later` governance scopes.
+- Capability accounting from the manifest is `6/9` done.
+- There are currently **no** `in_progress` capabilities in the manifest; the active delivery bottleneck is the highest-priority `planned` item: `observer_authorization_contract`.
 
 ## Evidence snapshot
 
@@ -18,73 +18,81 @@ SemanticNG is in an **operational hardening** state with replay completion achie
 
 Completion ratio (done / total): **66.7%** (`6/9`).
 
-Current bottleneck capability (highest-priority non-`done`): **`observer_authorization_contract`**. It is the only `Next` item in the roadmap, remains `planned` in the manifest, and maps to a `prototype` maturity contract in `docs/system_contract_map.md`.
+Current bottleneck capability (highest-priority non-`done`): **`observer_authorization_contract`**.
 
-This indicates the project is beyond replay completion and is now in authorization hardening + governance sequencing.
+Rationale:
+
+1. It is the only capability in roadmap section `Next`.
+2. `replay_projection_analytics` is already `done` (not an in-progress bottleneck).
+3. Remaining non-done capabilities are both `Later` (`capability_invocation_governance`, `repair_aware_projection_evolution`).
 
 ### Quality and validation signals
 
-- Test suite currently passes (`pytest -q`).
-- Roadmap items are linked to concrete test commands.
+- Manifest acceptance commands are defined per capability via `pytest_commands` in `docs/dod_manifest.json`.
+- Immediate-priority validation commands for `observer_authorization_contract` are:
+  - `pytest tests/test_observer_frame.py`
+  - `pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py`
 - Contract map defines explicit maturity labels (`prototype`, `operational`, `proven`) and promotion protocol.
-- Halt normalization and replay analytics validation packs are now part of regular milestone evidence.
+- Replay and halt capabilities remain in `done` and should continue running as non-regression evidence packs.
 
 ### Lifecycle/process signals
 
 - Repository documents a clear document lifecycle and milestone structure.
-- Recent updates are concentrated on deterministic replay/restart behavior and governance sequencing.
+- Current sequencing is authorization contract promotion first, then governance, then repair-aware evolution.
 
 ## Maturity conclusion
 
-**Current stage: Post-replay operational hardening / governance maturation**
+**Current stage: Post-replay governance maturation (authorization-first)**
 
 The project has:
 
 - Strong foundational contracts and deterministic behavior coverage.
-- Replay-grade projection reconstruction and analytics validation coverage in active command packs.
-- Hardened and explainable halt normalization behavior across unified gate paths.
+- Replay-grade projection reconstruction and restart analytics delivered as `done` capabilities.
+- Hardened halt behavior and invariant-matrix validation in the done baseline.
 
 It does **not yet** have:
 
-- Observer authorization and capability-governance contracts promoted beyond planned/prototype stages.
-- Full governance-path maturity across external capability invocation surfaces.
+- Observer authorization promoted beyond `planned`/`prototype`.
+- Capability-invocation governance and repair-aware projection capabilities implemented.
 
 ## Most timely development (priority recommendation)
 
 ### #1 Immediate priority
 
-**Prioritize `observer_authorization_contract` as the single immediate implementation focus; queue `capability_invocation_governance` next once observer authorization is operational.**
+**Prioritize `observer_authorization_contract` as the single current implementation target.**
 
 Why this is most timely:
 
-1. Replay projection analytics is marked `done` and sits in the `Now` milestone as a maintained non-regression baseline, not a delivery bottleneck.
-2. The roadmap's `Next` section contains only observer authorization, making it the mandatory sequencing gate before `Later` governance capabilities.
-3. The contract map shows observer authorization still at `prototype`, so maturity promotion here provides the largest near-term risk reduction.
+1. It is the highest-priority non-done capability (`Next`).
+2. No capabilities are currently marked `in_progress`, so this is the clear next execution slot.
+3. It is a prerequisite sequencing gate before both `Later` governance and repair-aware scopes.
 
 ### #2 Concrete near-term execution sequence
 
 1. **Land runtime observer authorization enforcement (`Next`)**
-   - Promote authorization checks from prototype-only contract framing to default-path runtime behavior with CI-backed gate coverage.
+   - Execute and keep green the manifest commands:
+     - `pytest tests/test_observer_frame.py`
+     - `pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py`
 2. **Promote Observer authorization contract maturity**
-   - Update contract-map maturity once tests show default runtime authorization and allowlist behavior are stable.
-3. **Start capability governance implementation only after observer promotion (`Later`)**
-   - Add deterministic tests for allowed/denied capability invocation outcomes after observer authorization enforcement is green.
-4. **Keep replay/halt packs as non-regression gates**
-   - Preserve replay/restart + halt explainability packs as required green checks while authorization/governance work lands.
-
-### #3 Defer until #1 is green
-
-- Repair-aware projection evolution.
-- Any broad external integration surface expansion.
+   - Update contract-map maturity after stable default-path enforcement evidence.
+3. **Start `capability_invocation_governance` (`Later`)**
+   - Use manifest commands:
+     - `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py`
+     - `pytest tests/test_predictions_contracts_and_gates.py`
+4. **Then start `repair_aware_projection_evolution` (`Later`)**
+   - Use manifest commands:
+     - `pytest tests/test_repair_mode_projection.py tests/test_repair_events_auditability.py`
+     - `pytest tests/test_predictions_contracts_and_gates.py`
 
 ## Suggested maturity targets for next review
 
 - Promote observer authorization from `prototype` toward `operational` with CI-backed default-path enforcement evidence.
-- Establish `capability_invocation_governance` baseline test evidence only after observer authorization maturity promotion is recorded.
-- Recompute capability completion and confirm observer + governance tests pass in CI before expanding repair-aware scope.
+- Establish capability-invocation governance baseline evidence after observer authorization promotion.
+- Recompute capability completion and confirm all `pytest_commands` for non-done capabilities are represented in CI checks.
 
 ## Maturity changelog
 
+- 2026-02-28: **Refresh update** — recomputed capability totals from `docs/dod_manifest.json` (`6 done / 0 in_progress / 3 planned`), replaced stale replay-bottleneck framing with observer-authorization bottleneck framing, updated priority recommendation to `observer_authorization_contract`, and aligned command references to manifest `pytest_commands`.
 - 2026-02-28: Sync pass — updated this evaluation to match manifest totals (`6 done / 0 in_progress / 3 planned`), roadmap sequencing (`observer_authorization_contract` as the sole `Next` item), and contract-map maturity framing (observer authorization still `prototype`); replay is treated as a maintained baseline rather than a bottleneck.
 - 2026-02-28: Revalidated `gate_halt_unification` as `done` against its acceptance command (`pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py` => `92 passed, 4 skipped`).
 - 2026-02-28: Confirmed `tests/test_predictions_contracts_and_gates.py` enforces deterministic `Flow.CONTINUE`/`Flow.STOP` parity assertions and `tests/test_persistence_jsonl.py` verifies halt payload durability for canonical `details`, `evidence`, and invariant identity (`invariant_id`) round-trips.
@@ -120,6 +128,6 @@ Narrative planning in this document should reference those generated outputs rat
 
 | Next milestone | Target date | Owner area | Pass criteria |
 | --- | --- | --- | --- |
-| Observer authorization contract activation | 2026-03-22 | Engine + Invariants | `tests/test_observer_frame.py` is green with authorization-scope enforcement in default mission-loop paths. |
-| Capability governance contract baseline | 2026-03-29 | Engine + Contracts | Governance tests pass with policy-aware capability invocation and no regression in prediction/halt/replay contracts. |
-| Repair-aware projection evolution baseline | 2026-04-05 | Engine + Contracts + Invariants | Repair-mode tests establish auditable repair-event lineage without regressing append-only replay guarantees. |
+| Observer authorization contract activation | 2026-03-22 | Engine + Invariants | `pytest tests/test_observer_frame.py` and `pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py` are green with authorization-scope enforcement in default mission-loop paths. |
+| Capability governance contract baseline | 2026-03-29 | Engine + Contracts | `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py` and `pytest tests/test_predictions_contracts_and_gates.py` pass with policy-aware capability invocation and no regression in prediction/halt/replay contracts. |
+| Repair-aware projection evolution baseline | 2026-04-05 | Engine + Contracts + Invariants | `pytest tests/test_repair_mode_projection.py tests/test_repair_events_auditability.py` and `pytest tests/test_predictions_contracts_and_gates.py` establish auditable repair-event lineage without regressing append-only replay guarantees. |

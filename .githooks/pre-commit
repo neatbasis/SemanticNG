@@ -1,3 +1,2 @@
 #!/usr/bin/env bash
-python .github/scripts/run_precommit_governance_checks.py
-exit $?
+pre-commit run

@@ -8,12 +8,12 @@
 
 ## Milestone pytest commands + adjacent evidence URLs (mandatory)
 
-For every status-transition capability in this PR, paste the exact `pytest` command lines from `docs/dod_manifest.json` (verbatim) and place one adjacent `https://...` evidence URL directly below each command line.
+For every status-transition capability in this PR, include the exact `pytest` command lines from `docs/dod_manifest.json` (verbatim) and place one adjacent `https://...` evidence URL directly below each command line.
 
-<!-- AUTOGEN SECTION: capability examples; source=docs/dod_manifest.json; generator=.github/scripts/render_transition_evidence.py -->
+<!-- AUTOGEN SECTION: milestone evidence pairs; source=docs/dod_manifest.json; generator=.github/scripts/render_transition_evidence.py -->
 
-<!-- BEGIN AUTOGEN: capability-examples -->
-### Capability command blocks (generated from `docs/dod_manifest.json`)
+<!-- BEGIN AUTOGEN: milestone-evidence -->
+### Capability command/evidence blocks (generated from `docs/dod_manifest.json`)
 
 #### Capability: `capability_invocation_governance` (status: `planned`)
 ```text
@@ -92,6 +92,4 @@ pytest tests/test_schema_selector.py tests/test_schema_bubbling_option_a.py test
 Evidence URL: https://github.com/<org>/<repo>/actions/runs/<run_id>
 
 ```
-
-I confirmed adjacency formatting was preserved (each command line is immediately followed by its own `https://...` evidence URL line).
-<!-- END AUTOGEN: capability-examples -->
+<!-- END AUTOGEN: milestone-evidence -->

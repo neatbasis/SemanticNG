@@ -14,7 +14,7 @@ validate_milestone_docs = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(validate_milestone_docs)
 
 
-def test_commands_with_invalid_evidence_format_accepts_exact_command_plus_https_line() -> None:
+def test_commands_missing_evidence_accepts_https_evidence_line() -> None:
     command = "pytest tests/test_dod_manifest.py"
     pr_body = "\n".join(
         [
@@ -25,10 +25,10 @@ def test_commands_with_invalid_evidence_format_accepts_exact_command_plus_https_
         ]
     )
 
-    assert validate_milestone_docs._commands_with_invalid_evidence_format(pr_body, [command]) == []
+    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == []
 
 
-def test_commands_with_invalid_evidence_format_rejects_non_https_evidence_line() -> None:
+def test_commands_missing_evidence_accepts_artifact_evidence_line() -> None:
     command = "pytest tests/test_replay_projection_determinism.py"
     pr_body = "\n".join(
         [
@@ -37,10 +37,22 @@ def test_commands_with_invalid_evidence_format_rejects_non_https_evidence_line()
         ]
     )
 
-    assert validate_milestone_docs._commands_with_invalid_evidence_format(pr_body, [command]) == [command]
+    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == []
 
 
-def test_commands_with_invalid_evidence_format_reports_missing_when_no_immediate_evidence_line() -> None:
+def test_commands_missing_evidence_rejects_unsupported_evidence_format() -> None:
+    command = "pytest tests/test_replay_projection_determinism.py"
+    pr_body = "\n".join(
+        [
+            command,
+            "Evidence: s3://bucket/path/to/log",
+        ]
+    )
+
+    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == [command]
+
+
+def test_commands_missing_evidence_reports_missing_when_no_immediate_evidence_line() -> None:
     command = "pytest tests/test_invariants.py"
     pr_body = "\n".join(
         [
@@ -49,10 +61,10 @@ def test_commands_with_invalid_evidence_format_reports_missing_when_no_immediate
         ]
     )
 
-    assert validate_milestone_docs._commands_with_invalid_evidence_format(pr_body, [command]) == [command]
+    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == [command]
 
 
-def test_commands_with_invalid_evidence_format_reports_missing_when_evidence_not_next_line() -> None:
+def test_commands_missing_evidence_reports_missing_when_evidence_not_next_line() -> None:
     command = "pytest tests/test_invariants.py"
     pr_body = "\n".join(
         [
@@ -62,7 +74,7 @@ def test_commands_with_invalid_evidence_format_reports_missing_when_evidence_not
         ]
     )
 
-    assert validate_milestone_docs._commands_with_invalid_evidence_format(pr_body, [command]) == [command]
+    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == [command]
 
 
 def test_done_capability_sync_mismatches_reports_roadmap_milestone_and_maturity_issues() -> None:

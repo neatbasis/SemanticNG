@@ -73,3 +73,29 @@ def test_render_block_reports_no_transitions_message_when_empty() -> None:
     block = render_transition_evidence._render_block({})
 
     assert "No capability status transitions were detected for this diff." in block
+
+
+def test_render_pr_template_autogen_section_is_sorted_and_wrapped() -> None:
+    manifest = {
+        "capabilities": [
+            {"id": "zeta", "pytest_commands": ["pytest tests/test_zeta.py"]},
+            {"id": "alpha", "pytest_commands": ["pytest tests/test_alpha.py", "pytest tests/test_alpha_extra.py"]},
+            {"id": "empty", "pytest_commands": []},
+        ]
+    }
+
+    section = render_transition_evidence._render_pr_template_autogen_section(manifest)
+
+    assert section.startswith(render_transition_evidence.AUTOGEN_BEGIN)
+    assert section.endswith(render_transition_evidence.AUTOGEN_END)
+    assert section.index("# Capability: alpha") < section.index("# Capability: zeta")
+    assert "# Capability: empty" not in section
+
+
+def test_replace_between_markers_replaces_only_autogen_block() -> None:
+    original = "prefix\n" + render_transition_evidence.AUTOGEN_BEGIN + "\nold\n" + render_transition_evidence.AUTOGEN_END + "\nsuffix\n"
+    replacement = render_transition_evidence.AUTOGEN_BEGIN + "\nnew\n" + render_transition_evidence.AUTOGEN_END
+
+    updated = render_transition_evidence._replace_between_markers(original, replacement)
+
+    assert updated == "prefix\n" + replacement + "\nsuffix\n"

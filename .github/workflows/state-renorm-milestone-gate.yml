@@ -37,7 +37,7 @@ jobs:
     runs-on: self-hosted
     permissions:
       contents: read
-      pull-requests: write
+      issues: write
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -99,22 +99,34 @@ jobs:
           if-no-files-found: error
 
       - name: Validate milestone documentation governance
+        id: validate_milestone
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: |
-          set -o pipefail
-          python .github/scripts/validate_milestone_docs.py || {
+          set -euo pipefail
+          echo "VALIDATOR_MISSING_EVIDENCE=false" >> "$GITHUB_ENV"
+
+          set +e
+          python .github/scripts/validate_milestone_docs.py 2>&1 | tee artifacts/validate_milestone_docs.log
+          validator_status=${PIPESTATUS[0]}
+          set -e
+
+          if [[ $validator_status -ne 0 ]]; then
+            if grep -Fq "PR description must include adjacency evidence" artifacts/validate_milestone_docs.log; then
+              echo "VALIDATOR_MISSING_EVIDENCE=true" >> "$GITHUB_ENV"
+            fi
+
             echo
             echo "Copy this exact block into PR description"
             cat artifacts/transition_evidence_block.md
-            exit 1
-          }
+            exit "$validator_status"
+          fi
 
       - name: Comment transition evidence block on PR when validation fails
-        if: ${{ failure() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
+        if: ${{ failure() && github.event_name == 'pull_request' && env.VALIDATOR_MISSING_EVIDENCE == 'true' }}
+        continue-on-error: true
         env:
-          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           {
@@ -126,7 +138,22 @@ jobs:
             cat artifacts/transition_evidence_block.md
           } > artifacts/transition_evidence_comment.md
 
-          gh pr comment "$PR_NUMBER" --body-file artifacts/transition_evidence_comment.md
+      - name: Post transition evidence comment using GitHub API
+        if: ${{ failure() && github.event_name == 'pull_request' && env.VALIDATOR_MISSING_EVIDENCE == 'true' }}
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('artifacts/transition_evidence_comment.md', 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(process.env.PR_NUMBER),
+              body,
+            });
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
 
       - name: Generate capability parity report
         run: python .github/scripts/capability_parity_report.py

@@ -4,7 +4,6 @@ import importlib.util
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / ".github" / "scripts" / "capability_parity_report.py"
 MANIFEST_PATH = ROOT / "docs" / "dod_manifest.json"
@@ -67,6 +66,24 @@ def test_contract_maturity_evidence_mismatches_require_https_and_known_contract(
     assert any("missing https evidence URL" in mismatch for mismatch in mismatches)
     assert any("unknown contract" in mismatch.lower() for mismatch in mismatches)
     assert any("forward maturity move" in mismatch for mismatch in mismatches)
+
+
+def test_contract_maturity_evidence_mismatches_accepts_capability_id_prefix() -> None:
+    contract_map_text = "\n".join(
+        [
+            "## Milestone: Now",
+            "| Contract name | Source file / class | Invariant IDs | Producing stage | Consuming stage | Test coverage reference | Maturity |",
+            "|---|---|---|---|---|---|---|",
+            "| Known Contract | a | b | c | d | e | operational |",
+            "",
+            "### Changelog",
+            "- 2026-02-28 (Now): capability_id=known_capability; Known Contract prototype -> operational; promotion evidence. https://example.test/evidence",
+        ]
+    )
+
+    mismatches = capability_parity_report.contract_maturity_evidence_mismatches(contract_map_text)
+
+    assert mismatches == []
 
 
 def test_project_maturity_mismatches_detects_status_and_ratio_drift() -> None:

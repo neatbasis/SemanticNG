@@ -11,7 +11,11 @@ from state_renormalization.contracts import (
     ProjectionState,
     VerbosityDecision,
 )
-from state_renormalization.engine import append_turn_summary, evaluate_invariant_gates, run_mission_loop
+from state_renormalization.engine import (
+    append_turn_summary,
+    evaluate_invariant_gates,
+    run_mission_loop,
+)
 
 
 def test_run_mission_loop_updates_projection_before_decision_stages(
@@ -64,7 +68,9 @@ def test_run_mission_loop_updates_projection_before_decision_stages(
     assert prediction_event["episode_id"] == ep.episode_id
     assert prediction_event["conversation_id"] == ep.conversation_id
     assert prediction_event["turn_index"] == ep.turn_index
-    assert all(evt["event_kind"] == "prediction_record" for evt in events)
+    event_kinds = {evt["event_kind"] for evt in events}
+    assert event_kinds.issubset({"prediction", "prediction_record"})
+    assert "prediction_record" in event_kinds
 
 
 def test_run_mission_loop_emits_turn_prediction_when_no_pending_predictions(

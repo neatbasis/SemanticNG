@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 from pathlib import Path
 import subprocess
@@ -130,6 +131,28 @@ def regenerate_pr_template_autogen_section() -> None:
     PR_TEMPLATE_PATH.write_text(updated, encoding="utf-8")
 
 
+def check_pr_template_autogen_section() -> int:
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    template = PR_TEMPLATE_PATH.read_text(encoding="utf-8")
+    expected_template = _replace_between_markers(template, _render_pr_template_autogen_section(manifest))
+
+    if template == expected_template:
+        print("PR template AUTOGEN section is up to date.")
+        return 0
+
+    diff = difflib.unified_diff(
+        template.splitlines(),
+        expected_template.splitlines(),
+        fromfile=str(PR_TEMPLATE_PATH),
+        tofile=f"{PR_TEMPLATE_PATH} (expected)",
+        lineterm="",
+    )
+    print("PR template AUTOGEN section is stale. Regenerate it with:")
+    print("  python .github/scripts/render_transition_evidence.py --regenerate-pr-template")
+    print("\n".join(diff))
+    return 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base", help="Base commit SHA")
@@ -139,10 +162,28 @@ def main() -> int:
         action="store_true",
         help="Regenerate the pull_request_template.md capability examples autogen block",
     )
+    parser.add_argument(
+        "--check-pr-template-autogen",
+        action="store_true",
+        help="Fail if the pull_request_template.md capability examples autogen block is stale",
+    )
+    parser.add_argument(
+        "--emit-pr-template-autogen",
+        action="store_true",
+        help="Print the rendered pull_request_template.md capability examples autogen block",
+    )
     args = parser.parse_args()
 
     if args.regenerate_pr_template:
         regenerate_pr_template_autogen_section()
+        return 0
+
+    if args.check_pr_template_autogen:
+        return check_pr_template_autogen_section()
+
+    if args.emit_pr_template_autogen:
+        manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+        print(_render_pr_template_autogen_section(manifest))
         return 0
 
     if not args.base or not args.head:

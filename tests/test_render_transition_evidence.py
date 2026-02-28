@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 
@@ -99,3 +100,42 @@ def test_replace_between_markers_replaces_only_autogen_block() -> None:
     updated = render_transition_evidence._replace_between_markers(original, replacement)
 
     assert updated == "prefix\n" + replacement + "\nsuffix\n"
+
+
+def test_check_pr_template_autogen_section_returns_zero_when_current(monkeypatch, tmp_path) -> None:
+    manifest_path = tmp_path / "dod_manifest.json"
+    template_path = tmp_path / "pull_request_template.md"
+
+    manifest = {"capabilities": [{"id": "cap_a", "pytest_commands": ["pytest tests/test_alpha.py"]}]}
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    template_path.write_text(render_transition_evidence._render_pr_template_autogen_section(manifest), encoding="utf-8")
+
+    monkeypatch.setattr(render_transition_evidence, "MANIFEST_PATH", manifest_path)
+    monkeypatch.setattr(render_transition_evidence, "PR_TEMPLATE_PATH", template_path)
+
+    assert render_transition_evidence.check_pr_template_autogen_section() == 0
+
+
+def test_check_pr_template_autogen_section_returns_one_when_stale(monkeypatch, tmp_path) -> None:
+    manifest_path = tmp_path / "dod_manifest.json"
+    template_path = tmp_path / "pull_request_template.md"
+
+    manifest = {"capabilities": [{"id": "cap_a", "pytest_commands": ["pytest tests/test_alpha.py"]}]}
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    template_path.write_text(
+        "\n".join(
+            [
+                render_transition_evidence.AUTOGEN_BEGIN,
+                "```text",
+                "# stale",
+                "```",
+                render_transition_evidence.AUTOGEN_END,
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(render_transition_evidence, "MANIFEST_PATH", manifest_path)
+    monkeypatch.setattr(render_transition_evidence, "PR_TEMPLATE_PATH", template_path)
+
+    assert render_transition_evidence.check_pr_template_autogen_section() == 1

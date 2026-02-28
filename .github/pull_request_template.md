@@ -10,6 +10,8 @@
 
 For every status-transition capability in this PR, paste the exact `pytest` command lines from `docs/dod_manifest.json` (verbatim) and place one adjacent `https://...` evidence URL directly below each command line.
 
+<!-- AUTOGEN SECTION: capability examples; source=docs/dod_manifest.json; generator=.github/scripts/render_transition_evidence.py -->
+
 <!-- BEGIN AUTOGEN: capability-examples -->
 ```text
 # Capability: capability_invocation_governance

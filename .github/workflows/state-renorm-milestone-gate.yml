@@ -76,6 +76,9 @@ jobs:
           echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
           echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
 
+      - name: Verify PR template AUTOGEN section is current
+        run: python .github/scripts/render_transition_evidence.py --check-pr-template-autogen
+
       - name: Render transition evidence block
         run: |
           mkdir -p artifacts

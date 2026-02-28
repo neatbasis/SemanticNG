@@ -58,6 +58,19 @@ Validate this inventory in tests:
 pytest tests/test_dod_manifest.py
 ```
 
+### Mandatory milestone commands before PR submission
+
+When your PR touches `src/state_renormalization/`, you must run and pass every `pytest_commands` entry for capabilities marked `in_progress` in `docs/dod_manifest.json`.
+
+Current mandatory command set:
+
+```bash
+pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py
+pytest tests/test_replay_projection_analytics.py tests/test_prediction_outcome_binding.py
+```
+
+These commands are enforced in CI for PRs/merge queues that touch `src/state_renormalization/`.
+
 ## Running tests
 
 Run the pytest suite:

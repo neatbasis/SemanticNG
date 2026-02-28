@@ -4,90 +4,90 @@ from __future__ import annotations
 # Temporary integration merge-freeze marker:
 # during stabilization of integration/pr-conflict-resolution, merge changes to this
 # module only via the ordered integration stack documented in docs/integration_notes.md.
-
 import hashlib
+import importlib
 import uuid
-from datetime import datetime, timezone
-from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Any, Dict, Mapping, Optional, Protocol, Sequence
-from pydantic import BaseModel
+from datetime import datetime, timezone
 from enum import Enum
-from gherkin.parser import Parser
-from gherkin.token_scanner import TokenScanner
+from pathlib import Path
+from typing import Any, Dict, Mapping, Optional, Protocol, Sequence
 
+from pydantic import BaseModel
+
+from state_renormalization.adapters.ask_outbox import AskOutboxAdapter
+from state_renormalization.adapters.observation_freshness import ObservationFreshnessPolicyAdapter
+from state_renormalization.adapters.persistence import (
+    append_ask_outbox_request_event,
+    append_ask_outbox_response_event,
+    append_halt,
+    append_jsonl,
+    append_prediction_event,
+    append_prediction_record_event,
+    iter_projection_lineage_records,
+)
+from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.contracts import (
     AmbiguityStatus,
-    CaptureOutcome,
-    CaptureStatus,
     AskMetrics,
+    AskOutboxRequestArtifact,
+    AskOutboxResponseArtifact,
     AskResult,
     AskStatus,
     BeliefState,
-    HypothesisEvaluation,
+    CapabilityAdapterGate,
+    CapabilityInvocationAttempt,
+    CapabilityInvocationPolicyCode,
+    CapabilityInvocationPolicyDecision,
+    CapabilityPolicyHaltPayload,
+    CaptureOutcome,
+    CaptureStatus,
+    CorrectionCostAttribution,
     DecisionEffect,
     Episode,
     EpisodeOutputs,
+    EvidenceRef,
+    HaltPayloadValidationError,
+    HaltRecord,
+    HypothesisEvaluation,
+    InterventionAction,
+    InterventionDecision,
+    InterventionRequest,
+    InvariantAuditResult,
     Observation,
     ObservationFreshnessDecision,
     ObservationFreshnessDecisionOutcome,
     ObservationFreshnessPolicyContract,
     ObservationType,
     ObserverFrame,
-    ProjectionState,
-    ProjectionReplayResult,
+    PredictionOutcome,
+    PredictionRecord,
     ProjectionAnalyticsSnapshot,
+    ProjectionReplayResult,
+    ProjectionState,
     RepairLineageRef,
     RepairProposalEvent,
     RepairResolution,
     RepairResolutionEvent,
-    CorrectionCostAttribution,
-    CapabilityAdapterGate,
-    CapabilityInvocationAttempt,
-    CapabilityInvocationPolicyCode,
-    CapabilityInvocationPolicyDecision,
-    CapabilityPolicyHaltPayload,
-    InterventionAction,
-    InterventionDecision,
-    InterventionRequest,
-    AskOutboxRequestArtifact,
-    AskOutboxResponseArtifact,
-    InvariantAuditResult,
-    PredictionOutcome,
-    PredictionRecord,
-    HaltPayloadValidationError,
-    HaltRecord,
-    EvidenceRef,
     SchemaSelection,
     UtteranceType,
     default_observer_frame,
     project_ambiguity_state,
 )
-from state_renormalization.adapters.persistence import (
-    append_halt,
-    append_prediction_event,
-    append_prediction_record_event,
-    append_ask_outbox_request_event,
-    append_ask_outbox_response_event,
-    iter_projection_lineage_records,
-    append_jsonl,
-)
-from state_renormalization.adapters.ask_outbox import AskOutboxAdapter
-from state_renormalization.adapters.observation_freshness import ObservationFreshnessPolicyAdapter
-from state_renormalization.adapters.schema_selector import naive_schema_selector
 from state_renormalization.invariants import (
-    Flow as InvariantFlow,
-    InvariantId,
-    CheckerResult,
-    InvariantOutcome,
     REGISTRY,
+    CheckerResult,
+    InvariantHandlingMode,
+    InvariantId,
+    InvariantOutcome,
     default_check_context,
     normalize_outcome,
-    InvariantHandlingMode,
     repair_mode_enabled,
 )
+from state_renormalization.invariants import (
+    Flow as InvariantFlow,
+)
 from state_renormalization.stable_ids import derive_stable_ids
-
 
 PHATIC_PATTERNS = [
     "that's a great question",
@@ -751,9 +751,9 @@ def _find_stable_ids_from_payload(payload: Mapping[str, Any]) -> Dict[str, str]:
     if not feature_path.exists():
         return {}
 
-    try:
-        doc = Parser().parse(TokenScanner(feature_path.read_text(encoding="utf-8")))
-    except Exception:
+    feature_text = feature_path.read_text(encoding="utf-8")
+    doc = _parse_feature_doc(feature_text)
+    if doc is None:
         return {}
 
     doc["uri"] = feature_uri
@@ -794,6 +794,26 @@ def _find_stable_ids_from_payload(payload: Mapping[str, Any]) -> Dict[str, str]:
     if step_id is not None:
         out["step_id"] = step_id
     return out
+
+
+def _parse_feature_doc(feature_text: str) -> Optional[Dict[str, Any]]:
+    """
+    Parse Gherkin content if optional parser dependencies are installed.
+
+    Returns None when parser modules are unavailable or parsing fails so core
+    state renormalization behavior can remain available without BDD extras.
+    """
+    try:
+        parser_module = importlib.import_module("gherkin.parser")
+        scanner_module = importlib.import_module("gherkin.token_scanner")
+        parser = parser_module.Parser()
+        scanner = scanner_module.TokenScanner(feature_text)
+        parsed = parser.parse(scanner)
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        return None
+    return None
 
 
 def _episode_stable_ids(ep: Episode) -> Dict[str, str]:

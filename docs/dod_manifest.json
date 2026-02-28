@@ -132,7 +132,7 @@
     {
       "id": "replay_projection_analytics",
       "title": "Replay-grade projection reconstruction and deterministic restart analytics",
-      "status": "in_progress",
+      "status": "done",
       "roadmap_section": "Later",
       "code_paths": [
         "src/state_renormalization/engine.py",

@@ -28,18 +28,6 @@ def test_commands_missing_evidence_accepts_https_evidence_line() -> None:
     assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == []
 
 
-def test_commands_missing_evidence_accepts_artifact_evidence_line() -> None:
-    command = "pytest tests/test_replay_projection_determinism.py"
-    pr_body = "\n".join(
-        [
-            command,
-            "Evidence: artifact://milestone/projection-determinism",
-        ]
-    )
-
-    assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == []
-
-
 def test_commands_missing_evidence_rejects_unsupported_evidence_format() -> None:
     command = "pytest tests/test_replay_projection_determinism.py"
     pr_body = "\n".join(

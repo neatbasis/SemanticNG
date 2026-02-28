@@ -32,8 +32,11 @@ Rationale:
 - Immediate-priority validation command pack for `observer_authorization_contract` (exact manifest set):
   - `pytest tests/test_observer_frame.py`
   - `pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py`
+- Replay non-regression command pack for `replay_projection_analytics` (exact manifest set):
+  - `pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py`
+  - `pytest tests/test_replay_projection_analytics.py tests/test_replay_projection_determinism.py tests/test_replay_projection_restart_contracts.py tests/test_prediction_outcome_binding.py`
+  - `pytest tests/replay_projection_analytics/test_append_only_replay.py`
 - Contract map defines explicit maturity labels (`prototype`, `operational`, `proven`) and promotion protocol.
-- Replay and halt capabilities remain in `done` and should continue running as non-regression evidence packs.
 
 ### Lifecycle/process signals
 
@@ -92,6 +95,7 @@ Why this is most timely:
 
 ## Maturity changelog
 
+- 2026-02-28: **Maturity refresh (manifest-derived)** — recomputed status totals directly from `docs/dod_manifest.json` (`6 done / 0 in_progress / 3 planned`), confirmed `observer_authorization_contract` as the highest-priority non-done bottleneck (`Next`), and synchronized all listed command packs to their exact manifest `pytest_commands` definitions (including replay analytics non-regression packs).
 - 2026-02-28: **Manifest synchronization pass** — recomputed capability totals directly from `docs/dod_manifest.json` (`6 done / 0 in_progress / 3 planned`), reaffirmed `observer_authorization_contract` as the highest-priority non-done bottleneck, replaced stale replay-bottleneck framing with replay-as-done-baseline wording, and normalized listed validation command packs to exact manifest `pytest_commands`.
 - 2026-02-28: Revalidated `gate_halt_unification` as `done` against its acceptance command (`pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py` => `92 passed, 4 skipped`).
 - 2026-02-28: Confirmed `tests/test_predictions_contracts_and_gates.py` enforces deterministic `Flow.CONTINUE`/`Flow.STOP` parity assertions and `tests/test_persistence_jsonl.py` verifies halt payload durability for canonical `details`, `evidence`, and invariant identity (`invariant_id`) round-trips.

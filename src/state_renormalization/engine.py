@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Protocol, Sequence
+from typing import Any, Dict, Mapping, Optional, Protocol, Sequence, cast
 
 from pydantic import BaseModel
 
@@ -71,12 +71,14 @@ from state_renormalization.contracts import (
     RepairResolutionEvent,
     SchemaSelection,
     UtteranceType,
+    VerbosityDecision,
     default_observer_frame,
     project_ambiguity_state,
 )
 from state_renormalization.invariants import (
     REGISTRY,
     CheckerResult,
+    CheckContext,
     InvariantHandlingMode,
     InvariantId,
     InvariantOutcome,
@@ -433,7 +435,7 @@ def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltR
             invariant_id=outcome.invariant_id.value,
             reason=reason,
             details=dict(outcome.details),
-            evidence=[_as_evidence_ref(_to_dict(item)).model_dump(mode="json") for item in outcome.evidence],
+            evidence=[_as_evidence_ref(_to_dict(item)) for item in outcome.evidence],
             timestamp=_now_iso(),
             retryability=bool(outcome.action_hints),
         )
@@ -449,14 +451,14 @@ def _authorization_halt_record(*, stage: str, reason: str, context: Mapping[str,
             reason=reason,
             details={"authorization_context": _to_dict(context)},
             evidence=[
-                {
-                    "kind": "authorization_scope",
-                    "ref": f"action:{context.get('action', 'unknown')}",
-                },
-                {
-                    "kind": "required_capability",
-                    "ref": str(context.get("required_capability") or "unknown"),
-                },
+                EvidenceRef(
+                    kind="authorization_scope",
+                    ref=f"action:{context.get('action', 'unknown')}",
+                ),
+                EvidenceRef(
+                    kind="required_capability",
+                    ref=str(context.get("required_capability") or "unknown"),
+                ),
             ],
             timestamp=_now_iso(),
             retryability=True,
@@ -838,7 +840,7 @@ def _append_episode_artifact(ep: Episode, artifact: Dict[str, Any], *, stable_id
     ep.artifacts.append({**sid, **artifact} if sid else artifact)
 
 
-def _run_invariant(invariant_id: InvariantId, *, ctx) -> InvariantOutcome:
+def _run_invariant(invariant_id: InvariantId, *, ctx: CheckContext) -> InvariantOutcome:
     checker = REGISTRY[invariant_id]
     outcome = checker(ctx)
     if outcome.flow != InvariantFlow.STOP:
@@ -1088,7 +1090,7 @@ def evaluate_invariant_gates(
             reason="observer is not authorized to evaluate invariant gates",
             context=auth_context,
         )
-        halt_evidence_ref = append_halt_record(halt, halt_log_path=halt_log_path, stable_ids=_episode_stable_ids(ep))
+        auth_halt_evidence_ref = append_halt_record(halt, halt_log_path=halt_log_path, stable_ids=_episode_stable_ids(ep))
         _append_authorization_issue(ep, halt=halt, context=auth_context)
         _append_episode_artifact(
             ep,
@@ -1096,7 +1098,7 @@ def evaluate_invariant_gates(
                 "artifact_kind": "halt_observation",
                 "observation_type": "halt",
                 **_halt_payload(halt),
-                "halt_evidence_ref": halt_evidence_ref,
+                "halt_evidence_ref": auth_halt_evidence_ref,
             },
         )
         return halt
@@ -1215,7 +1217,7 @@ def evaluate_invariant_gates(
                 "kind": result_kind,
                 "prediction": _to_dict(result.artifact) if isinstance(result, Success) else None,
                 "halt": _halt_payload(result) if isinstance(result, HaltRecord) else None,
-                "halt_evidence_ref": halt_evidence_ref,
+                "halt_evidence_ref": auth_halt_evidence_ref,
             },
         )
 
@@ -1238,7 +1240,7 @@ def evaluate_invariant_gates(
                     "observation_type": "halt",
                     "observation_id": halt_observation.observation_id,
                     **_halt_payload(halt),
-                    "halt_evidence_ref": halt_evidence_ref,
+                    "halt_evidence_ref": auth_halt_evidence_ref,
                 },
             )
 
@@ -1909,7 +1911,7 @@ def run_mission_loop(
     pre_output_gate = evaluate_invariant_gates(
         ep=ep,
         scope=active_scope,
-        prediction_key=last_written_prediction.get("key"),
+        prediction_key=cast(Optional[str], last_written_prediction.get("key")),
         projection_state=updated_projection,
         prediction_log_available=True,
         gate_point="pre-output",
@@ -1942,7 +1944,7 @@ def build_episode(
     conversation_id: str,
     turn_index: int,
     assistant_prompt_asked: str,
-    policy_decision,
+    policy_decision: VerbosityDecision,
     payload: Dict[str, Any],
     outputs: EpisodeOutputs,
     observer: Optional[ObserverFrame] = None,

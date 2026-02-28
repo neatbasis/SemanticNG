@@ -82,7 +82,26 @@ show_error_codes = true
 # If your project imports optional deps in some modules:
 ignore_missing_imports = false
 
+[[tool.mypy.overrides]]
+module = [
+  "steps",
+  "index_steps",
+  "ontology_steps",
+]
+# Legacy BDD glue code with optional deps (behave/deeponto) and dynamic context objects.
+# Keep strict checks in core modules while deferring this suite.
+ignore_missing_imports = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_decorators = false
+warn_return_any = false
+disable_error_code = ["arg-type", "misc", "type-arg", "typeddict-unknown-key", "import-not-found"]
+
 # Tests often use duck-typing/fakes:
+
+[[tool.mypy.overrides]]
+module = ["behave", "deeponto", "deeponto.*"]
+ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_any_generics = false

@@ -96,7 +96,8 @@ class SelectorContext:
 
 
 class Rule(Protocol):
-    name: str
+    @property
+    def name(self) -> str: ...
 
     def applies(self, ctx: SelectorContext) -> bool: ...
 
@@ -182,13 +183,11 @@ def _amb(
 
 
 def _selection(*, schemas: list[SchemaHit], ambiguities: list[Ambiguity], notes: Optional[str] = None) -> SchemaSelection:
-    payload: dict[str, object] = {
-        "schemas": sort_schema_hits(schemas),
-        "ambiguities": ambiguities,
-    }
-    if notes is not None:
-        payload["notes"] = notes
-    return SchemaSelection(**payload)
+    return SchemaSelection(
+        schemas=sort_schema_hits(schemas),
+        ambiguities=ambiguities,
+        notes=notes,
+    )
 
 
 @dataclass(frozen=True)

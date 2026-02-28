@@ -19,6 +19,7 @@ This document is the canonical source for active release/integration workflow ex
 ## Governance enforcement requirements
 
 - [ ] **No-regression budget respected:** All `done` capability command packs remain green with zero unapproved failures.
+- [ ] **No-regression policy source stays canonical:** `docs/no_regression_budget.json` remains synchronized with done capability IDs, waiver records, and expiry semantics.
 - [ ] **Regression waiver timeboxed:** Any waiver includes owner, rationale, rollback-by date, and mitigation command packs.
 - [ ] **Dependency impact statements present:** Every merged PR includes upstream/downstream impact and cross-capability risk statements.
 - [ ] **Capability maturity gates enforced:** `planned -> in_progress -> done` transitions are validated by CI entry/exit gate checks.

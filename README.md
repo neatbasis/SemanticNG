@@ -53,6 +53,7 @@ python -m pip install -e ".[test,bdd]"
 ## Definition-of-done manifest
 
 A machine-readable status inventory lives at `docs/dod_manifest.json` with capability IDs, status (`done`/`in_progress`/`planned`), code paths, and test commands.
+No-regression budget governance is defined in `docs/no_regression_budget.json`, including done-capability coverage, waiver schema, and expiry semantics used by CI validation.
 
 Canonical completion criteria across capability/integration/system layers are defined in `docs/definition_of_complete.md`.
 

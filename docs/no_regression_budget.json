@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "done_capability_ids": [
+    "prediction_persistence_baseline",
+    "channel_agnostic_pending_obligation",
+    "schema_selection_ambiguity_baseline",
+    "gate_halt_unification",
+    "observer_authorization_contract",
+    "replay_projection_analytics",
+    "invariant_matrix_coverage"
+  ],
+  "budget_rules": {
+    "enforcement_trigger": "when_done_capability_ci_evidence_refreshes",
+    "default": "zero_failing_command_packs",
+    "failure_signal_field": "ci_evidence_links[].result",
+    "allowed_result_values": [
+      "pass",
+      "fail"
+    ]
+  },
+  "waiver_schema": {
+    "required_fields": [
+      "owner",
+      "reason",
+      "rollback_by",
+      "scope"
+    ],
+    "scope": {
+      "required_fields": [
+        "capability_id",
+        "command_packs"
+      ],
+      "command_packs": "list of exact pytest command strings or '*'"
+    }
+  },
+  "expiry_semantics": {
+    "rollback_by_format": "YYYY-MM-DD",
+    "expiration_rule": "waiver is invalid once rollback_by is earlier than current UTC date",
+    "timezone": "UTC"
+  },
+  "waivers": []
+}

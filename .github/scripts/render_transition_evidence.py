@@ -5,8 +5,16 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 import subprocess
 import sys
+
+
+ROOT = Path(__file__).resolve().parents[2]
+MANIFEST_PATH = ROOT / "docs" / "dod_manifest.json"
+PR_TEMPLATE_PATH = ROOT / ".github" / "pull_request_template.md"
+AUTOGEN_BEGIN = "<!-- BEGIN AUTOGEN: capability-examples -->"
+AUTOGEN_END = "<!-- END AUTOGEN: capability-examples -->"
 
 
 def _load_manifest(rev: str) -> dict:
@@ -71,11 +79,74 @@ def _render_block(commands_by_capability: dict[str, list[str]]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _commands_for_pr_template_examples(manifest: dict) -> dict[str, list[str]]:
+    commands_by_capability: dict[str, list[str]] = {}
+    for capability in manifest.get("capabilities", []):
+        cap_id = capability.get("id")
+        if not isinstance(cap_id, str) or not cap_id.strip():
+            continue
+
+        pytest_commands = capability.get("pytest_commands") or []
+        commands = [command for command in pytest_commands if isinstance(command, str) and command.strip()]
+        if commands:
+            commands_by_capability[cap_id] = commands
+
+    return commands_by_capability
+
+
+def _render_pr_template_examples(manifest: dict) -> str:
+    lines: list[str] = ["```text"]
+    commands_by_capability = _commands_for_pr_template_examples(manifest)
+    for cap_id in sorted(commands_by_capability):
+        lines.append(f"# Capability: {cap_id}")
+        for command in commands_by_capability[cap_id]:
+            lines.append(command)
+            lines.append("https://github.com/<org>/<repo>/actions/runs/<run_id>")
+            lines.append("")
+
+    lines.append("```")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _render_pr_template_autogen_section(manifest: dict) -> str:
+    body = _render_pr_template_examples(manifest).rstrip("\n")
+    return f"{AUTOGEN_BEGIN}\n{body}\n{AUTOGEN_END}"
+
+
+def _replace_between_markers(text: str, replacement: str) -> str:
+    start = text.find(AUTOGEN_BEGIN)
+    end = text.find(AUTOGEN_END)
+    if start == -1 or end == -1 or end < start:
+        raise ValueError("Failed to locate AUTOGEN markers in pull request template")
+
+    end += len(AUTOGEN_END)
+    return f"{text[:start]}{replacement}{text[end:]}"
+
+
+def regenerate_pr_template_autogen_section() -> None:
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    template = PR_TEMPLATE_PATH.read_text(encoding="utf-8")
+    updated = _replace_between_markers(template, _render_pr_template_autogen_section(manifest))
+    PR_TEMPLATE_PATH.write_text(updated, encoding="utf-8")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base", required=True, help="Base commit SHA")
-    parser.add_argument("--head", required=True, help="Head commit SHA")
+    parser.add_argument("--base", help="Base commit SHA")
+    parser.add_argument("--head", help="Head commit SHA")
+    parser.add_argument(
+        "--regenerate-pr-template",
+        action="store_true",
+        help="Regenerate the pull_request_template.md capability examples autogen block",
+    )
     args = parser.parse_args()
+
+    if args.regenerate_pr_template:
+        regenerate_pr_template_autogen_section()
+        return 0
+
+    if not args.base or not args.head:
+        parser.error("--base and --head are required unless --regenerate-pr-template is provided")
 
     try:
         base_manifest = _load_manifest(args.base)

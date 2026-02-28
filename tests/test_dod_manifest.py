@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 import shlex
@@ -9,6 +10,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "docs" / "dod_manifest.json"
+
+PR_TEMPLATE_PATH = ROOT / ".github" / "pull_request_template.md"
+RENDER_SCRIPT_PATH = ROOT / ".github" / "scripts" / "render_transition_evidence.py"
+
+_spec = importlib.util.spec_from_file_location("render_transition_evidence", RENDER_SCRIPT_PATH)
+assert _spec and _spec.loader
+render_transition_evidence = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(render_transition_evidence)
 
 
 def _load_manifest() -> dict:
@@ -167,3 +176,20 @@ def test_done_status_transition_retains_at_least_one_passing_regression_command(
             f"Capability {cap['id']} transitioned to done and must retain at least one passing pytest command\n"
             f"commands={commands}"
         )
+
+
+def test_pull_request_template_autogen_section_matches_manifest_commands() -> None:
+    manifest = _load_manifest()
+    expected = render_transition_evidence._render_pr_template_autogen_section(manifest)
+    template = PR_TEMPLATE_PATH.read_text(encoding="utf-8")
+
+    start = template.find(render_transition_evidence.AUTOGEN_BEGIN)
+    end = template.find(render_transition_evidence.AUTOGEN_END)
+
+    assert start != -1 and end != -1 and end > start, "PR template must include AUTOGEN markers"
+
+    actual = template[start : end + len(render_transition_evidence.AUTOGEN_END)]
+    assert actual == expected, (
+        "The AUTOGEN capability examples in .github/pull_request_template.md are out of date. "
+        "Run: python .github/scripts/render_transition_evidence.py --regenerate-pr-template"
+    )

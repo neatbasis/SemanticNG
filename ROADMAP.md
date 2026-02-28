@@ -69,28 +69,29 @@ This roadmap translates the architecture in `ARCHITECTURE.md` into an execution 
   - Files: `src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`, `src/state_renormalization/invariants.py`
   - Tests: `tests/test_observer_frame.py`, `tests/test_predictions_contracts_and_gates.py`, `tests/test_invariants.py`
 
+### 8) Capability-invocation governance + Ask/staleness policy integration (`status: done`)
+- **Owner area/module:** Engine + Contracts + Capability adapters (`src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, adapter modules under `src/state_renormalization/adapters/`)
+- **Success criteria (test outcomes):**
+  - `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_capability_adapter_surface_policy_guards.py` passes.
+  - `pytest tests/test_ask_outbox_contracts.py tests/test_predictions_contracts_and_gates.py` passes.
+  - Outcomes verify policy-aware side-effect gating, adapter guard enforcement, and canonical Ask outbox contract artifacts for staleness-request workflows.
+- **Related files/tests:**
+  - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, `src/state_renormalization/adapters/persistence.py`, `src/state_renormalization/adapters/ask_outbox.py`, `src/state_renormalization/adapters/observation_freshness.py`
+  - Tests: `tests/test_capability_invocation_governance.py`, `tests/test_capability_adapter_policy_guards.py`, `tests/test_capability_adapter_surface_policy_guards.py`, `tests/test_ask_outbox_contracts.py`, `tests/test_predictions_contracts_and_gates.py`
+
 ## Next (promotion checkpoint)
 
 _No planned capabilities remain in `Next`; observer authorization promotion is complete (`observer_authorization_contract` = `done`) and remains a non-regression dependency while `Later` capabilities advance._
 
 ## Capability status alignment (manifest source-of-truth sync)
 
-- `done`: `prediction_persistence_baseline`, `channel_agnostic_pending_obligation`, `schema_selection_ambiguity_baseline`, `gate_halt_unification`, `invariant_matrix_coverage`, `replay_projection_analytics`, `observer_authorization_contract`.
+- `done`: `prediction_persistence_baseline`, `channel_agnostic_pending_obligation`, `schema_selection_ambiguity_baseline`, `gate_halt_unification`, `invariant_matrix_coverage`, `replay_projection_analytics`, `observer_authorization_contract`, `capability_invocation_governance`.
 - `in_progress`: _none currently recorded_.
-- `planned`: `capability_invocation_governance`, `repair_aware_projection_evolution`.
+- `planned`: `repair_aware_projection_evolution`.
 
 ## Later (larger architecture goals)
 
-### 1) Capability-invocation governance (policy-aware external actions; `status: planned`)
-- **Owner area/module:** Engine + Contracts + Capability adapters (`src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, adapter modules under `src/state_renormalization/adapters/`)
-- **Success criteria (test outcomes):**
-  - New capability-gating tests pass, showing no externally consequential action executes without a current valid prediction and explicit gate pass.
-  - Failure-path tests pass, proving policy violations produce persisted explainable halts and zero side-effect invocation.
-- **Related files/tests:**
-  - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, capability adapter files (as added)
-  - Tests: add capability governance suites under `tests/` (prediction + halt + side-effect guards).
-
-### 2) Evolution path toward repair-aware projection (without silent mutation; `status: planned`)
+### 1) Evolution path toward repair-aware projection (without silent mutation; `status: planned`)
 - **Owner area/module:** Invariants + Engine (`src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py`)
 - **Success criteria (test outcomes):**
   - Prototype repair-mode tests pass where repair proposals are emitted as explicit auditable events (never implicit state mutation).
@@ -108,8 +109,7 @@ _No planned capabilities remain in `Next`; observer authorization promotion is c
 ## Backlog dependency tags
 
 - `Later` item 1 (Replay projection analytics contract): `done`; maintain replay analytics suites as non-regression gates while sequencing `Next` governance contracts.
-- `Later` item 2 (Capability-invocation governance): `planned`; dependency on `observer_authorization_contract` is met (`status: done`), so capability-side policy gating is now the next dependency-unblocked scope.
-- `Later` item 3 (Repair-aware projection evolution): `planned`; sequence after replay analytics baselines are stable to preserve auditable repair-event lineage.
+- `Later` item 2 (Repair-aware projection evolution): `planned`; sequence after governance and replay analytics baselines to preserve auditable repair-event lineage.
 
 ## Planning cadence
 
@@ -168,10 +168,10 @@ Use this short table at each planning checkpoint to pick exactly one next PR sco
 
 | Capability ID | Dependency status (met/blocked) | Governance readiness (manifest+roadmap+contract-map aligned) | Test evidence completeness | Risk-reduction score | Recommended next action |
 | --- | --- | --- | --- | --- | --- |
-| `replay_projection_analytics` | met (`status=done`) | aligned | complete | 2/5 | Keep replay analytics tests green as non-regression guardrails while sequencing capability invocation governance. |
+| `replay_projection_analytics` | met (`status=done`) | aligned | complete | 2/5 | Keep replay analytics tests green as non-regression guardrails while sequencing repair-aware projection evolution. |
 | `observer_authorization_contract` | met (`status=done`) | aligned | complete | 4/5 | Maintain authorization gate/invariant allowlist tests as non-regression guardrails. |
-| `capability_invocation_governance` | met (observer authorization dependency complete) | partial | missing | 5/5 | Promote as next implementation PR scope with policy-aware side-effect gating tests. |
-| `repair_aware_projection_evolution` | blocked (sequence after replay analytics hardening) | blocked | missing | 3/5 | Draft explicit auditable repair-event contract tests while keeping strict halt-only behavior as default. |
+| `capability_invocation_governance` | met (`status=done`) | aligned | complete | 5/5 | Maintain policy-aware side-effect and Ask/staleness contract suites as non-regression guardrails. |
+| `repair_aware_projection_evolution` | met (governance dependency complete) | partial | missing | 3/5 | Promote as next implementation PR scope and keep strict halt-only behavior as default until auditable repair lineage lands. |
 
 ## Guardrails (unchanged until Next milestones are complete)
 

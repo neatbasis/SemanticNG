@@ -2,36 +2,36 @@
 
 ## Executive assessment
 
-SemanticNG is in an **authorization-first governance hardening** state:
+SemanticNG is in a **post-governance hardening with repair-evolution pending** state:
 
 - Core baseline capabilities remain implemented and tested.
-- Capability accounting recomputed from `docs/dod_manifest.json` is `7/9` done.
-- There are currently **no** `in_progress` capabilities in the manifest; the active delivery bottleneck is the highest-priority `planned` item: `capability_invocation_governance`.
+- Capability accounting recomputed from `docs/dod_manifest.json` is `8/9` done.
+- There are currently **no** `in_progress` capabilities in the manifest; the active delivery bottleneck is the highest-priority `planned` item: `repair_aware_projection_evolution`.
 
 ## Evidence snapshot
 
 ### Capability delivery status (from DoD manifest)
 
-- **Done:** 7
+- **Done:** 8
 - **In progress:** 0
-- **Planned:** 2
+- **Planned:** 1
 
-Completion ratio (done / total): **77.8%** (`7/9`).
+Completion ratio (done / total): **88.9%** (`8/9`).
 
-Current bottleneck capability (highest-priority non-`done`): **`capability_invocation_governance`**.
+Current bottleneck capability (highest-priority non-`done`): **`repair_aware_projection_evolution`**.
 
 Rationale:
 
-1. `observer_authorization_contract` is now `done`; the next non-done dependency-unblocked capability is `capability_invocation_governance`.
+1. `capability_invocation_governance` is now `done`; the next non-done dependency-unblocked capability is `repair_aware_projection_evolution`.
 2. `replay_projection_analytics` is `done` in the manifest and treated as maintained baseline coverage, not an in-progress bottleneck.
-3. The other non-done capabilities are `Later` (`capability_invocation_governance`, `repair_aware_projection_evolution`).
+3. The remaining non-done capability is `Later` (`repair_aware_projection_evolution`).
 
 ### Quality and validation signals
 
 - Manifest acceptance commands are canonical per capability via `pytest_commands` in `docs/dod_manifest.json`.
-- Immediate-priority validation command pack for `capability_invocation_governance` (exact manifest set):
-  - `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py`
-  - `pytest tests/test_predictions_contracts_and_gates.py`
+- Capability-governance non-regression command packs for `capability_invocation_governance` (exact manifest set):
+  - `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_capability_adapter_surface_policy_guards.py`
+  - `pytest tests/test_ask_outbox_contracts.py tests/test_predictions_contracts_and_gates.py`
 - Replay non-regression command pack for `replay_projection_analytics` (exact manifest set):
   - `pytest tests/test_predictions_contracts_and_gates.py tests/test_persistence_jsonl.py`
   - `pytest tests/test_replay_projection_analytics.py tests/test_replay_projection_determinism.py tests/test_replay_projection_restart_contracts.py tests/test_prediction_outcome_binding.py`
@@ -55,42 +55,41 @@ The project has:
 
 It does **not yet** have:
 
-- Capability-invocation governance implemented.
 - Repair-aware projection evolution implemented.
 
 ## Most timely development (priority recommendation)
 
 ### #1 Immediate priority
 
-**Prioritize `capability_invocation_governance` as the single current implementation target.**
+**Prioritize `repair_aware_projection_evolution` as the single current implementation target.**
 
 Why this is most timely:
 
-1. It is the highest-priority non-done capability after observer authorization completion.
+1. It is the only remaining non-done capability after capability-governance and Ask/staleness policy integration landed.
 2. No capabilities are currently marked `in_progress`, so this is the clear next execution slot.
-3. It is a prerequisite sequencing gate before both `Later` governance and repair-aware scopes.
+3. It closes the final planned roadmap gap while preserving append-only replay and explainable halt guarantees.
 
 ### #2 Concrete near-term execution sequence
 
 1. **Start `capability_invocation_governance` (`Later`)**
    - Execute the exact manifest `pytest_commands`:
-     - `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py`
-     - `pytest tests/test_predictions_contracts_and_gates.py`
+     - `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_capability_adapter_surface_policy_guards.py`
+     - `pytest tests/test_ask_outbox_contracts.py tests/test_predictions_contracts_and_gates.py`
 2. **Then start `repair_aware_projection_evolution` (`Later`)**
    - Execute the exact manifest `pytest_commands`:
      - `pytest tests/test_repair_mode_projection.py tests/test_repair_events_auditability.py`
-     - `pytest tests/test_predictions_contracts_and_gates.py`
+     - `pytest tests/test_ask_outbox_contracts.py tests/test_predictions_contracts_and_gates.py`
 
 ## Suggested maturity targets for next review
 
 - Maintain observer authorization as `operational` with CI-backed non-regression evidence.
-- Establish capability-invocation governance baseline evidence as the next dependency-unblocked implementation scope.
-- Recompute capability completion and confirm all `pytest_commands` for non-done capabilities are represented in CI checks.
+- Maintain capability-invocation governance + Ask/staleness policy evidence as done non-regression coverage.
+- Recompute capability completion and confirm all `pytest_commands` for remaining non-done capabilities are represented in CI checks.
 
 ## Maturity changelog
 
-- 2026-02-28: **Maturity refresh (manifest-derived)** — recomputed status totals directly from `docs/dod_manifest.json` (`7 done / 0 in_progress / 2 planned`), confirmed `capability_invocation_governance` as the highest-priority non-done bottleneck, and synchronized all listed command packs to their exact manifest `pytest_commands` definitions (including replay analytics non-regression packs).
-- 2026-02-28: **Manifest synchronization pass** — recomputed capability totals directly from `docs/dod_manifest.json` (`7 done / 0 in_progress / 2 planned`), reaffirmed `capability_invocation_governance` as the highest-priority non-done bottleneck, replaced stale replay-bottleneck framing with replay-as-done-baseline wording, and normalized listed validation command packs to exact manifest `pytest_commands`.
+- 2026-02-28: **Maturity refresh (manifest-derived)** — recomputed status totals directly from `docs/dod_manifest.json` (`8 done / 0 in_progress / 1 planned`), confirmed `repair_aware_projection_evolution` as the highest-priority non-done bottleneck, and synchronized all listed command packs to their exact manifest `pytest_commands` definitions (including governance and replay non-regression packs).
+- 2026-02-28: **Manifest synchronization pass** — recomputed capability totals directly from `docs/dod_manifest.json` (`8 done / 0 in_progress / 1 planned`), reaffirmed `repair_aware_projection_evolution` as the highest-priority non-done bottleneck, and normalized listed validation command packs to exact manifest `pytest_commands`.
 - 2026-02-28: Revalidated `gate_halt_unification` as `done` against its acceptance command (`pytest tests/test_predictions_contracts_and_gates.py tests/test_engine_projection_mission_loop.py tests/test_persistence_jsonl.py tests/test_contracts_halt_record.py` => `92 passed, 4 skipped`).
 - 2026-02-28: Confirmed `tests/test_predictions_contracts_and_gates.py` enforces deterministic `Flow.CONTINUE`/`Flow.STOP` parity assertions and `tests/test_persistence_jsonl.py` verifies halt payload durability for canonical `details`, `evidence`, and invariant identity (`invariant_id`) round-trips.
 
@@ -115,5 +114,5 @@ For each review, execute this update sequence:
 | Next milestone | Target date | Owner area | Pass criteria |
 | --- | --- | --- | --- |
 | Observer authorization contract activation | 2026-03-22 | Engine + Invariants | `pytest tests/test_observer_frame.py` and `pytest tests/test_predictions_contracts_and_gates.py tests/test_invariants.py` are green with authorization-scope enforcement in default mission-loop paths. |
-| Capability governance contract baseline | 2026-03-29 | Engine + Contracts | `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py` and `pytest tests/test_predictions_contracts_and_gates.py` pass with policy-aware capability invocation and no regression in prediction/halt/replay contracts. |
+| Capability governance contract baseline | 2026-03-29 | Engine + Contracts | `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_capability_adapter_surface_policy_guards.py` and `pytest tests/test_ask_outbox_contracts.py tests/test_predictions_contracts_and_gates.py` pass with policy-aware capability invocation and no regression in prediction/halt/replay contracts. |
 | Repair-aware projection evolution baseline | 2026-04-05 | Engine + Contracts + Invariants | `pytest tests/test_repair_mode_projection.py tests/test_repair_events_auditability.py` and `pytest tests/test_predictions_contracts_and_gates.py` establish auditable repair-event lineage without regressing append-only replay guarantees. |

@@ -10,19 +10,48 @@ Canonical tier source is `[tool.semanticng.mypy_tiers]` in `pyproject.toml`.
 
 Temporary suppressions are tracked against a specific tier below.
 
-- **Tier:** Tier 2 only (BDD step glue signatures)
-  **Modules:** `src.features.steps.*`, `steps`, `index_steps`, `ontology_steps`.
-  **Suppressed:** `disallow_untyped_defs = false`, `disallow_incomplete_defs = false`, `disallow_untyped_decorators = false`, `warn_return_any = false`.
-  **Why:** Behave step functions are decorator-driven entrypoints with runtime-provided `context`, table rows, and doc text objects that are not yet modeled by first-party type stubs.
-  **Owner:** BDD/Acceptance Test Maintainers.
-  **Removal condition:** Add a typed Behave context protocol/stubs for the step API and annotate all step function signatures/decorator use sites so this module override can be deleted.
+## Current suppression inventory (authoritative)
 
-- **Tier:** Tier 2 only (optional dependency wrapper boundary)
-  **Modules:** `semanticng.bdd_compat`, `semanticng.deeponto_compat`.
-  **Suppressed:** `warn_return_any = false`.
-  **Why:** The wrappers intentionally use importlib-based loading and runtime attribute lookups to keep optional dependencies (`behave`, `deeponto`) out of the rest of the type surface.
-  **Owner:** Build & Tooling Maintainers.
-  **Removal condition:** Replace dynamic importlib boundary with typed direct imports guarded by installed optional extras (or dedicated typed stubs), then remove this wrapper-only suppression.
+| File/module | Suppression/error code | Owner | Created date | Target removal sprint | Blocker |
+| --- | --- | --- | --- | --- | --- |
+| `src.features.steps.*` | `disallow_untyped_defs = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Missing typed Behave context protocol and decorator stubs for step signatures. |
+| `src.features.steps.*` | `disallow_incomplete_defs = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Missing typed Behave context protocol and decorator stubs for step signatures. |
+| `src.features.steps.*` | `disallow_untyped_decorators = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Behave decorators are runtime-driven and currently untyped. |
+| `src.features.steps.*` | `warn_return_any = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Step glue returns transitively depend on untyped Behave objects. |
+| `steps` | `disallow_untyped_defs = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Missing typed Behave context protocol and decorator stubs for step signatures. |
+| `steps` | `disallow_incomplete_defs = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Missing typed Behave context protocol and decorator stubs for step signatures. |
+| `steps` | `disallow_untyped_decorators = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Behave decorators are runtime-driven and currently untyped. |
+| `steps` | `warn_return_any = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Step glue returns transitively depend on untyped Behave objects. |
+| `index_steps` | `disallow_untyped_defs = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Missing typed Behave context protocol and decorator stubs for step signatures. |
+| `index_steps` | `disallow_incomplete_defs = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Missing typed Behave context protocol and decorator stubs for step signatures. |
+| `index_steps` | `disallow_untyped_decorators = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Behave decorators are runtime-driven and currently untyped. |
+| `index_steps` | `warn_return_any = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Step glue returns transitively depend on untyped Behave objects. |
+| `ontology_steps` | `disallow_untyped_defs = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Missing typed Behave context protocol and decorator stubs for step signatures. |
+| `ontology_steps` | `disallow_incomplete_defs = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Missing typed Behave context protocol and decorator stubs for step signatures. |
+| `ontology_steps` | `disallow_untyped_decorators = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Behave decorators are runtime-driven and currently untyped. |
+| `ontology_steps` | `warn_return_any = false` | BDD/Acceptance Test Maintainers | 2026-03-01 | Sprint 7 | Step glue returns transitively depend on untyped Behave objects. |
+| `semanticng.bdd_compat` | `warn_return_any = false` | Build & Tooling Maintainers | 2026-03-01 | Sprint 8 | Runtime importlib boundaries for optional dependencies are not typed yet. |
+| `semanticng.deeponto_compat` | `warn_return_any = false` | Build & Tooling Maintainers | 2026-03-01 | Sprint 8 | Runtime importlib boundaries for optional dependencies are not typed yet. |
+| `tests` / `tests.*` | `strict = false` | Testing Infrastructure Maintainers | 2026-03-01 | Sprint 10 | Contract-sensitive tranche is strict-ready, but full test tree still has legacy fixture/fake typing gaps. |
+| `tests` / `tests.*` | `disallow_any_generics = false` | Testing Infrastructure Maintainers | 2026-03-01 | Sprint 10 | Tests still use generic runtime fixtures/fakes that require progressive annotation cleanup. |
+| `tests` / `tests.*` | `check_untyped_defs = false` | Testing Infrastructure Maintainers | 2026-03-01 | Sprint 10 | Test modules remain readability-first while helper/fake protocols are being formalized. |
+| `tests` / `tests.*` | `disallow_untyped_defs = false` | Testing Infrastructure Maintainers | 2026-03-01 | Sprint 10 | Test fixtures and helper factories need explicit signatures before strict re-enable. |
+| `tests` / `tests.*` | `warn_return_any = false` | Testing Infrastructure Maintainers | 2026-03-01 | Sprint 10 | Test factories currently expose transitional `Any` payloads in non-contract test modules. |
+
+Use the suppression inventory script to regenerate/review this table before release:
+
+```bash
+python .github/scripts/mypy_override_inventory.py --format markdown
+```
+
+## Sprint-level KPIs
+
+| KPI | Baseline (Sprint 5) | Sprint 6 target | Sprint 7 target | Sprint 8 target | Sprint 9 target | Sprint 10 target |
+| --- | --- | --- | --- | --- | --- | --- |
+| Remove suppression entries from `tool.mypy.overrides` | 0 removed | Remove >=2 | Remove >=8 | Remove >=10 cumulative | Remove >=14 cumulative | Remove all planned-to-remove suppressions (>=18 cumulative) |
+| Reduce `Any` count in engine/adapters paths (`src/state_renormalization`) | 100% baseline from Sprint 5 audit | -10% | -25% | -40% | -55% | -70% |
+| Shrink disabled error-code/rule set across overrides | 11 disabled rules | <=10 | <=8 | <=6 | <=4 | <=2 |
+| Keep suppression inventory visibility current in CI | Manual snapshots only | Add inventory script | Enforce script in release evidence | Weekly inventory trend artifact | Delta report in sprint handoff | Release checklist gate with debt-delta sign-off |
 
 ## 2026-03 Engine canonical payload typing pass (incremental)
 

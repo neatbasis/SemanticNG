@@ -2,6 +2,10 @@
 
 Canonical location: `docs/sprint_handoffs/`.
 
+Additional planning artifact:
+
+- `mypy-debt-5-sprint-timeline.md` — explicit 5-sprint exit criteria for mypy suppression burn-down governance.
+
 ## Naming
 
 - One sprint handoff file per sprint: `sprint-<n>-handoff.md`

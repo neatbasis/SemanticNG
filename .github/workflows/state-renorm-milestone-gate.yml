@@ -15,6 +15,8 @@ on:
       - '.github/scripts/capability_parity_report.py'
       - '.github/scripts/render_transition_evidence.py'
       - '.github/workflows/state-renorm-milestone-gate.yml'
+      - '.github/workflows/quality-guardrails.yml'
+      - '.github/actions/python-test-setup/action.yml'
   pull_request_target:
     types: [opened, synchronize, reopened, edited, ready_for_review]
     paths:
@@ -29,6 +31,8 @@ on:
       - '.github/scripts/capability_parity_report.py'
       - '.github/scripts/render_transition_evidence.py'
       - '.github/workflows/state-renorm-milestone-gate.yml'
+      - '.github/workflows/quality-guardrails.yml'
+      - '.github/actions/python-test-setup/action.yml'
   merge_group:
     paths:
       - 'src/state_renormalization/**'
@@ -42,28 +46,38 @@ on:
       - '.github/scripts/capability_parity_report.py'
       - '.github/scripts/render_transition_evidence.py'
       - '.github/workflows/state-renorm-milestone-gate.yml'
+      - '.github/workflows/quality-guardrails.yml'
+      - '.github/actions/python-test-setup/action.yml'
 
 jobs:
-  milestone-pytest:
+  baseline-quality:
     runs-on: self-hosted
+    permissions:
+      contents: read
+    steps:
+      - name: Shared Python setup
+        uses: ./.github/actions/python-test-setup
+
+      - name: Verify Python support policy sync
+        run: python .github/scripts/check_python_support_policy.py
+
+      - name: Run baseline lint/type checks
+        run: pre-commit run --all-files
+
+      - name: Run baseline tests with coverage gate
+        run: pytest --cov --cov-report=term-missing --cov-report=xml
+
+  milestone-governance:
+    runs-on: self-hosted
+    needs: [baseline-quality]
     permissions:
       contents: read
       issues: write
     steps:
-      - name: Check out
-        uses: actions/checkout@v4
+      - name: Shared Python setup
+        uses: ./.github/actions/python-test-setup
         with:
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install test dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e ".[test]"
+          fetch-depth: '0'
 
       - name: Compute diff SHAs
         id: shas
@@ -91,7 +105,7 @@ jobs:
         run: |
           python .github/scripts/render_transition_evidence.py --check-pr-template-autogen
 
-      - name: Run AUTOGEN parity pytest
+      - name: Run milestone governance targeted pytest suite
         run: |
           pytest tests/test_render_transition_evidence.py tests/test_pr_template_autogen_governance.py tests/test_sprint_handoff_validation.py
 
@@ -117,7 +131,7 @@ jobs:
           path: artifacts/transition_evidence.txt
           if-no-files-found: error
 
-      - name: Validate milestone documentation governance
+      - name: Validate milestone manifest/doc parity
         id: validate_milestone
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
@@ -134,7 +148,6 @@ jobs:
             echo "Milestone validation failed. See artifacts/validate_milestone_docs.log for details."
             exit "$validator_status"
           fi
-
 
       - name: Validate sprint handoff artifacts
         run: |

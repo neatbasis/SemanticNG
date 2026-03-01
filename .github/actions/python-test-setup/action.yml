@@ -1,0 +1,30 @@
+name: Python Test Setup
+description: Common Python CI setup (checkout, Python, pip cache, editable install with test extras)
+inputs:
+  python-version:
+    description: Python version to install
+    required: false
+    default: '3.11'
+  fetch-depth:
+    description: Checkout fetch-depth
+    required: false
+    default: '1'
+runs:
+  using: composite
+  steps:
+    - name: Check out
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: ${{ inputs.fetch-depth }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+
+    - name: Install project + tooling
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -e ".[test]"

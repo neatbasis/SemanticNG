@@ -3,12 +3,15 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 
 _GLOB_META_CHARS = set("*?[]")
+_HEX_COMMIT_PATTERN = re.compile(r"^[0-9a-f]{7,40}$")
 
 
 def _load_config(config_path: Path) -> dict:
@@ -53,8 +56,46 @@ def _resolve_governed_paths(base_dir: Path, configured_path: str) -> list[str]:
     return [candidate]
 
 
-def _validate_doc_freshness(config: dict, base_dir: Path, now_utc: datetime) -> list[dict[str, str]]:
+def _resolve_git_commit(base_dir: Path, repo_relative_path: str) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(base_dir), "rev-list", "-1", "HEAD", "--", repo_relative_path],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError:
+        return None
+
+    commit_hash = result.stdout.strip().lower()
+    return commit_hash or None
+
+
+def _lookup_commit_binding(file_path: str, policy: dict) -> dict[str, str] | None:
+    bindings = policy.get("governed_source_commits", {})
+    if not isinstance(bindings, dict):
+        return None
+
+    direct = bindings.get(file_path)
+    if isinstance(direct, dict):
+        return direct
+
+    wildcard = bindings.get("*")
+    if isinstance(wildcard, dict):
+        return wildcard
+
+    return None
+
+
+def _validate_doc_freshness(
+    config: dict,
+    base_dir: Path,
+    now_utc: datetime,
+    *,
+    commit_resolver: Callable[[Path, str], str | None] | None = None,
+) -> list[dict[str, str]]:
     issues: list[dict[str, str]] = []
+    commit_resolver = commit_resolver or _resolve_git_commit
 
     timestamp_policy = config.get("timestamp_policy", {})
     timestamp_pattern = str(timestamp_policy.get("pattern", ""))
@@ -62,6 +103,8 @@ def _validate_doc_freshness(config: dict, base_dir: Path, now_utc: datetime) -> 
 
     file_classes = config.get("file_classes", {})
     governed_files = config.get("governed_files", [])
+    source_commit_policy = config.get("source_commit_policy", {})
+    source_files = source_commit_policy.get("source_files", {}) if isinstance(source_commit_policy, dict) else {}
 
     for entry in governed_files:
         configured_path = str(entry.get("path", "")).strip()
@@ -105,6 +148,35 @@ def _validate_doc_freshness(config: dict, base_dir: Path, now_utc: datetime) -> 
             age_days = (now_utc - timestamp).total_seconds() / 86400
             if age_days > max_age_days:
                 issues.append({"file_path": file_path, "message": f"stale freshness metadata: age={age_days:.1f} days exceeds max_age_days={max_age_days} for class '{file_class}'."})
+
+            if source_commit_policy:
+                commit_binding = _lookup_commit_binding(file_path, source_commit_policy)
+                if commit_binding is None:
+                    issues.append({"file_path": file_path, "message": "missing source commit metadata for governed document."})
+                    continue
+
+                for source_alias, expected_commit in commit_binding.items():
+                    source_path = source_files.get(source_alias)
+                    if not isinstance(source_path, str) or not source_path.strip():
+                        issues.append({"file_path": file_path, "message": f"source alias '{source_alias}' is not configured in source_commit_policy.source_files."})
+                        continue
+
+                    if not isinstance(expected_commit, str) or not _HEX_COMMIT_PATTERN.fullmatch(expected_commit.lower()):
+                        issues.append({"file_path": file_path, "message": f"source alias '{source_alias}' has invalid commit hash metadata '{expected_commit}'."})
+                        continue
+
+                    resolved_commit = commit_resolver(base_dir, source_path)
+                    if resolved_commit is None:
+                        issues.append({"file_path": file_path, "message": f"unable to resolve git commit for source file '{source_path}'."})
+                        continue
+
+                    if not resolved_commit.startswith(expected_commit.lower()):
+                        issues.append(
+                            {
+                                "file_path": file_path,
+                                "message": f"source commit mismatch for '{source_alias}' ({source_path}): expected '{expected_commit}', resolved '{resolved_commit}'.",
+                            }
+                        )
 
     return issues
 

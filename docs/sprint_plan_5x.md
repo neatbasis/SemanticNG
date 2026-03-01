@@ -25,6 +25,22 @@ Canonical references:
 | Horizon sequencing | `ROADMAP.md` | Horizon notes derive from capability IDs and dependency map; execution docs consume this sequence without redefining horizon ownership. |
 | Sprint execution controls | `docs/sprint_plan_5x.md` | Sprint controls (gates, PR requirements, templates) govern execution mechanics only and must reference capability IDs for scope. |
 
+## Coverage scope roadmap
+
+### Current scope baseline
+- Coverage-governed execution scope is currently limited to `src/state_renormalization`.
+- Sprint evidence, parity validators, and maturity claims must continue to map to this baseline until explicit scope-expansion readiness is accepted.
+
+### Conditions required to include `src/core`
+- Contract stability: canonical contract names and payload surfaces must remain stable across two consecutive sprint closes, with no unplanned schema churn in `docs/system_contract_map.md`.
+- Deterministic tests: replay/projection and gate-path suites must show deterministic repeated runs for the candidate `src/core`-touching workflows.
+- Parity gates: roadmap/manifest/contract-map parity validators must pass in fail-closed mode before and after any candidate scope update.
+
+### Sequencing constraints tied to refactoring milestones
+1. Keep scope at `src/state_renormalization` through refactor-only milestones where behavior drift is disallowed.
+2. Allow `src/core` expansion only after the coherence/refactor milestone confirms naming/boundary cleanup with invariant freeze still green.
+3. Execute first `src/core` inclusion as a gated, single-sprint rollout with rollback criteria, then widen only after one additional green sprint cycle.
+
 ## Sprint 1 — Governance substrate lock
 
 ### Objective
@@ -62,6 +78,9 @@ Finalize no-regression budget, doc freshness SLO checks, handoff minimums, and p
 - Capability IDs and statuses in sprint notes exactly match `docs/dod_manifest.json`.
 - Contract names used in sprint notes exactly match `docs/system_contract_map.md` names.
 - `ROADMAP.md` sequencing references only manifest-defined IDs.
+
+### Scope change readiness acceptance criterion
+- [ ] Scope remains constrained to `src/state_renormalization`; any proposed `src/core` touch is deferred unless contract stability baseline, deterministic-test baseline, and parity-gate baseline are all documented as green.
 
 ### Alignment gate checklist (must pass before sprint close)
 - [ ] `ROADMAP.md` capability IDs/statuses are parity-checked against `docs/dod_manifest.json`.
@@ -106,6 +125,9 @@ Promote `capability_invocation_governance` to `done` with policy-aware side-effe
 - Contract-map changelog entries exist for any maturity promotions.
 - Policy gate test names in sprint evidence match manifest command packs exactly.
 
+### Scope change readiness acceptance criterion
+- [ ] Promotion evidence confirms contract stability and deterministic policy-gate behavior in current scope, and parity gates remain fail-closed as a prerequisite for future `src/core` inclusion.
+
 ### Alignment gate checklist (must pass before sprint close)
 - [ ] `ROADMAP.md` reflects `capability_invocation_governance` final sprint state.
 - [ ] `docs/dod_manifest.json` status and pytest packs are unchanged from executed evidence or updated in same PR.
@@ -146,6 +168,9 @@ Deliver auditable repair events and deterministic replay/restart guarantees whil
 - Manifest status transitions for `repair_aware_projection_evolution` are reflected in roadmap and sprint close notes.
 - Contract-map maturity transitions include capability-ID references and evidence URLs.
 - Repair/replay test evidence references exact command packs from manifest.
+
+### Scope change readiness acceptance criterion
+- [ ] Deterministic replay/restart evidence for repair/projection paths is repeatable and parity validated, establishing readiness evidence needed before any scope broadening beyond `src/state_renormalization`.
 
 ### Alignment gate checklist (must pass before sprint close)
 - [ ] `ROADMAP.md` records repair-aware capability completion and dependency closure.
@@ -188,6 +213,9 @@ Complete module boundary cleanup and naming normalization under invariant freeze
 - Contract names, invariants, and producing/consuming stage labels remain canonical in contract map.
 - Manifest command packs remain authoritative and unchanged unless explicitly revised.
 - Roadmap narrative reflects refactor-only scope without introducing new capability statuses.
+
+### Scope change readiness acceptance criterion
+- [ ] Refactor milestone closes with zero behavior drift, stable contracts, and deterministic suites, satisfying the sequencing prerequisite to consider a gated `src/core` pilot in a subsequent sprint.
 
 ### Alignment gate checklist (must pass before sprint close)
 - [ ] `ROADMAP.md` indicates coherence/refactor scope with no unauthorized status changes.
@@ -238,6 +266,9 @@ Upgrade qualifying contracts from `operational` to `proven` using repeated evide
 - Final roadmap capability states exactly match manifest terminal states.
 - Contract-map maturity table and changelog fully reflect promoted contracts.
 - Manifest `contract_map_refs` remain canonical and complete for all active capabilities.
+
+### Scope change readiness acceptance criterion
+- [ ] Release-readiness package includes explicit sign-off on contract stability, deterministic test history, and parity-gate continuity as the acceptance gate for any approved post-plan scope expansion into `src/core`.
 
 ### Alignment gate checklist (must pass before sprint close)
 - [ ] `ROADMAP.md` terminal statuses match `docs/dod_manifest.json` exactly.

@@ -12,6 +12,14 @@ This canonical matrix defines mandatory documentation update paths and merge-blo
 | **Improve** (roadmap/sprint-plan transitions and transition evidence) | `ROADMAP.md`; `docs/sprint_plan_5x.md`; `docs/dod_manifest.json`; `docs/system_contract_map.md` (when contract maturity changes). | `make promotion-checks`; `python .github/scripts/validate_milestone_docs.py`; `python .github/scripts/render_transition_evidence.py --emit-pr-template-autogen`; `python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json`. | PR body generated transition evidence block + dependency impact/no-regression sections; sprint handoff preload list and transition outcome summary. | Block merge if capability status transitions are not mirrored across roadmap/manifest/contract map, required command evidence URLs are missing, or sprint-plan transition artifacts are incomplete. |
 | **Control** (validators/tests/CI checks and freshness metadata) | `.github/workflows/*` (if control gates change); `.github/scripts/validate_milestone_docs.py`; `docs/doc_freshness_slo.json`; `docs/release_checklist.md`; `tests/test_validate_milestone_docs.py` (or relevant governance tests). | `python .github/scripts/validate_milestone_docs.py`; `python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json`; `pytest tests/test_validate_milestone_docs.py tests/test_doc_freshness_slo.py`. | PR body governance/handoff mandatory section with explicit control-gate updates; sprint handoff includes validator outcomes and freshness SLO compliance timestamp. | Block merge if control-gate scripts/tests are changed without synchronized policy docs, freshness metadata is stale/missing, or CI validator coverage regresses. |
 
+
+## CI workflow architecture note
+
+- `quality-guardrails.yml` owns the **baseline quality layer** (lint/type/test-cov) for general repository health and branch protection defaults.
+- `state-renorm-milestone-gate.yml` owns the **milestone governance layer** (manifest/doc parity validation plus milestone-targeted suites) and now declares a `needs` dependency so governance checks run only after its baseline-quality job succeeds.
+- Both workflows share `.github/actions/python-test-setup/action.yml` for checkout, Python setup, pip caching, and editable test-extra installation to keep CI environment semantics aligned.
+- Trigger boundary intent: baseline quality runs broadly on pull requests/pushes, while milestone governance remains path-scoped to state-renormalization and governance artifacts to avoid unnecessary governance gate runs on unrelated changes.
+
 ## Contributor usage notes
 
 - Treat this matrix as the canonical routing policy for governance-relevant change sets.

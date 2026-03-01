@@ -1,6 +1,13 @@
-# SemanticNG Invariants
+# INVARIANTS
 
-This document captures runtime and structural invariants for `src/semanticng`.
+Let `M_sem` be the `src/semanticng` boundary.
 
-- Invariants should remain implementation-agnostic but verifiable.
-- Any change in observable behavior must first update this file.
+## Symbolic constraints
+- **I1 (Canonical version export):** `__version__` is part of the public surface and sourced from `semanticng._version`.
+- **I2 (Bridge role):** module composes/re-exports implementation surface without redefining core semantics.
+- **I3 (Boundary clarity):** semantic boundary policy is documented and remains compatible with `state_renormalization` re-export behavior.
+
+## Failure semantics
+- Violation of **I1** is a **release integrity failure**.
+- Violation of **I2** is a **semantic drift failure**.
+- Violation of **I3** is a **boundary contract failure**.

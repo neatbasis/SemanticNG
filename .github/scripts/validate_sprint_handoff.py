@@ -17,6 +17,8 @@ REQUIRED_HEADINGS = (
     "## Exit criteria pass/fail matrix",
     "## Open risk register with owners/dates",
     "## Next-sprint preload mapped to capability IDs",
+    "## Workflow quality KPI trend deltas",
+    "## Completed workflow-quality actions",
 )
 
 GOVERNANCE_INPUTS = {
@@ -127,6 +129,30 @@ def _validate_handoff_file(path: Path, capability_ids: set[str]) -> list[str]:
                     mismatches.append(f"{path}: risk row {idx} target date must be YYYY-MM-DD.")
 
     preload = _section_body(text, REQUIRED_HEADINGS[2])
+
+    kpi_section = _section_body(text, "## Workflow quality KPI trend deltas")
+    if kpi_section is None:
+        mismatches.append(f"{path}: missing workflow quality KPI trend section.")
+    else:
+        kpi_rows = _extract_markdown_table_rows(kpi_section)
+        if len(kpi_rows) < 5:
+            mismatches.append(f"{path}: KPI trend section must include header and four KPI rows.")
+
+    actions_section = _section_body(text, "## Completed workflow-quality actions")
+    if actions_section is None:
+        mismatches.append(f"{path}: missing completed workflow-quality actions section.")
+    else:
+        action_rows = _extract_markdown_table_rows(actions_section)
+        if len(action_rows) < 2:
+            mismatches.append(f"{path}: workflow-quality actions section must include at least one completed action row.")
+        else:
+            for idx, row in enumerate(action_rows[1:], start=1):
+                status = row[3].strip().lower() if len(row) > 3 else ""
+                if status != "done":
+                    mismatches.append(
+                        f"{path}: workflow-quality action row {idx} must have status 'done' at sprint close."
+                    )
+
     if preload is None:
         mismatches.append(f"{path}: missing next-sprint preload section.")
     else:

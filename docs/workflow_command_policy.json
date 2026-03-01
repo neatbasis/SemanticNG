@@ -1,0 +1,58 @@
+{
+  "policy_version": "2026-03-01",
+  "description": "Canonical workflow command policy for CI drift detection and governance evidence.",
+  "required_commands": [
+    {
+      "command": "python .github/scripts/check_python_support_policy.py",
+      "workflows": [
+        ".github/workflows/quality-guardrails.yml",
+        ".github/workflows/state-renorm-milestone-gate.yml"
+      ],
+      "policy_sources": [
+        "docs/release_checklist.md",
+        "docs/documentation_change_control.md"
+      ]
+    },
+    {
+      "command": "pre-commit run --all-files",
+      "workflows": [
+        ".github/workflows/quality-guardrails.yml",
+        ".github/workflows/state-renorm-milestone-gate.yml"
+      ],
+      "policy_sources": [
+        "docs/release_checklist.md"
+      ]
+    },
+    {
+      "command": "pytest --cov --cov-report=term-missing --cov-report=xml",
+      "workflows": [
+        ".github/workflows/quality-guardrails.yml",
+        ".github/workflows/state-renorm-milestone-gate.yml"
+      ],
+      "policy_sources": [
+        "docs/release_checklist.md",
+        "docs/no_regression_budget.json"
+      ]
+    },
+    {
+      "command": "python .github/scripts/validate_sprint_handoff.py",
+      "workflows": [
+        ".github/workflows/state-renorm-milestone-gate.yml"
+      ],
+      "policy_sources": [
+        "docs/release_checklist.md",
+        "docs/sprint_handoffs/sprint-handoff-template.md"
+      ]
+    },
+    {
+      "command": "python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json",
+      "workflows": [
+        ".github/workflows/state-renorm-milestone-gate.yml"
+      ],
+      "policy_sources": [
+        "docs/release_checklist.md",
+        "docs/doc_freshness_slo.json"
+      ]
+    }
+  ]
+}

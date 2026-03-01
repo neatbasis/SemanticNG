@@ -22,3 +22,35 @@ Temporary suppressions are tracked against a specific tier below.
   **Why:** The wrappers intentionally use importlib-based loading and runtime attribute lookups to keep optional dependencies (`behave`, `deeponto`) out of the rest of the type surface.
   **Owner:** Build & Tooling Maintainers.
   **Removal condition:** Replace dynamic importlib boundary with typed direct imports guarded by installed optional extras (or dedicated typed stubs), then remove this wrapper-only suppression.
+
+## 2026-03 Engine canonical payload typing pass (incremental)
+
+Completed in `src/state_renormalization/engine.py` (core loop boundary):
+
+- Replaced `Mapping[str, Any]` payload wiring in gate/invariant flow with `CanonicalPredictionPayload` alias.
+- Added validated payload models for high-traffic canonical payload paths:
+  - `WrittenPredictionPayload` (mission-loop `last_written_prediction` contract)
+  - `CanonicalHaltPayload` (typed canonical halt payload normalization)
+- Refactored payload transformation helpers used by persistence handoff:
+  - `_prediction_payload_with_stable_ids`
+  - `_prediction_record_event_payload`
+  - `_halt_payload_with_stable_ids`
+- Replaced cast-based pre-output gate key extraction with typed model access (`last_written_prediction.key`).
+- Extended schema selector validation boundary so `_validated_selection` accepts either `SchemaSelection` or a mapping validated via `SchemaSelection.model_validate`.
+
+High-traffic function inventory addressed in this pass:
+
+- `evaluate_invariant_gates(..., just_written_prediction=...)`
+- `_evaluate_gate_phase(..., just_written_prediction=...)`
+- `_evaluate_invariant_gate_pipeline(..., just_written_prediction=...)`
+- `append_prediction_record(...)`
+- `append_halt_record(...)`
+- `_halt_payload(...)`
+- `_validated_selection(...)`
+
+Remaining `Any` hotspots (next module boundary: adapters):
+
+- `src/state_renormalization/adapters/persistence.py`
+  - `JsonObj = dict[str, Any]`
+  - `_to_jsonable`, `append_jsonl`, `append_prediction*`, `append_ask_outbox_*`, `_canonicalize_halt_payload`, `append_halt`
+  - follow-up plan: replace `Any` entrypoints with typed JSON aliases + validated event payload wrappers.

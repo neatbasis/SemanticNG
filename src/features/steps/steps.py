@@ -8,9 +8,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from behave import given, then, when
-from gherkin.parser import Parser
-from gherkin.token_scanner import TokenScanner
+from gherkin.parser import Parser  # type: ignore[import-not-found]
+from gherkin.token_scanner import TokenScanner  # type: ignore[import-not-found]
+
+from semanticng.bdd_compat import given, then, when
+from semanticng.step_state import get_resource_step_state
 
 from state_renormalization.gherkin_document import GherkinDocument
 from state_renormalization.stable_ids import derive_stable_ids
@@ -165,35 +167,27 @@ def _derive_context_stable_ids(context) -> dict[str, str]:
     return out
 
 
-def _ensure_resource_draft(context) -> None:
-    context._meta = getattr(context, "_meta", {})
-    context._payload = getattr(context, "_payload", None)
-    context._extensions = getattr(context, "_extensions", None)
-
-
 def _set_meta_field(context, key: str, value: str) -> None:
-    _ensure_resource_draft(context)
-    context._meta[key] = value
+    state = get_resource_step_state(context)
+    state.meta[key] = value
 
 
 def _build_and_store_resource(context) -> None:
-    _ensure_resource_draft(context)
+    state = get_resource_step_state(context)
     stable_ids = _derive_context_stable_ids(context)
     if stable_ids:
-        context._meta["stable_ids"] = dict(stable_ids)
-        context._meta.setdefault("semanticng", {}).update(stable_ids)
-    context.resource = build_resource(
-        meta=context._meta,
-        payload=context._payload,
-        extensions=context._extensions,
-    )
+        state.meta["stable_ids"] = dict(stable_ids)
+        state.meta.setdefault("semanticng", {}).update(stable_ids)
+    state.resource = build_resource(meta=state.meta, payload=state.payload, extensions=state.extensions)
     if stable_ids:
-        context.resource.update(stable_ids)
-    context.store.put(context.resource)
+        state.resource.update(stable_ids)
+    context.store.put(state.resource)
 
 
 def _resource_for_validation(context) -> dict[str, Any]:
-    return json.loads(canonical_json(context.resource))
+    state = get_resource_step_state(context)
+    assert state.resource is not None, "Resource must be built before validation"
+    return json.loads(canonical_json(state.resource))
 
 
 # ----------------------------
@@ -264,7 +258,8 @@ def step_when_create_resource_table(context) -> None:
             continue
         meta[key.strip()] = val.strip()
 
-    context._meta = meta
+    state = get_resource_step_state(context)
+    state.meta = meta
 
 
 @when("with payload:")
@@ -275,13 +270,15 @@ def step_when_set_payload(context) -> None:
     except json.JSONDecodeError:
         # Allow non-JSON payloads if your system supports them
         payload = raw
-    context._payload = payload
+    state = get_resource_step_state(context)
+    state.payload = payload
 
 
 @when("I create a Resource with extensions:")
 def step_when_set_extensions(context) -> None:
     raw = context.text.strip()
-    context._extensions = json.loads(raw)
+    state = get_resource_step_state(context)
+    state.extensions = json.loads(raw)
 
 
 @when("I build the Resource")
@@ -291,7 +288,9 @@ def step_when_build_resource(context) -> None:
 
 @then("the Resource MUST contain meta, payload, integrity")
 def step_then_must_contain_core_fields(context) -> None:
-    r = context.resource
+    state = get_resource_step_state(context)
+    assert state.resource is not None, "Resource not built"
+    r = state.resource
     assert "meta" in r, "Missing meta"
     assert "payload" in r, "Missing payload"
     assert "integrity" in r, "Missing integrity"
@@ -299,12 +298,16 @@ def step_then_must_contain_core_fields(context) -> None:
 
 @then('meta.dc:type MUST equal "{expected}"')
 def step_then_dc_type_equals(context, expected: str) -> None:
-    assert context.resource["meta"]["dc:type"] == expected
+    state = get_resource_step_state(context)
+    assert state.resource is not None, "Resource not built"
+    assert state.resource["meta"]["dc:type"] == expected
 
 
 @then("integrity.content_hash MUST be a sha256 of canonical content")
 def step_then_hash_matches(context) -> None:
-    r = context.resource
+    state = get_resource_step_state(context)
+    assert state.resource is not None, "Resource not built"
+    r = state.resource
 
     # Recompute hash from canonical content excluding derived fields (identifier, integrity)
     clone = {
@@ -321,21 +324,27 @@ def step_then_hash_matches(context) -> None:
 
 @then("meta.dc:identifier MUST be a content-addressed identifier derived from the content hash")
 def step_then_identifier_matches_hash(context) -> None:
-    r = context.resource
+    state = get_resource_step_state(context)
+    assert state.resource is not None, "Resource not built"
+    r = state.resource
     hash_hex = r["integrity"]["content_hash"].split("sha256:", 1)[1]
     assert r["meta"]["dc:identifier"] == content_addressed_id(hash_hex)
 
 
 @then('the Resource MUST contain "{field}"')
 def step_then_contains_field(context, field: str) -> None:
-    assert field in context.resource, f"Missing field {field}"
+    state = get_resource_step_state(context)
+    assert state.resource is not None, "Resource not built"
+    assert field in state.resource, f"Missing field {field}"
 
 
 @then('every extension key MUST match the pattern "{pattern}"')
 def step_then_extension_key_pattern(context, pattern: str) -> None:
     # This allows the feature to specify the regex; we enforce it here.
     rx = re.compile(pattern)
-    exts = context.resource.get("extensions", {})
+    state = get_resource_step_state(context)
+    assert state.resource is not None, "Resource not built"
+    exts = state.resource.get("extensions", {})
     for k in exts.keys():
         assert rx.match(k), f"Extension key '{k}' does not match /{pattern}/"
 
@@ -350,26 +359,29 @@ def step_then_kernel_validator_pass_without_extensions(context) -> None:
 
 @given('a Resource exists with meta.dc:type equal to "{dc_type}"')
 def step_given_resource_exists_with_type(context, dc_type: str) -> None:
-    context._meta = {"dc:type": dc_type, "dc:created": "2026-02-14T00:00:00Z", "dc:source": "test"}
-    context._payload = {"ok": True}
-    context._extensions = None
-    context.resource = build_resource(context._meta, context._payload, context._extensions)
-    context.store.put(context.resource)
+    state = get_resource_step_state(context)
+    state.meta = {"dc:type": dc_type, "dc:created": "2026-02-14T00:00:00Z", "dc:source": "test"}
+    state.payload = {"ok": True}
+    state.extensions = None
+    state.resource = build_resource(state.meta, state.payload, state.extensions)
+    context.store.put(state.resource)
 
 
 @when('I add an extension that attempts to set "meta.dc:type" to "{new_type}"')
 def step_when_extension_attempts_override_dc_type(context, new_type: str) -> None:
     # This simulates a forbidden “redefine kernel field” attempt.
     # In practice, you’d forbid this by validator rules.
-    context._bad_extension = {"badext.v1": {"meta": {"dc:type": new_type}}}
+    state = get_resource_step_state(context)
+    state.bad_extension = {"badext.v1": {"meta": {"dc:type": new_type}}}
 
 
 @then('validation MUST fail with code "{code}"')
 def step_then_validation_fails_with_code(context, code: str) -> None:
+    state = get_resource_step_state(context)
     r = _resource_for_validation(context)
     # Apply the bad extension for this validation attempt
-    if hasattr(context, "_bad_extension"):
-        r["extensions"] = context._bad_extension
+    if state.bad_extension is not None:
+        r["extensions"] = state.bad_extension
 
         # Detect conflict: extension tries to redefine meta.dc:type
         for _, ext in r["extensions"].items():

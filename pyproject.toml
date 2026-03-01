@@ -98,8 +98,10 @@ show_error_codes = true
 ignore_missing_imports = false
 
 [[tool.mypy.overrides]]
-module = ["behave", "deeponto", "deeponto.*"]
-ignore_missing_imports = true
+module = ["semanticng.bdd_compat", "semanticng.deeponto_compat"]
+# Optional third-party adapters are isolated here. Any importlib-dynamic edges stay
+# at this boundary so step modules can remain fully typed.
+warn_return_any = false
 
 [[tool.mypy.overrides]]
 module = [
@@ -115,14 +117,6 @@ disallow_untyped_defs = false
 disallow_incomplete_defs = false
 disallow_untyped_decorators = false
 warn_return_any = false
-disable_error_code = [
-  "arg-type",
-  "misc",
-  "type-arg",
-  "typeddict-unknown-key",
-  "import-not-found",
-]
-
 [[tool.mypy.overrides]]
 module = ["tests", "tests.*"]
 # Tests prioritize readability and controlled fakes over full annotation coverage.

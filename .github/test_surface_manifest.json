@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "baseline": {
+    "description": "Suites guaranteed by baseline-quality jobs in CI.",
+    "guaranteed_pytest_commands": [
+      "pytest --cov --cov-report=term-missing --cov-report=xml"
+    ]
+  },
+  "milestone_targeted_delta": {
+    "description": "Capability-level suites selected from docs/dod_manifest.json for in-progress capabilities."
+  },
+  "transition_only": {
+    "description": "Suites that only run when a capability transitions in_progress -> done."
+  },
+  "change_scope_filters": {
+    "docs_only_prefixes": [
+      "docs/",
+      ".github/"
+    ],
+    "docs_only_allowlist": [
+      "README.md",
+      "ROADMAP.md"
+    ],
+    "impacting_docs_paths": [
+      "docs/dod_manifest.json",
+      "docs/system_contract_map.md",
+      "docs/sprint_handoffs/",
+      ".github/workflows/state-renorm-milestone-gate.yml",
+      ".github/scripts/validate_milestone_docs.py",
+      ".github/scripts/validate_sprint_handoff.py",
+      ".github/scripts/render_transition_evidence.py",
+      ".github/scripts/capability_parity_report.py",
+      ".github/actions/python-test-setup/action.yml"
+    ]
+  },
+  "workflow_mapping": {
+    "state-renorm-milestone-gate": {
+      "baseline_job": "baseline-quality",
+      "milestone_job": "milestone-governance"
+    },
+    "quality-guardrails": {
+      "baseline_jobs": [
+        "baseline-lint-type",
+        "baseline-test-cov"
+      ]
+    }
+  }
+}

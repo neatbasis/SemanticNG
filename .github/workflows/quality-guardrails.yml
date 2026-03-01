@@ -18,6 +18,9 @@ jobs:
   baseline-lint-type:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
 
@@ -30,6 +33,9 @@ jobs:
   baseline-test-cov:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
 

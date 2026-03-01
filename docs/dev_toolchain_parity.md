@@ -20,10 +20,17 @@ It defines:
 
 | Hook | Scope | Required imports in scanned code paths | Package source |
 | --- | --- | --- | --- |
-| `mypy` | `[tool.mypy].files = ["src/state_renormalization", "tests"]` | `pydantic`, `pytest`, `gherkin`, `typing_extensions` | Hook `additional_dependencies` in `.pre-commit-config.yaml` (isolated env) |
+| `mypy` | `[tool.mypy].files = ["src/state_renormalization", "src/core"]`; hook args `args: ["--config-file=pyproject.toml", "src/state_renormalization", "src/core"]` | `pydantic`, `pytest`, `gherkin`, `typing_extensions` | Hook `additional_dependencies` in `.pre-commit-config.yaml` (isolated env) |
 | `ruff` | `src`, `tests` (from `[tool.ruff].src`) | None beyond Ruff itself for static analysis | Project tooling dependency from `pyproject.toml` `test` extra (`ruff`) |
 | `ruff-format` | `src`, `tests` (from `[tool.ruff].src`) | None beyond Ruff itself for static analysis | Project tooling dependency from `pyproject.toml` `test` extra (`ruff`) |
 | `pytest-quick` (local hook) | `tests/test_engine_pending_obligation.py`, `tests/test_invariants.py` | `pytest` | Project tooling dependency from `pyproject.toml` `test` extra (`pytest`) |
+
+## Mypy scope tiers (canonical)
+
+- Tier 1 (strict, required pre-commit): `src/state_renormalization`, `src/core`
+- Tier 2 (extended, optional local / CI full-surface): `src`, `tests`
+
+Canonical source: `[tool.semanticng.mypy_tiers]` in `pyproject.toml`.
 
 ## Drift controls
 

@@ -67,6 +67,16 @@ Recent timestamp values are **not** sufficient on their own: missing commit meta
 python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json
 ```
 
+## Freshness validator remediation playbook
+
+When `python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json` fails, remediate in this order:
+
+1. Identify each failing file/message pair from CI logs.
+2. For `missing freshness metadata`, add/update `_Last regenerated from manifest: YYYY-MM-DDTHH:MM:SSZ (UTC)._` near EOF.
+3. For `stale freshness metadata`, regenerate/update the governed doc, then refresh the UTC timestamp to current content state.
+4. For source-commit metadata issues, update `docs/doc_freshness_slo.json` `source_commit_policy.governed_source_commits` values to the source commit(s) produced by `git rev-list -1 HEAD -- <source-file>`.
+5. Re-run `python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json` locally and include pass evidence in the PR.
+
 ## `pyproject.toml` quality-tooling change controls
 
 Apply this section whenever a PR modifies `pyproject.toml` entries that affect `pytest`, `mypy`, or `coverage` behavior.
@@ -218,4 +228,4 @@ Use this template:
 
 If conflict reconciliation drops or defers any behavior, do not merge immediately: open follow-up patch PR(s) in the same integration cycle and link them under the affected checklist entry.
 
-_Last regenerated from manifest: 2026-03-01T12:00:00Z (UTC)._
+_Last regenerated from manifest: 2026-03-01T18:00:00Z (UTC)._

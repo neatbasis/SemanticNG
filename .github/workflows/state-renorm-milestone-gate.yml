@@ -6,12 +6,16 @@ on:
     paths:
       - 'src/state_renormalization/**'
       - 'docs/dod_manifest.json'
+      - 'docs/doc_freshness_slo.json'
+      - 'docs/release_checklist.md'
+      - 'docs/documentation_change_control.md'
       - 'docs/sprint_handoffs/**'
       - 'docs/system_contract_map.md'
       - 'ROADMAP.md'
       - '.github/pull_request_template.md'
       - '.github/scripts/validate_milestone_docs.py'
       - '.github/scripts/validate_sprint_handoff.py'
+      - '.github/scripts/validate_doc_freshness_slo.py'
       - '.github/scripts/capability_parity_report.py'
       - '.github/scripts/render_transition_evidence.py'
       - '.github/workflows/state-renorm-milestone-gate.yml'
@@ -22,12 +26,16 @@ on:
     paths:
       - 'src/state_renormalization/**'
       - 'docs/dod_manifest.json'
+      - 'docs/doc_freshness_slo.json'
+      - 'docs/release_checklist.md'
+      - 'docs/documentation_change_control.md'
       - 'docs/sprint_handoffs/**'
       - 'docs/system_contract_map.md'
       - 'ROADMAP.md'
       - '.github/pull_request_template.md'
       - '.github/scripts/validate_milestone_docs.py'
       - '.github/scripts/validate_sprint_handoff.py'
+      - '.github/scripts/validate_doc_freshness_slo.py'
       - '.github/scripts/capability_parity_report.py'
       - '.github/scripts/render_transition_evidence.py'
       - '.github/workflows/state-renorm-milestone-gate.yml'
@@ -37,12 +45,16 @@ on:
     paths:
       - 'src/state_renormalization/**'
       - 'docs/dod_manifest.json'
+      - 'docs/doc_freshness_slo.json'
+      - 'docs/release_checklist.md'
+      - 'docs/documentation_change_control.md'
       - 'docs/sprint_handoffs/**'
       - 'docs/system_contract_map.md'
       - 'ROADMAP.md'
       - '.github/pull_request_template.md'
       - '.github/scripts/validate_milestone_docs.py'
       - '.github/scripts/validate_sprint_handoff.py'
+      - '.github/scripts/validate_doc_freshness_slo.py'
       - '.github/scripts/capability_parity_report.py'
       - '.github/scripts/render_transition_evidence.py'
       - '.github/workflows/state-renorm-milestone-gate.yml'
@@ -158,6 +170,10 @@ jobs:
       - name: Validate sprint handoff artifacts
         run: |
           python .github/scripts/validate_sprint_handoff.py
+
+      - name: Validate documentation freshness SLO
+        run: |
+          python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json
 
       - name: Select and run milestone pytest commands for relevant changes
         run: |

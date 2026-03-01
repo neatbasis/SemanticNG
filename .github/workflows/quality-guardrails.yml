@@ -40,7 +40,21 @@ jobs:
         run: |
           set -o pipefail
           pre-commit run --all-files -v 2>&1 | tee precommit.log
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
+      - name: Upload pre-commit log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: precommit-log
+          path: precommit.log
+
+      - name: Show pre-commit log
+        if: always()
+        run: |
+          echo "===== precommit.log ====="
+          sed -n '1,200p' precommit.log || true
+          echo "===== (end) ====="
       - name: Classify pre-commit output
         if: always()
         run: python .github/scripts/classify_precommit_failures.py --log precommit.log >> "$GITHUB_STEP_SUMMARY"

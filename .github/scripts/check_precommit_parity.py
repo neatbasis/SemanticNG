@@ -144,7 +144,7 @@ def _read_python_versions_from_workflow(workflow_path: Path) -> list[str]:
 
 
 def _as_scope_expr(values: list[str]) -> str:
-    return "[" + ", ".join(f'\"{value}\"' for value in values) + "]"
+    return "[" + ", ".join(f'"{value}"' for value in values) + "]"
 
 
 def _ensure_docs_match_mypy_scope(mypy_files: list[str], mypy_hook_args: list[str]) -> None:

@@ -12,9 +12,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Protocol, TypeAlias
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from state_renormalization._compat import UTC
 from state_renormalization.adapters.ask_outbox import AskOutboxAdapter
@@ -137,6 +137,38 @@ GateDecision = Success | HaltRecord
 # Backward-compatible names retained for older callers/tests.
 GateSuccessOutcome = Success
 
+JsonPrimitive: TypeAlias = str | int | float | bool | None
+JsonValue: TypeAlias = JsonPrimitive | dict[str, "JsonValue"] | list["JsonValue"]
+CanonicalPredictionPayload: TypeAlias = Mapping[str, object]
+
+
+class WrittenPredictionPayload(BaseModel):
+    key: str | None
+    evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+
+    @classmethod
+    def from_evidence_ref(
+        cls,
+        *,
+        key: str | None,
+        evidence_ref: Mapping[str, object],
+    ) -> "WrittenPredictionPayload":
+        return cls(
+            key=key,
+            evidence_refs=[EvidenceRef.from_raw(evidence_ref)],
+        )
+
+
+class CanonicalHaltPayload(BaseModel):
+    halt_id: str
+    stage: str
+    invariant_id: str
+    reason: str
+    details: dict[str, object]
+    evidence: list[dict[str, str]]
+    retryability: bool
+    timestamp: str
+
 
 @dataclass(frozen=True)
 class GateHaltOutcome:
@@ -163,7 +195,7 @@ class InterventionLifecycleHook(Protocol):
         episode: Episode,
         belief: BeliefState,
         projection_state: ProjectionState,
-    ) -> InterventionDecision | Mapping[str, Any] | None: ...
+    ) -> InterventionDecision | CanonicalPredictionPayload | None: ...
 
 
 def _parse_iso8601(value: str) -> datetime | None:
@@ -344,7 +376,7 @@ def _evaluate_gate_phase(
     prediction_log_available: bool,
     phase: str,
     invariant_id: InvariantId,
-    just_written_prediction: Mapping[str, Any] | None,
+    just_written_prediction: CanonicalPredictionPayload | None,
 ) -> GateInvariantEvaluation:
     phase_ctx = default_check_context(
         scope=scope,
@@ -415,7 +447,7 @@ def _observer_authorized_for_action(
     observer: ObserverFrame | None,
     action: str,
     required_capability: str,
-) -> tuple[bool, dict[str, Any]]:
+) -> tuple[bool, dict[str, object]]:
     authorized = _observer_has_capability(observer, required_capability)
     context = {
         "action": action,
@@ -460,7 +492,7 @@ def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltR
 
 
 def _authorization_halt_record(
-    *, stage: str, reason: str, context: Mapping[str, Any]
+    *, stage: str, reason: str, context: Mapping[str, object]
 ) -> HaltRecord:
     return HaltRecord.from_payload(
         HaltRecord.build_canonical_payload(
@@ -606,11 +638,11 @@ def _evaluate_invariant_gate_pipeline(
     prediction_key: str | None,
     current_predictions: Mapping[str, str],
     prediction_log_available: bool,
-    just_written_prediction: Mapping[str, Any] | None,
+    just_written_prediction: CanonicalPredictionPayload | None,
     gate_point: str,
 ) -> tuple[list[GateInvariantEvaluation], GateDecision]:
     evaluations: list[GateInvariantEvaluation] = []
-    gate_specs: tuple[tuple[str, InvariantId, bool, Mapping[str, Any] | None], ...] = (
+    gate_specs: tuple[tuple[str, InvariantId, bool, CanonicalPredictionPayload | None], ...] = (
         ("pre_consume", InvariantId.PREDICTION_AVAILABILITY, True, None),
         (
             "post_write",
@@ -643,12 +675,13 @@ def _evaluate_invariant_gate_pipeline(
     )
 
 
-def _halt_payload(halt: HaltRecord) -> dict[str, Any]:
-    return halt.to_canonical_payload()
+def _halt_payload(halt: HaltRecord) -> dict[str, object]:
+    validated = CanonicalHaltPayload.model_validate(halt.to_canonical_payload())
+    return validated.model_dump(mode="json")
 
 
 def _append_authorization_issue(
-    ep: Episode, *, halt: HaltRecord, context: Mapping[str, Any]
+    ep: Episode, *, halt: HaltRecord, context: Mapping[str, object]
 ) -> None:
     _append_episode_artifact(
         ep,
@@ -673,7 +706,7 @@ def _append_authorization_issue(
     )
 
 
-def _turn_halt_summary(ep: Episode) -> list[dict[str, Any]]:
+def _turn_halt_summary(ep: Episode) -> list[dict[str, object]]:
     return [
         {
             "halt_id": artifact.get("halt_id"),
@@ -738,7 +771,7 @@ def classify_utterance(sentence: str | None, error: CaptureOutcome | None) -> Ut
     return UtteranceType.NORMAL
 
 
-def _to_dict(obj: Any) -> Any:
+def _to_dict(obj: object) -> object:
     """
     Convert dataclasses / pydantic models / enums / nested containers into JSON-safe primitives.
     """
@@ -764,7 +797,7 @@ def _to_dict(obj: Any) -> Any:
     return obj
 
 
-def _find_stable_ids_from_payload(payload: Mapping[str, Any]) -> dict[str, str]:
+def _find_stable_ids_from_payload(payload: Mapping[str, object]) -> dict[str, str]:
     nested = payload.get("stable_ids")
     nested_stable = nested if isinstance(nested, Mapping) else {}
     explicit = {
@@ -866,7 +899,7 @@ def _episode_stable_ids(ep: Episode) -> dict[str, str]:
 
 
 def _append_episode_artifact(
-    ep: Episode, artifact: dict[str, Any], *, stable_ids: Mapping[str, str] | None = None
+    ep: Episode, artifact: dict[str, object], *, stable_ids: Mapping[str, str] | None = None
 ) -> None:
     sid = dict(stable_ids or _episode_stable_ids(ep))
     ep.artifacts.append({**sid, **artifact} if sid else artifact)
@@ -927,7 +960,7 @@ def _build_intervention_request(
 
 
 def _normalize_intervention_decision(
-    decision: InterventionDecision | Mapping[str, Any] | None,
+    decision: InterventionDecision | CanonicalPredictionPayload | None,
 ) -> InterventionDecision:
     if decision is None:
         return InterventionDecision(action=InterventionAction.NONE)
@@ -1121,7 +1154,7 @@ def evaluate_invariant_gates(
     projection_state: ProjectionState,
     prediction_log_available: bool,
     gate_point: str = "pre-decision",
-    just_written_prediction: Mapping[str, Any] | None = None,
+    just_written_prediction: CanonicalPredictionPayload | None = None,
     halt_log_path: str | Path = "halts.jsonl",
 ) -> GateDecision:
     observer = getattr(ep, "observer", None) if ep is not None else None
@@ -1302,6 +1335,40 @@ def evaluate_invariant_gates(
     return result
 
 
+def _prediction_payload_with_stable_ids(
+    pred: PredictionRecord,
+    *,
+    stable_ids: Mapping[str, str] | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = pred.model_dump(mode="json")
+    if stable_ids:
+        return {**dict(stable_ids), **payload}
+    return payload
+
+
+def _prediction_record_event_payload(
+    pred: PredictionRecord,
+    *,
+    prediction_ref: Mapping[str, str],
+    stable_ids: Mapping[str, str] | None = None,
+) -> dict[str, object]:
+    payload = _prediction_payload_with_stable_ids(pred, stable_ids=stable_ids)
+    evidence_refs = [item.model_dump(mode="json") for item in pred.evidence_refs]
+    payload["evidence_refs"] = [*evidence_refs, dict(prediction_ref)]
+    return payload
+
+
+def _halt_payload_with_stable_ids(
+    halt: HaltRecord,
+    *,
+    stable_ids: Mapping[str, str] | None = None,
+) -> dict[str, object]:
+    payload = _halt_payload(halt)
+    if stable_ids:
+        return {**dict(stable_ids), **payload}
+    return payload
+
+
 def append_prediction_record(
     pred: PredictionRecord,
     *,
@@ -1341,9 +1408,7 @@ def append_prediction_record(
         invocation_id=policy_decision.attempt.invocation_id, allowed=True
     )
 
-    prediction_payload: Any = pred.model_dump(mode="json")
-    if stable_ids:
-        prediction_payload = {**dict(stable_ids), **prediction_payload}
+    prediction_payload = _prediction_payload_with_stable_ids(pred, stable_ids=stable_ids)
     prediction_ref = append_prediction_event(
         prediction_payload,
         adapter_gate=adapter_gate,
@@ -1353,11 +1418,11 @@ def append_prediction_record(
         turn_index=getattr(episode, "turn_index", None),
     )
 
-    payload: Any = pred.model_dump(mode="json")
-    payload["evidence_refs"] = [_to_dict(item) for item in pred.evidence_refs]
-    payload["evidence_refs"].append(prediction_ref)
-    if stable_ids:
-        payload = {**dict(stable_ids), **payload}
+    payload = _prediction_record_event_payload(
+        pred,
+        prediction_ref=prediction_ref,
+        stable_ids=stable_ids,
+    )
 
     return append_prediction_record_event(
         payload,
@@ -1378,9 +1443,7 @@ def append_halt_record(
 ) -> dict[str, str]:
     if adapter_gate is None:
         adapter_gate = CapabilityAdapterGate(invocation_id=_new_id("invoke:"), allowed=True)
-    payload: Any = halt.to_canonical_payload()
-    if stable_ids:
-        payload = {**dict(stable_ids), **halt.to_canonical_payload()}
+    payload = _halt_payload_with_stable_ids(halt, stable_ids=stable_ids)
     return append_halt(halt_log_path, payload, adapter_gate=adapter_gate)
 
 
@@ -1409,7 +1472,7 @@ def _append_repair_event(
     prediction_log_path: str | Path,
     stable_ids: Mapping[str, str] | None,
 ) -> dict[str, str]:
-    payload: dict[str, Any] = event.model_dump(mode="json")
+    payload: dict[str, object] = event.model_dump(mode="json")
     if stable_ids:
         payload = {**dict(stable_ids), **payload}
     append_jsonl(prediction_log_path, payload)
@@ -1471,8 +1534,8 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
     projection = ProjectionState(current_predictions={}, updated_at_iso="1970-01-01T00:00:00+00:00")
     fields = set(PredictionRecord.model_fields)
     records_processed = 0
-    lineage_rows: list[Mapping[str, Any]] = []
-    seen_prediction_fingerprints: set[tuple[Any, ...]] = set()
+    lineage_rows: list[Mapping[str, object]] = []
+    seen_prediction_fingerprints: set[tuple[object, ...]] = set()
 
     for raw in iter_projection_lineage_records(path):
         lineage_rows.append(raw)
@@ -1548,7 +1611,7 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
 
 
 def derive_projection_analytics_from_lineage(
-    records: Sequence[Mapping[str, Any]],
+    records: Sequence[Mapping[str, object]],
 ) -> ProjectionAnalyticsSnapshot:
     """Pure analytics derivation from append-only persisted lineage rows.
 
@@ -1565,7 +1628,7 @@ def derive_projection_analytics_from_lineage(
     outstanding_requests: dict[str, AskOutboxRequestArtifact] = {}
     resolved_requests: dict[str, AskOutboxResponseArtifact] = {}
     request_outcome_linkage: dict[str, str] = {}
-    seen_corrected_prediction_fingerprints: set[tuple[Any, ...]] = set()
+    seen_corrected_prediction_fingerprints: set[tuple[object, ...]] = set()
 
     known_event_kinds = {
         "prediction_record",
@@ -1814,7 +1877,7 @@ def _reconcile_predictions(
 def bind_prediction_outcome(
     pred: PredictionRecord,
     *,
-    observed_outcome: Any,
+    observed_outcome: object,
     recorded_at_iso: str | None = None,
 ) -> tuple[PredictionRecord, PredictionOutcome]:
     expected = pred.expectation
@@ -1860,7 +1923,7 @@ def run_mission_loop(
     belief: BeliefState,
     projection_state: ProjectionState,
     *,
-    pending_predictions: Sequence[PredictionRecord | Mapping[str, Any]] = (),
+    pending_predictions: Sequence[PredictionRecord | Mapping[str, object]] = (),
     prediction_log_path: str | Path = "artifacts/predictions.jsonl",
     intervention_hook: InterventionLifecycleHook | None = None,
     ask_outbox_adapter: AskOutboxAdapter | None = None,
@@ -1919,10 +1982,10 @@ def run_mission_loop(
         },
     )
 
-    last_written_prediction = {
-        "key": turn_prediction.scope_key,
-        "evidence_refs": [turn_prediction_ref],
-    }
+    last_written_prediction = WrittenPredictionPayload.from_evidence_ref(
+        key=turn_prediction.scope_key,
+        evidence_ref=turn_prediction_ref,
+    )
     for pending in pending_predictions:
         pred = (
             pending
@@ -1953,7 +2016,10 @@ def run_mission_loop(
                 "projection_updated_at_iso": updated_projection.updated_at_iso,
             },
         )
-        last_written_prediction = {"key": pred.scope_key, "evidence_refs": [evidence_ref]}
+        last_written_prediction = WrittenPredictionPayload.from_evidence_ref(
+            key=pred.scope_key,
+            evidence_ref=evidence_ref,
+        )
 
     active_scope = next(iter(updated_projection.current_predictions), "decision_stage")
     pre_decision_gate = evaluate_invariant_gates(
@@ -2017,11 +2083,11 @@ def run_mission_loop(
     pre_output_gate = evaluate_invariant_gates(
         ep=ep,
         scope=active_scope,
-        prediction_key=cast(str | None, last_written_prediction.get("key")),
+        prediction_key=last_written_prediction.key,
         projection_state=updated_projection,
         prediction_log_available=True,
         gate_point="pre-output",
-        just_written_prediction=last_written_prediction,
+        just_written_prediction=last_written_prediction.model_dump(mode="json"),
     )
     if isinstance(pre_output_gate, HaltRecord):
         append_turn_summary(ep)
@@ -2052,7 +2118,7 @@ def build_episode(
     turn_index: int,
     assistant_prompt_asked: str,
     policy_decision: VerbosityDecision,
-    payload: dict[str, Any],
+    payload: dict[str, object],
     outputs: EpisodeOutputs,
     observer: ObserverFrame | None = None,
 ) -> Episode:
@@ -2211,12 +2277,14 @@ def attach_decision_effect(prev_ep: Episode | None, curr_ep: Episode) -> Episode
     return curr_ep
 
 
-def _validated_selection(raw_selection: Any) -> SchemaSelection:
+def _validated_selection(raw_selection: object) -> SchemaSelection:
     if isinstance(raw_selection, SchemaSelection):
         return raw_selection
+    if isinstance(raw_selection, Mapping):
+        return SchemaSelection.model_validate(raw_selection)
 
     raise TypeError(
-        f"naive_schema_selector must return SchemaSelection; got {type(raw_selection).__name__}"
+        f"naive_schema_selector must return SchemaSelection or Mapping; got {type(raw_selection).__name__}"
     )
 
 
@@ -2365,7 +2433,7 @@ def apply_utterance_interpretation(ep: Episode, belief: BeliefState) -> tuple[Ep
     return ep, belief
 
 
-def to_jsonable_episode(ep: Episode) -> dict[str, Any]:
+def to_jsonable_episode(ep: Episode) -> dict[str, object]:
     """
     Always return a dict that json.dumps can serialize.
     """

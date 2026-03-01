@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 from state_renormalization.adapters.persistence import read_jsonl
-from state_renormalization.contracts import HaltRecord, PredictionRecord, ProjectionState
+from state_renormalization.contracts import Episode, EvidenceRef, HaltRecord, PredictionRecord, ProjectionState
 from state_renormalization.engine import (
     GateDecision,
     Success,
@@ -28,7 +28,7 @@ from state_renormalization.invariants import (
     normalize_outcome,
 )
 
-FIXED_PREDICTION = {
+FIXED_PREDICTION: dict[str, Any] = {
     "prediction_id": "pred:test",
     "prediction_key": "room:kitchen:light",
     "scope_key": "room:kitchen:light",
@@ -156,7 +156,7 @@ def _build_allow_context_for_explainable_halt_payload() -> Any:
             details={
                 "message": "Action selection requires at least one projected current prediction."
             },
-            evidence=({"kind": "scope", "value": "scope:test"},),
+            evidence=(EvidenceRef(kind="scope", ref="scope:test"),),
             action_hints=({"kind": "rebuild_view", "scope": "scope:test"},),
         ),
     )
@@ -351,7 +351,7 @@ def test_halt_payload_schema_is_canonical_for_stop_emitters() -> None:
 
 
 def test_gate_flow_contract_parity_for_continue_and_stop(tmp_path: Path) -> None:
-    scope = FIXED_PREDICTION["scope_key"]
+    scope = cast(str, FIXED_PREDICTION["scope_key"])
     projected = project_current(
         PredictionRecord.model_validate(FIXED_PREDICTION),
         ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
@@ -577,10 +577,10 @@ def test_gate_decisions_and_artifacts_are_deterministic_by_invariant(
 
     class DummyEpisode:
         def __init__(self) -> None:
-            self.artifacts = []
+            self.artifacts: list[dict[str, Any]] = []
 
     projection = ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00")
-    scope_key = FIXED_PREDICTION["scope_key"]
+    scope_key = cast(str, FIXED_PREDICTION["scope_key"])
     if has_projected_prediction:
         pred = PredictionRecord.model_validate(FIXED_PREDICTION)
         projection = project_current(pred, projection)
@@ -593,7 +593,7 @@ def test_gate_decisions_and_artifacts_are_deterministic_by_invariant(
         gate_write["key"] = scope_key
 
     first = evaluate_invariant_gates(
-        ep=first_ep,
+        ep=cast(Episode, first_ep),
         scope=scope_key,
         prediction_key=scope_key,
         projection_state=projection,
@@ -602,7 +602,7 @@ def test_gate_decisions_and_artifacts_are_deterministic_by_invariant(
         halt_log_path=tmp_path / f"halts_{invariant_id.value.replace('.', '_')}_1.jsonl",
     )
     second = evaluate_invariant_gates(
-        ep=second_ep,
+        ep=cast(Episode, second_ep),
         scope=scope_key,
         prediction_key=scope_key,
         projection_state=projection,
@@ -787,7 +787,7 @@ def test_post_write_gate_halts_when_append_evidence_missing(tmp_path: Path) -> N
 def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path: Path) -> None:
     class DummyEpisode:
         def __init__(self) -> None:
-            self.artifacts = []
+            self.artifacts: list[dict[str, Any]] = []
 
     pred = PredictionRecord.model_validate(FIXED_PREDICTION)
     projected = project_current(
@@ -797,7 +797,7 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
     ep = DummyEpisode()
 
     gate = evaluate_invariant_gates(
-        ep=ep,
+        ep=cast(Episode, ep),
         scope=pred.scope_key,
         prediction_key=pred.scope_key,
         projection_state=projected,
@@ -1035,7 +1035,7 @@ def test_gate_deterministic_continue_outcome_has_stable_branches() -> None:
 def test_gate_flow_parity_continue_and_stop_payloads(tmp_path: Path) -> None:
     class DummyEpisode:
         def __init__(self) -> None:
-            self.artifacts = []
+            self.artifacts: list[dict[str, Any]] = []
 
     pred = PredictionRecord.model_validate(FIXED_PREDICTION)
     projected = project_current(
@@ -1045,7 +1045,7 @@ def test_gate_flow_parity_continue_and_stop_payloads(tmp_path: Path) -> None:
 
     continue_ep = DummyEpisode()
     continue_gate = evaluate_invariant_gates(
-        ep=continue_ep,
+        ep=cast(Episode, continue_ep),
         scope=pred.scope_key,
         prediction_key=pred.scope_key,
         projection_state=projected,
@@ -1062,7 +1062,7 @@ def test_gate_flow_parity_continue_and_stop_payloads(tmp_path: Path) -> None:
 
     stop_ep = DummyEpisode()
     stop_gate = evaluate_invariant_gates(
-        ep=stop_ep,
+        ep=cast(Episode, stop_ep),
         scope=pred.scope_key,
         prediction_key=pred.scope_key,
         projection_state=projected,
@@ -1081,7 +1081,9 @@ def test_gate_flow_parity_continue_and_stop_payloads(tmp_path: Path) -> None:
     assert stop_gate.invariant_id == InvariantId.EVIDENCE_LINK_COMPLETENESS.value
 
 
-def test_evaluate_invariant_gates_rejects_malformed_halt_outcome_payload(monkeypatch) -> None:
+def test_evaluate_invariant_gates_rejects_malformed_halt_outcome_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     malformed = InvariantOutcome(
         invariant_id=InvariantId.PREDICTION_AVAILABILITY,
         passed=False,
@@ -1117,7 +1119,7 @@ def test_evaluate_invariant_gates_rejects_malformed_halt_outcome_payload(monkeyp
 def test_evaluate_invariant_gates_emits_invariant_audit_records() -> None:
     class DummyEpisode:
         def __init__(self) -> None:
-            self.artifacts = []
+            self.artifacts: list[dict[str, Any]] = []
 
     pred = PredictionRecord.model_validate(FIXED_PREDICTION)
     projected = project_current(
@@ -1127,7 +1129,7 @@ def test_evaluate_invariant_gates_emits_invariant_audit_records() -> None:
 
     ep = DummyEpisode()
     _ = evaluate_invariant_gates(
-        ep=ep,
+        ep=cast(Episode, ep),
         scope=pred.scope_key,
         prediction_key=pred.scope_key,
         projection_state=projected,

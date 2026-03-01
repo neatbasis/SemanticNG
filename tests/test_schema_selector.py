@@ -9,6 +9,7 @@ from state_renormalization.adapters.schema_selector import (
     RULE_PHASES,
     RULE_REGISTRY,
     BaseRule,
+    SelectorCheckContext,
     SelectorContext,
     SelectorDecisionStatus,
     _decide_selection_policy,
@@ -132,10 +133,10 @@ def test_variant_addition_can_be_localized_to_a_single_phase_rule() -> None:
     class KitchenLightsRule(BaseRule):
         name: str = "kitchen_lights"
 
-        def applies(self, ctx: SelectorContext) -> bool:
+        def applies(self, ctx: SelectorCheckContext) -> bool:
             return "kitchen" in ctx.tokens and "lights" in ctx.tokens
 
-        def emit(self, ctx: SelectorContext) -> SchemaSelection:
+        def emit(self, ctx: SelectorCheckContext) -> SchemaSelection:
             return SchemaSelection(
                 schemas=[SchemaHit(name="lights.kitchen", score=0.99, about=None)],
                 ambiguities=[],
@@ -170,10 +171,10 @@ def test_regression_stays_stable_as_non_matching_rules_grow() -> None:
     class NeverAppliesRule(BaseRule):
         name: str = "never"
 
-        def applies(self, ctx: SelectorContext) -> bool:
+        def applies(self, ctx: SelectorCheckContext) -> bool:
             return False
 
-        def emit(self, ctx: SelectorContext) -> SchemaSelection:
+        def emit(self, ctx: SelectorCheckContext) -> SchemaSelection:
             raise AssertionError("should never emit")
 
     snapshot_before = [

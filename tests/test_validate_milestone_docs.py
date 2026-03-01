@@ -4,6 +4,8 @@ import importlib.util
 import re
 from pathlib import Path
 
+from _pytest.monkeypatch import MonkeyPatch
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / ".github" / "scripts" / "validate_milestone_docs.py"
 
@@ -476,7 +478,7 @@ def test_documentation_change_control_mismatches_passes_with_current_docs() -> N
 
 
 def test_documentation_change_control_mismatches_reports_missing_references(
-    tmp_path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     repo_root = tmp_path
     docs_dir = repo_root / "docs"

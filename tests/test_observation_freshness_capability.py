@@ -4,6 +4,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from _pytest.monkeypatch import MonkeyPatch
+
 from state_renormalization.contracts import (
     AskResult,
     BeliefState,
@@ -54,7 +56,7 @@ def _projection_state() -> ProjectionState:
 
 
 def test_no_observation_emits_request(
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
     make_episode: Callable[..., Episode],
     make_policy_decision: Callable[..., VerbosityDecision],
     make_ask_result: Callable[..., AskResult],
@@ -71,7 +73,7 @@ def test_no_observation_emits_request(
         projection_state=_projection_state(),
         policy_adapter=_FreshnessPolicyAdapter(
             contract=ObservationFreshnessPolicyContract(
-                scope=ObservationType.USER_UTTERANCE.value, observed_at=None, stale_after_seconds=30
+                scope=ObservationType.USER_UTTERANCE.value, observed_at_iso=None, stale_after_seconds=30
             ),
         ),
         ask_outbox_adapter=outbox,
@@ -82,7 +84,7 @@ def test_no_observation_emits_request(
 
 
 def test_stale_observation_emits_request_with_rationale(
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
     make_episode: Callable[..., Episode],
     make_policy_decision: Callable[..., VerbosityDecision],
     make_ask_result: Callable[..., AskResult],
@@ -123,7 +125,7 @@ def test_stale_observation_emits_request_with_rationale(
 
 
 def test_fresh_observation_continues_without_request(
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
     make_episode: Callable[..., Episode],
     make_policy_decision: Callable[..., VerbosityDecision],
     make_ask_result: Callable[..., AskResult],
@@ -159,7 +161,7 @@ def test_fresh_observation_continues_without_request(
 
 
 def test_duplicate_outstanding_request_holds_instead_of_reissuing(
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
     make_episode: Callable[..., Episode],
     make_policy_decision: Callable[..., VerbosityDecision],
     make_ask_result: Callable[..., AskResult],

@@ -25,6 +25,39 @@ This document is the canonical source for active release/integration workflow ex
 - [ ] **Documentation freshness SLO met:** `docs/doc_freshness_slo.json` governs the freshness metadata policy and `python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json` passes.
 - [ ] **Sprint handoff minimum artifacts attached:** Sprint-close report includes exit table, open-risk register, and next-sprint preload list.
 
+## `pyproject.toml` quality-tooling change controls
+
+Apply this section whenever a PR modifies `pyproject.toml` entries that affect `pytest`, `mypy`, or `coverage` behavior.
+
+### Required reviewers/owners
+
+- [ ] **Code owner review:** At least one maintainer with ownership of CI/governance workflows (`.github/workflows/*`) approves the PR.
+- [ ] **Quality gate owner review:** At least one reviewer accountable for test/static-analysis policy confirms the new settings and rationale.
+- [ ] **Release/governance acknowledgement for threshold/policy shifts:** Required when changing blocking semantics (for example: coverage fail-under, strictness toggles, warning-as-error behavior).
+
+### Required before/after command evidence
+
+Attach before/after evidence in the PR description or linked artifact for each affected gate:
+
+- [ ] `pytest --cov --cov-report=term-missing --cov-report=xml`
+- [ ] `mypy .`
+- [ ] Any additional command newly required by the `pyproject.toml` change.
+
+Evidence expectations:
+
+1. Provide both a **before** run (baseline branch or pre-change commit) and an **after** run (PR head).
+2. Include exit status and key summary lines (test counts, mypy error totals, coverage percent/fail-under check).
+3. Link to the exact CI run URL or uploaded artifact for reproducibility.
+
+### CI workflow compatibility checks
+
+Before merge, confirm `.github/workflows/quality-guardrails.yml` remains aligned with updated `pyproject.toml` gates:
+
+- [ ] Every changed `pyproject` quality section maps to at least one CI command in `Quality Guardrails`.
+- [ ] Command flags in CI are still compatible with updated defaults/strictness from `pyproject.toml`.
+- [ ] If a new section/tool is introduced, add or update a CI workflow step in the same PR.
+- [ ] PR notes include the mapping update reference (see table in `.github/workflows/quality-guardrails.yml`).
+
 ## Coverage threshold governance policy
 
 This section is the canonical policy for coverage threshold governance.

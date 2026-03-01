@@ -1,5 +1,14 @@
 name: Quality Guardrails
 
+# Pyproject-to-CI quality gate mapping
+#
+# | pyproject.toml section | CI command in this workflow | Notes |
+# | --- | --- | --- |
+# | [tool.pytest.ini_options] | pytest --cov --cov-report=term-missing --cov-report=xml | Test discovery/runtime flags and marker/filter behavior apply to the test-cov job. |
+# | [tool.coverage.run], [tool.coverage.report] | pytest --cov --cov-report=term-missing --cov-report=xml | Coverage configuration (including fail_under) is enforced by pytest-cov in test-cov. |
+# | [tool.mypy] | pre-commit run --all-files | mypy policy is enforced when mypy hooks are enabled in pre-commit. |
+# | [tool.ruff], [tool.black], [tool.isort], other lint tooling sections | pre-commit run --all-files | Lint/format policy is enforced through configured pre-commit hooks. |
+
 on:
   pull_request:
   push:

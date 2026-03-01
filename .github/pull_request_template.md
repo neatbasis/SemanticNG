@@ -20,6 +20,13 @@
 - Sprint handoff artifact updates included (`yes`/`no`/`not_applicable`):
 - If `no`, provide timeboxed follow-up issue/PR and owner:
 
+
+## Quality gate change declaration (mandatory)
+
+- Quality gate changed? (`yes`/`no`):
+- If `yes`, list updated files/sections (for example `pyproject.toml:[tool.pytest.ini_options]`, workflow step names):
+- Evidence link (CI run/artifact proving before+after behavior):
+
 ## Testing
 
 - List tests/checks run for this PR.

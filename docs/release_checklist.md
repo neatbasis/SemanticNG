@@ -33,7 +33,34 @@ For every Markdown file governed by `docs/doc_freshness_slo.json`, include this 
 
 `_Last regenerated from manifest: YYYY-MM-DDTHH:MM:SSZ (UTC)._`
 
-Use UTC only, keep the trailing `Z`, and do not alter punctuation/format. The validator enforces this pattern and freshness age SLO:
+The freshness SLO now also requires source-commit binding metadata in `docs/doc_freshness_slo.json` under `source_commit_policy`:
+
+- `source_files`: canonical source aliases and repository-relative paths that governed docs are regenerated from.
+- `governed_source_commits`: expected git commit hash per governed doc (`<governed_path>`) or a wildcard fallback (`*`).
+
+Example:
+
+```json
+{
+  "source_commit_policy": {
+    "source_files": {
+      "dod_manifest": "docs/dod_manifest.json",
+      "roadmap": "ROADMAP.md"
+    },
+    "governed_source_commits": {
+      "docs/release_checklist.md": {
+        "dod_manifest": "<git-commit-sha>",
+        "roadmap": "<git-commit-sha>"
+      },
+      "*": {
+        "dod_manifest": "<git-commit-sha>"
+      }
+    }
+  }
+}
+```
+
+Recent timestamp values are **not** sufficient on their own: missing commit metadata or commit hash mismatch against `git rev-list -1 HEAD -- <source-file>` fails validation. Use UTC only, keep the trailing `Z`, and do not alter punctuation/format.
 
 ```bash
 python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json

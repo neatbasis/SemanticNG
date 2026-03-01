@@ -10,6 +10,20 @@
       "max_age_days": 30
     }
   },
+  "source_commit_policy": {
+    "source_files": {
+      "dod_manifest": "docs/dod_manifest.json",
+      "roadmap": "ROADMAP.md",
+      "system_contract_map": "docs/system_contract_map.md"
+    },
+    "governed_source_commits": {
+      "*": {
+        "dod_manifest": "ac2d638cd32d89c3b46d8472e918445f9d829191",
+        "roadmap": "a1dd61d005d20bc3e15aa477e731d57c0a34ed45",
+        "system_contract_map": "a1dd61d005d20bc3e15aa477e731d57c0a34ed45"
+      }
+    }
+  },
   "governed_files": [
     {
       "path": "ROADMAP.md",

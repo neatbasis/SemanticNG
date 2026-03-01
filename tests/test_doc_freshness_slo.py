@@ -26,10 +26,24 @@ def _base_config() -> dict:
             "governance_doc": {"max_age_days": 30},
             "sprint_doc": {"max_age_days": 7},
         },
+        "source_commit_policy": {
+            "source_files": {
+                "manifest": "docs/dod_manifest.json",
+            },
+            "governed_source_commits": {
+                "*": {
+                    "manifest": "abc1234",
+                }
+            },
+        },
         "governed_files": [
             {"path": "docs/governed.md", "class": "governance_doc"},
         ],
     }
+
+
+def _commit_resolver(_base_dir: Path, _repo_path: str) -> str | None:
+    return "abc1234deadbeef"
 
 
 def test_doc_freshness_slo_accepts_compliant_metadata(tmp_path: Path) -> None:
@@ -44,6 +58,7 @@ def test_doc_freshness_slo_accepts_compliant_metadata(tmp_path: Path) -> None:
         _base_config(),
         tmp_path,
         datetime(2026, 3, 1, tzinfo=timezone.utc),
+        commit_resolver=_commit_resolver,
     )
 
     assert issues == []
@@ -58,6 +73,7 @@ def test_doc_freshness_slo_rejects_missing_metadata(tmp_path: Path) -> None:
         _base_config(),
         tmp_path,
         datetime(2026, 3, 1, tzinfo=timezone.utc),
+        commit_resolver=_commit_resolver,
     )
 
     assert len(issues) == 1
@@ -76,6 +92,7 @@ def test_doc_freshness_slo_rejects_stale_document(tmp_path: Path) -> None:
         _base_config(),
         tmp_path,
         datetime(2026, 3, 1, tzinfo=timezone.utc),
+        commit_resolver=_commit_resolver,
     )
 
     assert len(issues) == 1
@@ -104,6 +121,7 @@ def test_doc_freshness_slo_validates_multiple_governed_files(tmp_path: Path) -> 
         config,
         tmp_path,
         datetime(2026, 3, 1, tzinfo=timezone.utc),
+        commit_resolver=_commit_resolver,
     )
 
     assert issues == []
@@ -132,6 +150,7 @@ def test_doc_freshness_slo_reports_stale_metadata_across_classes_and_files(tmp_p
         config,
         tmp_path,
         datetime(2026, 3, 1, tzinfo=timezone.utc),
+        commit_resolver=_commit_resolver,
     )
 
     assert len(issues) == 2
@@ -163,8 +182,72 @@ def test_doc_freshness_slo_reports_missing_timestamp_for_newly_governed_docs(tmp
         config,
         tmp_path,
         datetime(2026, 3, 1, tzinfo=timezone.utc),
+        commit_resolver=_commit_resolver,
     )
 
     assert len(issues) == 1
     assert issues[0]["file_path"] == "docs/sprint_handoffs/sprint-2-handoff.md"
     assert "missing freshness metadata" in issues[0]["message"]
+
+
+def test_doc_freshness_slo_rejects_commit_mismatch_with_fresh_timestamp(tmp_path: Path) -> None:
+    governed = tmp_path / "docs" / "governed.md"
+    governed.parent.mkdir(parents=True)
+    governed.write_text(
+        "# Governed Doc\n\n_Last regenerated from manifest: 2026-02-28T15:48:35Z (UTC)._\n",
+        encoding="utf-8",
+    )
+
+    config = _base_config()
+    config["source_commit_policy"]["governed_source_commits"]["*"]["manifest"] = "fffffff"
+
+    issues = validate_doc_freshness_slo._validate_doc_freshness(
+        config,
+        tmp_path,
+        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        commit_resolver=_commit_resolver,
+    )
+
+    assert len(issues) == 1
+    assert "source commit mismatch" in issues[0]["message"]
+
+
+def test_doc_freshness_slo_stale_timestamp_still_fails_when_commit_matches(tmp_path: Path) -> None:
+    governed = tmp_path / "docs" / "governed.md"
+    governed.parent.mkdir(parents=True)
+    governed.write_text(
+        "# Governed Doc\n\n_Last regenerated from manifest: 2025-12-01T00:00:00Z (UTC)._\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_doc_freshness_slo._validate_doc_freshness(
+        _base_config(),
+        tmp_path,
+        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        commit_resolver=_commit_resolver,
+    )
+
+    assert len(issues) == 1
+    assert "stale freshness metadata" in issues[0]["message"]
+
+
+def test_doc_freshness_slo_rejects_missing_source_commit_metadata(tmp_path: Path) -> None:
+    governed = tmp_path / "docs" / "governed.md"
+    governed.parent.mkdir(parents=True)
+    governed.write_text(
+        "# Governed Doc\n\n_Last regenerated from manifest: 2026-02-28T15:48:35Z (UTC)._\n",
+        encoding="utf-8",
+    )
+
+    config = _base_config()
+    config["source_commit_policy"]["governed_source_commits"] = {}
+
+    issues = validate_doc_freshness_slo._validate_doc_freshness(
+        config,
+        tmp_path,
+        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        commit_resolver=_commit_resolver,
+    )
+
+    assert len(issues) == 1
+    assert "missing source commit metadata" in issues[0]["message"]

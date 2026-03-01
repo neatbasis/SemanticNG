@@ -111,3 +111,5 @@ This keeps compatibility measurable and drift bounded.
 - Treat this package as a constrained semantic boundary, not a dumping ground.
 - Keep changes aligned with [ARCHITECTURE.md](./ARCHITECTURE.md).
 - Pair behavior changes with constraint and test/check updates.
+
+_Last regenerated from manifest: 2026-03-01T16:17:40Z (UTC)._

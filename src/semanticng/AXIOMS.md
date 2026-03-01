@@ -36,3 +36,5 @@ For equivalent canonical append-only `PredictionRecord` lineage, replay must yie
 
 - Restart or reprocessing cannot change outcomes unless lineage input changes.
 - Any variability source must be captured as explicit lineage evidence so deterministic replay is preserved.
+
+_Last regenerated from manifest: 2026-03-01T16:17:40Z (UTC)._

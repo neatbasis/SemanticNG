@@ -8,3 +8,5 @@ Required conditions:
 3. **Commutation:** `Φ_core ∘ κ = κ ∘ Φ_core` on admissible states.
 
 If any condition fails, mapping is unsound and change is non-admissible.
+
+_Last regenerated from manifest: 2026-03-01T16:17:40Z (UTC)._

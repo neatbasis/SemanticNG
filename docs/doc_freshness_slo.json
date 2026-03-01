@@ -34,6 +34,18 @@
     {
       "path": "docs/project_maturity_evaluation.md",
       "class": "governance_doc"
+    },
+    {
+      "path": "src/core/*.md",
+      "class": "governance_doc"
+    },
+    {
+      "path": "src/semanticng/*.md",
+      "class": "governance_doc"
+    },
+    {
+      "path": "src/state_renormalization/*.md",
+      "class": "governance_doc"
     }
   ]
 }

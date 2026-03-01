@@ -6,3 +6,5 @@ Staged maturity guarantees for `src/core`:
 - **L1 (Enforced surface):** public API constrained to `__version__` and verified in review/tests.
 - **L2 (Governed evolution):** edits validated against commutation + invariant preservation rules.
 - **L3 (Audit-ready):** violations are detectable, classified, and release-blocking.
+
+_Last regenerated from manifest: 2026-03-01T16:17:40Z (UTC)._

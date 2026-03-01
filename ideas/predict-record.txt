@@ -476,7 +476,7 @@ identity = contextual attribute, not controlling variable
 
 
 
-This is some map. If you thought about it for long enough, you could say there is no distinction. They're the same topology 
+This is some map. If you thought about it for long enough, you could say there is no distinction. They're the same topology
 
 ChatGPT sanoi:
 
@@ -998,13 +998,13 @@ class PredictionRecord:
     prediction_id: str
     timestamp_predicted: datetime
     timestamp_observed: datetime | None
-    
+
     predicted_state: dict
     observed_state: dict | None
-    
+
     correction_cost: float | None
     survival_duration: float | None
-    
+
     identity_hash_before: str
     identity_hash_after: str
 
@@ -1524,4 +1524,3 @@ If you want, I can convert the above into:
     a projection algorithm for CurrentPredictions (SurrealDB table or in-memory view with rebuild-from-log)
 
 a prediction feature
-

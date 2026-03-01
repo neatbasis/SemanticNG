@@ -37,7 +37,13 @@ def test_iter_projection_lineage_records_filters_mixed_jsonl_rows(tmp_path: Path
         "scope_key": "turn:2",
     }
 
-    for row in (prediction_row, canonical_halt, unknown_event, malformed_halt_like, prediction_record_row):
+    for row in (
+        prediction_row,
+        canonical_halt,
+        unknown_event,
+        malformed_halt_like,
+        prediction_record_row,
+    ):
         append_jsonl(path, row)
 
     lineage = list(iter_projection_lineage_records(path))
@@ -68,7 +74,9 @@ def test_iter_projection_lineage_records_preserves_append_only_order(tmp_path: P
 def test_iter_projection_lineage_records_includes_only_rehydratable_halts(tmp_path: Path) -> None:
     path = tmp_path / "rehydration.jsonl"
 
-    valid_canonical_halt = _canonical_halt_payload("halt:valid", timestamp="2026-02-14T00:00:00+00:00")
+    valid_canonical_halt = _canonical_halt_payload(
+        "halt:valid", timestamp="2026-02-14T00:00:00+00:00"
+    )
     invalid_halt_like = {
         "halt_id": "halt:invalid",
         "stage": "gate:pre_consume",
@@ -85,7 +93,9 @@ def test_iter_projection_lineage_records_includes_only_rehydratable_halts(tmp_pa
     assert HaltRecord.from_payload(lineage[0]).to_canonical_payload() == valid_canonical_halt
 
 
-def test_iter_projection_lineage_records_skips_malformed_json_lines_and_non_object_rows(tmp_path: Path) -> None:
+def test_iter_projection_lineage_records_skips_malformed_json_lines_and_non_object_rows(
+    tmp_path: Path,
+) -> None:
     path = tmp_path / "malformed.jsonl"
     canonical_halt = _canonical_halt_payload("halt:ok", timestamp="2026-02-14T00:00:00+00:00")
     path.write_text(
@@ -93,7 +103,7 @@ def test_iter_projection_lineage_records_skips_malformed_json_lines_and_non_obje
             [
                 '{"event_kind":"prediction_record","prediction_id":"pred:ok","scope_key":"turn:1"}',
                 '{"event_kind":"prediction_record",',  # malformed JSON
-                '[]',
+                "[]",
                 '"string"',
                 json.dumps(canonical_halt),
             ]
@@ -103,10 +113,15 @@ def test_iter_projection_lineage_records_skips_malformed_json_lines_and_non_obje
     )
 
     lineage = list(iter_projection_lineage_records(path))
-    assert [row.get("prediction_id", row.get("halt_id")) for row in lineage] == ["pred:ok", "halt:ok"]
+    assert [row.get("prediction_id", row.get("halt_id")) for row in lineage] == [
+        "pred:ok",
+        "halt:ok",
+    ]
 
 
-def test_iter_projection_lineage_records_includes_ask_outbox_events_for_replay(tmp_path: Path) -> None:
+def test_iter_projection_lineage_records_includes_ask_outbox_events_for_replay(
+    tmp_path: Path,
+) -> None:
     path = tmp_path / "ask-outbox.jsonl"
 
     request = {

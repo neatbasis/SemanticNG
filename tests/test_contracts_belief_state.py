@@ -15,6 +15,7 @@ def test_belief_state_defaults() -> None:
     assert b.active_schemas == []
     assert b.schema_confidence == {}
 
+
 def test_belief_state_uses_last_status_not_last_ha_status() -> None:
     b = BeliefState()
     assert hasattr(b, "last_status"), "BeliefState should track channel-agnostic last_status"

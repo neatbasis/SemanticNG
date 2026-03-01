@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
-from pathlib import Path
 import subprocess
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / ".github" / "scripts" / "render_transition_evidence.py"
@@ -40,13 +39,20 @@ def test_transitioned_capability_commands_filters_to_transitioned_and_non_empty_
         "capabilities": [
             {
                 "id": "cap_a",
-                "pytest_commands": ["pytest tests/test_alpha.py", "", None, "pytest tests/test_beta.py"],
+                "pytest_commands": [
+                    "pytest tests/test_alpha.py",
+                    "",
+                    None,
+                    "pytest tests/test_beta.py",
+                ],
             },
             {"id": "cap_b", "pytest_commands": ["pytest tests/test_gamma.py"]},
         ]
     }
 
-    commands = render_transition_evidence._transitioned_capability_commands(head_manifest, {"cap_a"})
+    commands = render_transition_evidence._transitioned_capability_commands(
+        head_manifest, {"cap_a"}
+    )
 
     assert commands == {
         "cap_a": [
@@ -73,7 +79,10 @@ def test_render_block_includes_expected_markers_and_evidence_lines(monkeypatch) 
     assert "<!-- transition-evidence:end -->" in block
     assert "#### cap_a" in block
     assert "pytest tests/test_alpha.py" in block
-    assert "Evidence: https://github.com/<org>/<repo>/actions/runs/<run_id>#capability-cap_a-1" in block
+    assert (
+        "Evidence: https://github.com/<org>/<repo>/actions/runs/<run_id>#capability-cap_a-1"
+        in block
+    )
 
 
 def test_render_block_uses_explicit_evidence_url_override(monkeypatch) -> None:
@@ -94,7 +103,13 @@ def test_render_pr_template_autogen_section_is_sorted_and_wrapped() -> None:
     manifest = {
         "capabilities": [
             {"id": "zeta", "pytest_commands": ["pytest tests/test_zeta.py"]},
-            {"id": "alpha", "pytest_commands": ["pytest tests/test_alpha.py", "pytest tests/test_alpha_extra.py"]},
+            {
+                "id": "alpha",
+                "pytest_commands": [
+                    "pytest tests/test_alpha.py",
+                    "pytest tests/test_alpha_extra.py",
+                ],
+            },
             {"id": "empty", "pytest_commands": []},
         ]
     }
@@ -110,8 +125,18 @@ def test_render_pr_template_autogen_section_is_sorted_and_wrapped() -> None:
 
 
 def test_replace_between_markers_replaces_only_autogen_block() -> None:
-    original = "prefix\n" + render_transition_evidence.AUTOGEN_BEGIN + "\nold\n" + render_transition_evidence.AUTOGEN_END + "\nsuffix\n"
-    replacement = render_transition_evidence.AUTOGEN_BEGIN + "\nnew\n" + render_transition_evidence.AUTOGEN_END
+    original = (
+        "prefix\n"
+        + render_transition_evidence.AUTOGEN_BEGIN
+        + "\nold\n"
+        + render_transition_evidence.AUTOGEN_END
+        + "\nsuffix\n"
+    )
+    replacement = (
+        render_transition_evidence.AUTOGEN_BEGIN
+        + "\nnew\n"
+        + render_transition_evidence.AUTOGEN_END
+    )
 
     updated = render_transition_evidence._replace_between_markers(original, replacement)
 
@@ -122,9 +147,13 @@ def test_check_pr_template_autogen_section_returns_zero_when_current(monkeypatch
     manifest_path = tmp_path / "dod_manifest.json"
     template_path = tmp_path / "pull_request_template.md"
 
-    manifest = {"capabilities": [{"id": "cap_a", "pytest_commands": ["pytest tests/test_alpha.py"]}]}
+    manifest = {
+        "capabilities": [{"id": "cap_a", "pytest_commands": ["pytest tests/test_alpha.py"]}]
+    }
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-    template_path.write_text(render_transition_evidence._render_pr_template_autogen_section(manifest), encoding="utf-8")
+    template_path.write_text(
+        render_transition_evidence._render_pr_template_autogen_section(manifest), encoding="utf-8"
+    )
 
     monkeypatch.setattr(render_transition_evidence, "MANIFEST_PATH", manifest_path)
     monkeypatch.setattr(render_transition_evidence, "PR_TEMPLATE_PATH", template_path)
@@ -136,7 +165,9 @@ def test_check_pr_template_autogen_section_returns_one_when_stale(monkeypatch, t
     manifest_path = tmp_path / "dod_manifest.json"
     template_path = tmp_path / "pull_request_template.md"
 
-    manifest = {"capabilities": [{"id": "cap_a", "pytest_commands": ["pytest tests/test_alpha.py"]}]}
+    manifest = {
+        "capabilities": [{"id": "cap_a", "pytest_commands": ["pytest tests/test_alpha.py"]}]
+    }
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     template_path.write_text(
         "\n".join(
@@ -160,7 +191,11 @@ def test_check_pr_template_autogen_section_returns_one_when_stale(monkeypatch, t
 def test_main_emits_deterministic_block_for_same_base_and_head(monkeypatch, capsys) -> None:
     manifest = {
         "capabilities": [
-            {"id": "cap_a", "status": "in_progress", "pytest_commands": ["pytest tests/test_alpha.py"]},
+            {
+                "id": "cap_a",
+                "status": "in_progress",
+                "pytest_commands": ["pytest tests/test_alpha.py"],
+            },
             {"id": "cap_b", "status": "done", "pytest_commands": ["pytest tests/test_beta.py"]},
         ]
     }
@@ -173,18 +208,24 @@ def test_main_emits_deterministic_block_for_same_base_and_head(monkeypatch, caps
 
     monkeypatch.setattr(subprocess, "check_output", fake_check_output)
 
-    monkeypatch.setattr("sys.argv", ["render_transition_evidence.py", "--base", "abc123", "--head", "abc123"])
+    monkeypatch.setattr(
+        "sys.argv", ["render_transition_evidence.py", "--base", "abc123", "--head", "abc123"]
+    )
     assert render_transition_evidence.main() == 0
     first = capsys.readouterr().out
 
-    monkeypatch.setattr("sys.argv", ["render_transition_evidence.py", "--base", "abc123", "--head", "abc123"])
+    monkeypatch.setattr(
+        "sys.argv", ["render_transition_evidence.py", "--base", "abc123", "--head", "abc123"]
+    )
     assert render_transition_evidence.main() == 0
     second = capsys.readouterr().out
 
     assert first == second
 
 
-def test_check_pr_template_autogen_section_accepts_legacy_equivalent_command_grouping(monkeypatch, tmp_path) -> None:
+def test_check_pr_template_autogen_section_accepts_legacy_equivalent_command_grouping(
+    monkeypatch, tmp_path
+) -> None:
     manifest_path = tmp_path / "dod_manifest.json"
     template_path = tmp_path / "pull_request_template.md"
 

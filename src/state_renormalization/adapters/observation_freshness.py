@@ -1,8 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional, Protocol
+from collections.abc import Mapping
+from typing import Any, Protocol
 
-from state_renormalization.contracts import BeliefState, Episode, ObservationFreshnessPolicyContract, ProjectionState
+from state_renormalization.contracts import (
+    BeliefState,
+    Episode,
+    ObservationFreshnessPolicyContract,
+    ProjectionState,
+)
 
 
 class ObservationFreshnessPolicyAdapter(Protocol):
@@ -18,6 +24,6 @@ class ObservationFreshnessPolicyAdapter(Protocol):
         """Return the freshness policy contract for the current turn, or None to skip checks."""
         ...
 
-    def has_outstanding_request(self, *, scope: str) -> Optional[str]:
+    def has_outstanding_request(self, *, scope: str) -> str | None:
         """Return an existing outstanding request id for the same scope (if any)."""
         ...

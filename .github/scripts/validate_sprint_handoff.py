@@ -7,8 +7,8 @@ import json
 import os
 import re
 import subprocess
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 ROOT = Path(__file__).resolve().parents[2]
 HANDOFF_DIR = ROOT / "docs" / "sprint_handoffs"
@@ -59,7 +59,9 @@ def _is_sprint_close_or_governance_pr(changed_files: Iterable[str], payload: dic
         return True
 
     labels = pull_request.get("labels", [])
-    label_names = {str(label.get("name", "")).lower() for label in labels if isinstance(label, dict)}
+    label_names = {
+        str(label.get("name", "")).lower() for label in labels if isinstance(label, dict)
+    }
     return any(marker in label_names for marker in SPRINT_CLOSE_MARKERS | {"governance"})
 
 
@@ -113,11 +115,15 @@ def _validate_handoff_file(path: Path, capability_ids: set[str]) -> list[str]:
     else:
         risk_rows = _extract_markdown_table_rows(risks)
         if len(risk_rows) < 2:
-            mismatches.append(f"{path}: risk register must include header and at least one risk row.")
+            mismatches.append(
+                f"{path}: risk register must include header and at least one risk row."
+            )
         else:
             for idx, row in enumerate(risk_rows[1:], start=1):
                 if len(row) < 3:
-                    mismatches.append(f"{path}: risk row {idx} must include owner and target date columns.")
+                    mismatches.append(
+                        f"{path}: risk row {idx} must include owner and target date columns."
+                    )
                     continue
                 owner = row[1].strip()
                 target_date = row[2].strip()
@@ -132,7 +138,9 @@ def _validate_handoff_file(path: Path, capability_ids: set[str]) -> list[str]:
     else:
         preload_rows = _extract_markdown_table_rows(preload)
         if len(preload_rows) < 2:
-            mismatches.append(f"{path}: preload section must include header and at least one capability row.")
+            mismatches.append(
+                f"{path}: preload section must include header and at least one capability row."
+            )
         else:
             for idx, row in enumerate(preload_rows[1:], start=1):
                 capability_id = _normalize_capability_id(row[0]) if row else ""
@@ -157,8 +165,14 @@ def _load_capability_ids() -> set[str]:
 
 
 def main() -> int:
-    head_sha = os.environ.get("HEAD_SHA") or subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    base_sha = os.environ.get("BASE_SHA") or subprocess.check_output(["git", "rev-parse", f"{head_sha}~1"], text=True).strip()
+    head_sha = (
+        os.environ.get("HEAD_SHA")
+        or subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    )
+    base_sha = (
+        os.environ.get("BASE_SHA")
+        or subprocess.check_output(["git", "rev-parse", f"{head_sha}~1"], text=True).strip()
+    )
 
     changed_files = _changed_files(base_sha, head_sha)
     payload = _load_event_payload()
@@ -173,7 +187,9 @@ def main() -> int:
 
     handoff_files = sorted(path for path in HANDOFF_DIR.glob(HANDOFF_PATTERN) if path.is_file())
     if not handoff_files:
-        print("At least one sprint handoff artifact is required at docs/sprint_handoffs/sprint-<n>-handoff.md.")
+        print(
+            "At least one sprint handoff artifact is required at docs/sprint_handoffs/sprint-<n>-handoff.md."
+        )
         return 1
 
     capability_ids = _load_capability_ids()

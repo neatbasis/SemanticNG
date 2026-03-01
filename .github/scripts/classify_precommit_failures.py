@@ -77,7 +77,9 @@ def main() -> int:
 
     path = Path(args.log)
     if not path.exists():
-        print("## Pre-commit failure classification\n\n- ⚠️ `precommit.log` not found; classification skipped.")
+        print(
+            "## Pre-commit failure classification\n\n- ⚠️ `precommit.log` not found; classification skipped."
+        )
         return 0
 
     log_text = path.read_text(encoding="utf-8", errors="replace")

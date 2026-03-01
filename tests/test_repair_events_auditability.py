@@ -16,7 +16,6 @@ from state_renormalization.contracts import (
 from state_renormalization.engine import run_mission_loop
 from state_renormalization.invariants import InvariantHandlingMode
 
-
 FIXED_PENDING_PREDICTION = {
     "prediction_id": "pred:audit-base",
     "scope_key": "turn:1",
@@ -40,7 +39,9 @@ def _seed_projection() -> ProjectionState:
 
 
 def _read_jsonl(path: Path) -> list[dict[str, object]]:
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [
+        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
+    ]
 
 
 def test_repair_events_are_lineage_traceable_and_immutable(
@@ -69,7 +70,9 @@ def test_repair_events_are_lineage_traceable_and_immutable(
     resolution_row = next(row for row in rows if row.get("event_kind") == "repair_resolution")
 
     assert proposal_row["lineage_ref"]["scope_key"] == "turn:1"
-    prediction_ids = {row.get("prediction_id") for row in rows if row.get("event_kind") == "prediction_record"}
+    prediction_ids = {
+        row.get("prediction_id") for row in rows if row.get("event_kind") == "prediction_record"
+    }
     assert proposal_row["lineage_ref"]["prediction_id"] in prediction_ids
     assert resolution_row["lineage_ref"] == proposal_row["lineage_ref"]
 
@@ -105,12 +108,17 @@ def test_repair_mode_does_not_silently_mutate_prediction_records(
 
     rows = _read_jsonl(prediction_log)
     corrected_prediction_records = [
-        row for row in rows if row.get("event_kind") == "prediction_record" and int(row.get("correction_revision") or 0) > 0
+        row
+        for row in rows
+        if row.get("event_kind") == "prediction_record"
+        and int(row.get("correction_revision") or 0) > 0
     ]
     assert corrected_prediction_records == []
 
     accepted_resolutions = [
-        row for row in rows if row.get("event_kind") == "repair_resolution" and row.get("decision") == "accepted"
+        row
+        for row in rows
+        if row.get("event_kind") == "repair_resolution" and row.get("decision") == "accepted"
     ]
     assert accepted_resolutions
     assert all(

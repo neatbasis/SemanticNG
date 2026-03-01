@@ -41,7 +41,9 @@ def test_malformed_selector_output_raises_clear_error(
     monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
 
     ask = make_ask_result(status=AskStatus.OK, sentence="hello")
-    episode = ingest_observation(make_episode(turn_index=1, assistant_prompt_asked="prompt", ask=ask))
+    episode = ingest_observation(
+        make_episode(turn_index=1, assistant_prompt_asked="prompt", ask=ask)
+    )
 
     with pytest.raises(TypeError, match="must return SchemaSelection"):
         apply_schema_bubbling(episode, BeliefState())

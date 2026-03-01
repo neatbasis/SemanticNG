@@ -1,16 +1,19 @@
 # features/steps/ontology_steps.py
 
 import os
+
 from behave import given, then
 from deeponto.onto import Ontology
 
 RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
+
 
 @given('an ontology file "{path}"')
 def step_load_ontology(context, path):
     basename = os.path.basename(path)
     print(basename)
     context.onto = Ontology(path)
+
 
 def _resolve_class_iri(onto: Ontology, cls: str) -> str | None:
     # 1) Full IRI given
@@ -30,6 +33,7 @@ def _resolve_class_iri(onto: Ontology, cls: str) -> str | None:
             return iri
 
     return None
+
 
 @then('class "{cls}" should exist')
 def step_check_class(context, cls):

@@ -1172,4 +1172,3 @@ No demo runner, no registry iteration, no merge function yet.
 **Better:** make ports match, fold staleness→Ask into one capability, enforce write-before-emit for prompts, move policy out of engine, make envelope serialization/versioning explicit, and simplify invariant execution to exactly P0/P1 at two gate points.
 
 We could rewrite the spine in that tighter form (same models, fewer moving parts), so it’s closer to an invariant “complete” north-star implementation.
-

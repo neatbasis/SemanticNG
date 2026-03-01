@@ -5,7 +5,6 @@ import importlib.util
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "docs" / "dod_manifest.json"
 PR_TEMPLATE_PATH = ROOT / ".github" / "pull_request_template.md"

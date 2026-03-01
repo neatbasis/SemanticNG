@@ -1,15 +1,15 @@
 # tests/test_schema_bubbling_option_a.py
 from __future__ import annotations
 
-from collections.abc import Callable
 import json
+from collections.abc import Callable
 
 import pytest
 
 from state_renormalization.contracts import (
+    AboutKind,
     Ambiguity,
     AmbiguityAbout,
-    AboutKind,
     AmbiguityStatus,
     AmbiguityType,
     AskFormat,
@@ -50,7 +50,9 @@ def test_option_a_sets_pending_about_and_question_when_unresolved(
 
     monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
 
-    ep2, b2 = apply_schema_bubbling(make_episode(ask=make_ask_result(status=AskStatus.OK)), BeliefState())
+    ep2, b2 = apply_schema_bubbling(
+        make_episode(ask=make_ask_result(status=AskStatus.OK)), BeliefState()
+    )
 
     assert b2.ambiguity_state == AmbiguityStatus.UNRESOLVED
     assert b2.pending_about is not None
@@ -90,7 +92,9 @@ def test_schema_selection_artifact_does_not_leak_channel_specific_terms(
     monkeypatch: pytest.MonkeyPatch,
     make_episode: Callable[..., Episode],
 ) -> None:
-    sel = SchemaSelection(schemas=[SchemaHit(name="actionable_intent", score=0.7)], ambiguities=[], notes="ok")
+    sel = SchemaSelection(
+        schemas=[SchemaHit(name="actionable_intent", score=0.7)], ambiguities=[], notes="ok"
+    )
 
     def fake_selector(user_text: str | None, *, error: CaptureOutcome | None) -> SchemaSelection:
         return sel

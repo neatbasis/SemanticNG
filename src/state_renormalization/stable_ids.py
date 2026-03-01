@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .gherkin_document import GherkinDocument
 
@@ -24,11 +24,11 @@ def _canon(obj: Any) -> str:
 class StableIds:
     uri: str
     feature_id: str
-    scenario_ids: Dict[str, str]          # key: scenario_key -> scenario_id
-    step_ids: Dict[str, str]              # key: step_key -> step_id
+    scenario_ids: dict[str, str]  # key: scenario_key -> scenario_id
+    step_ids: dict[str, str]  # key: step_key -> step_id
 
 
-def derive_stable_ids(gherkin_document: GherkinDocument, *, uri: Optional[str] = None) -> StableIds:
+def derive_stable_ids(gherkin_document: GherkinDocument, *, uri: str | None = None) -> StableIds:
     """
     Compute stable IDs for feature/scenarios/steps using deterministic hashing.
     Does NOT rely on gherkin-official's internal incremental IDs.
@@ -48,8 +48,8 @@ def derive_stable_ids(gherkin_document: GherkinDocument, *, uri: Optional[str] =
     }
     feature_id = "feat_" + _sha256_hex(_canon(feature_key_obj))
 
-    scenario_ids: Dict[str, str] = {}
-    step_ids: Dict[str, str] = {}
+    scenario_ids: dict[str, str] = {}
+    step_ids: dict[str, str] = {}
 
     for scenario in feature.scenarios:
         s_name = scenario.name
@@ -105,7 +105,7 @@ def derive_prediction_id(
     issued_at_iso: str,
     filtration_id: str,
     distribution_kind: str,
-    distribution_params: Dict[str, Any],
+    distribution_params: dict[str, Any],
 ) -> str:
     key_obj = {
         "scope_key": scope_key,

@@ -2,17 +2,21 @@
 from __future__ import annotations
 
 import json
-from dataclasses import is_dataclass, asdict
+from collections.abc import Iterator
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterator, Tuple, Union
+from typing import Any
 
-from state_renormalization.contracts import CapabilityAdapterGate, HaltRecord
+from pydantic import BaseModel, ValidationError
 
-from pydantic import BaseModel
+from state_renormalization.contracts import (
+    CapabilityAdapterGate,
+    HaltPayloadValidationError,
+    HaltRecord,
+)
 
-
-JsonObj = Dict[str, Any]
-PathLike = Union[str, Path]
+JsonObj = dict[str, Any]
+PathLike = str | Path
 
 PREDICTIONS_LOG_PATH = Path("artifacts/predictions.jsonl")
 PREDICTION_RECORDS_LOG_PATH = Path("artifacts/prediction_records.jsonl")
@@ -72,7 +76,7 @@ def _inject_stable_ids(record: JsonObj) -> JsonObj:
         items = out.get(list_key)
         if not isinstance(items, list):
             continue
-        enriched = []
+        enriched: list[Any] = []
         for item in items:
             if isinstance(item, dict):
                 enriched.append({**stable, **item})
@@ -96,7 +100,7 @@ def append_jsonl(path: PathLike, record: Any) -> None:
         f.write(line + "\n")
 
 
-def read_jsonl(path: PathLike) -> Iterator[Tuple[JsonObj, JsonObj]]:
+def read_jsonl(path: PathLike) -> Iterator[tuple[JsonObj, JsonObj]]:
     """
     Yields (meta, obj) for each JSON object line.
     - meta includes line number and source path.
@@ -113,20 +117,6 @@ def read_jsonl(path: PathLike) -> Iterator[Tuple[JsonObj, JsonObj]]:
                 raise ValueError(f"Expected JSON object on line {lineno}, got {type(obj).__name__}")
             meta: JsonObj = {"path": str(p), "lineno": lineno}
             yield meta, obj
-
-
-# TODO: This prevents weird non-dict JSON from exploding later when you call raw.get(...).
-#raw = json.loads(line)
-#if not isinstance(raw, dict):
-#    if strict:
-#        raise TypeError(f"Expected dict JSON object on line {line_no}")
-#    yield line_no, {
-#        "kind": "json_type_error",
-#        "error": f"Expected object, got {type(raw).__name__}",
-#        "raw": raw,
-#        "line_no": line_no,
-#    }
-#    continue
 
 
 def _enforce_adapter_gate(*, action: str, adapter_gate: CapabilityAdapterGate) -> None:
@@ -202,8 +192,6 @@ def append_prediction_record_event(
     return append_prediction(path=path, record=event, adapter_gate=adapter_gate)
 
 
-
-
 def append_ask_outbox_request_event(
     record: Any,
     *,
@@ -233,13 +221,13 @@ def append_ask_outbox_response_event(
 
     return append_prediction(path=path, record=payload, adapter_gate=adapter_gate)
 
+
 def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
     """Yield append-only projection lineage rows that can be rehydrated.
 
     Includes prediction events and canonical halt payload rows.
     Excludes unknown event kinds and malformed/non-object JSONL rows.
     """
-
     p = Path(path)
     if not p.exists():
         return
@@ -259,18 +247,39 @@ def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
                 continue
 
             kind = raw.get("event_kind")
-            if kind in {"prediction_record", "prediction", "repair_proposal", "repair_resolution", "ask_outbox_request", "ask_outbox_response"}:
+            if kind in {
+                "prediction_record",
+                "prediction",
+                "repair_proposal",
+                "repair_resolution",
+                "ask_outbox_request",
+                "ask_outbox_response",
+            }:
                 yield raw
                 continue
 
+            # IMPORTANT:
+            # - lineage iteration should be resilient (skip malformed rows)
+            # - prefer strict Pydantic validation here so "halt" rows are guaranteed canonical
             try:
-                yield HaltRecord.from_payload(raw).to_canonical_payload()
+                yield HaltRecord.validate_payload(raw).to_canonical_payload()
             except Exception:
                 continue
 
+
 def _canonicalize_halt_payload(record: Any) -> JsonObj:
+    """
+    Convert a halt-ish object into the canonical persisted JSON payload.
+
+    NOTE on exception semantics:
+    - Use HaltRecord.validate_payload(...) here so persistence has "raw Pydantic" behavior
+      (i.e. raises pydantic.ValidationError for malformed inputs), matching adapter tests.
+    - Keep HaltRecord.from_payload(...) for "domain boundary" rehydration where you want
+      HaltPayloadValidationError instead.
+    """
     if isinstance(record, HaltRecord):
         return record.to_canonical_payload()
+
     if isinstance(record, dict):
         canonical = HaltRecord.from_payload(record).to_canonical_payload()
         stable_ids = {
@@ -279,11 +288,17 @@ def _canonicalize_halt_payload(record: Any) -> JsonObj:
             if isinstance((value := record.get(key)), str)
         }
         return {**stable_ids, **canonical}
-    return HaltRecord.from_payload(_to_jsonable(record)).to_canonical_payload()
+
+    # Convert non-dict inputs (dataclass/BaseModel/etc.) and validate strictly.
+    payload = _to_jsonable(record)
+    return HaltRecord.validate_payload(payload).to_canonical_payload()
 
 
 def read_halt_record(record: JsonObj) -> HaltRecord:
-    """Rehydrate a persisted halt artifact into a validated HaltRecord."""
+    """Rehydrate a persisted halt artifact into a validated HaltRecord.
+
+    Uses the domain boundary method (wraps into HaltPayloadValidationError).
+    """
     return HaltRecord.from_payload(record)
 
 
@@ -294,9 +309,23 @@ def append_halt(path: PathLike, record: Any, *, adapter_gate: CapabilityAdapterG
     if p.exists():
         next_offset = len(p.read_text(encoding="utf-8").splitlines()) + 1
 
-    payload = _canonicalize_halt_payload(record)
+    try:
+        payload = _canonicalize_halt_payload(record)
+        # Validate persistence/reload parity for explainability payload fields.
+        HaltRecord.from_payload(payload)
+    except HaltPayloadValidationError as exc:
+        # persistence tests expect pydantic.ValidationError
+        raise ValidationError.from_exception_data(
+            "HaltRecord",
+            [
+                {
+                    "loc": ("halt",),
+                    "type": "value_error",
+                    "input": record,
+                    "ctx": {"error": str(exc)},
+                }
+            ],
+        ) from exc
 
-    # Validate persistence/reload parity for explainability payload fields.
-    HaltRecord.from_payload(payload)
     append_jsonl(p, payload)
     return {"kind": "jsonl", "ref": f"{p.name}@{next_offset}"}

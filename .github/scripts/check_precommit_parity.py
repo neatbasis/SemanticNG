@@ -86,7 +86,9 @@ def _extract_additional_dependencies(hook_block: list[str]) -> list[str]:
 
 def _read_requires_python_minor(pyproject_path: Path) -> str:
     pyproject_text = pyproject_path.read_text(encoding="utf-8")
-    match = re.search(r'^requires-python\s*=\s*"\>=([0-9]+\.[0-9]+)"\s*$', pyproject_text, re.MULTILINE)
+    match = re.search(
+        r'^requires-python\s*=\s*"\>=([0-9]+\.[0-9]+)"\s*$', pyproject_text, re.MULTILINE
+    )
     if not match:
         raise ParityError("Could not parse [project].requires-python as >=X.Y from pyproject.toml.")
     return match.group(1)
@@ -128,7 +130,9 @@ def main() -> int:
 
     mypy_block = _extract_hook_block(config_lines, "mypy")
     mypy_dep_specs = _extract_additional_dependencies(mypy_block)
-    mypy_constraints = {_split_requirement(dep)[0]: _split_requirement(dep)[1] for dep in mypy_dep_specs}
+    mypy_constraints = {
+        _split_requirement(dep)[0]: _split_requirement(dep)[1] for dep in mypy_dep_specs
+    }
 
     missing = [pkg for pkg in REQUIRED_MYPY_PACKAGES if pkg not in mypy_constraints]
     if missing:
@@ -162,14 +166,19 @@ def main() -> int:
     for hook_id in ("mypy", "ruff", "ruff-format"):
         hook_block = _extract_hook_block(config_lines, hook_id)
         language_version = _extract_hook_language_version(hook_block, hook_id)
-        if language_version != expected_hook_language_version or language_version != REQUIRED_HOOK_LANGUAGE_VERSION:
+        if (
+            language_version != expected_hook_language_version
+            or language_version != REQUIRED_HOOK_LANGUAGE_VERSION
+        ):
             print("Pre-commit parity failure: language_version mismatch.")
             print(f"  hook: {hook_id}")
             print(f"  expected: {expected_hook_language_version}")
             print(f"  found: {language_version}")
             return 1
 
-    action_version = _read_action_default_python_version(Path(".github/actions/python-test-setup/action.yml"))
+    action_version = _read_action_default_python_version(
+        Path(".github/actions/python-test-setup/action.yml")
+    )
     if action_version != py_minor:
         print("Pre-commit parity failure: python-test-setup action default is out of sync.")
         print(f"  expected: {py_minor}")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from state_renormalization.contracts import HaltPayloadValidationError, HaltRecord
 
@@ -20,7 +21,7 @@ def test_halt_record_required_payload_fields_declared() -> None:
 
 
 def test_halt_record_rejects_missing_required_field() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         HaltRecord.model_validate(
             {
                 "halt_id": "halt:1",
@@ -35,7 +36,7 @@ def test_halt_record_rejects_missing_required_field() -> None:
 
 
 def test_halt_record_rejects_conflicting_alias_values() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         HaltRecord.model_validate(
             {
                 "halt_id": "halt:canonical",
@@ -52,7 +53,7 @@ def test_halt_record_rejects_conflicting_alias_values() -> None:
 
 
 def test_halt_record_rejects_incomplete_evidence_item() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         HaltRecord.model_validate(
             {
                 "halt_id": "halt:1",
@@ -68,7 +69,7 @@ def test_halt_record_rejects_incomplete_evidence_item() -> None:
 
 
 def test_halt_record_rejects_missing_details_field() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         HaltRecord.model_validate(
             {
                 "halt_id": "halt:1",
@@ -95,6 +96,7 @@ def test_halt_record_from_payload_rejects_missing_evidence_field() -> None:
                 "timestamp": "2026-02-13T00:00:00+00:00",
             }
         )
+
 
 def test_halt_record_from_payload_raises_typed_error_for_malformed_payload() -> None:
     with pytest.raises(HaltPayloadValidationError, match="malformed or incomplete"):

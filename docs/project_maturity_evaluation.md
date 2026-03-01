@@ -1,6 +1,6 @@
 # Project Maturity Evaluation
 
-_Last regenerated from manifest: 2026-02-28T15:48:35Z (UTC)._  
+_Last regenerated from manifest: 2026-02-28T15:48:35Z (UTC)._
 _Regeneration command: `python .github/scripts/capability_parity_report.py` (then update this summary from `docs/dod_manifest.json` and `docs/system_contract_map.md`)._
 
 ## Executive assessment

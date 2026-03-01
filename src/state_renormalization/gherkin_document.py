@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Typed boundary for Gherkin parser output.
 
@@ -9,14 +7,15 @@ wrapper models. Downstream code should use `GherkinDocument` accessors rather
 than traversing raw `dict[str, Any]` payloads.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Any, Optional
 
 
 @dataclass(frozen=True)
 class GherkinLocation:
-    line: Optional[int]
-    column: Optional[int]
+    line: int | None
+    column: int | None
 
 
 @dataclass(frozen=True)
@@ -48,7 +47,7 @@ class GherkinDocument:
     feature: GherkinFeature
 
     @classmethod
-    def from_raw(cls, raw: object, *, uri: str = "") -> Optional[GherkinDocument]:
+    def from_raw(cls, raw: object, *, uri: str = "") -> GherkinDocument | None:
         if not isinstance(raw, dict):
             return None
 
@@ -79,7 +78,7 @@ class GherkinDocument:
         return cls(uri=uri or raw_uri, feature=feature)
 
 
-def _scenario_from_raw(raw: object) -> Optional[GherkinScenario]:
+def _scenario_from_raw(raw: object) -> GherkinScenario | None:
     if not isinstance(raw, dict):
         return None
 
@@ -99,7 +98,7 @@ def _scenario_from_raw(raw: object) -> Optional[GherkinScenario]:
     )
 
 
-def _step_from_raw(raw: object) -> Optional[GherkinStep]:
+def _step_from_raw(raw: object) -> GherkinStep | None:
     if not isinstance(raw, dict):
         return None
 
@@ -121,6 +120,5 @@ def _as_str(value: object) -> str:
     return value if isinstance(value, str) else ""
 
 
-def _as_int(value: object) -> Optional[int]:
+def _as_int(value: object) -> int | None:
     return value if isinstance(value, int) else None
-

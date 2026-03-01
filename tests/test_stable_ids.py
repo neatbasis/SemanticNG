@@ -1,13 +1,13 @@
 # tests/test_stable_ids.py
 from __future__ import annotations
 
+from typing import Any
+
 from gherkin.parser import Parser
 from gherkin.token_scanner import TokenScanner
-from typing import Any
 
 from state_renormalization.gherkin_document import GherkinDocument
 from state_renormalization.stable_ids import derive_prediction_id, derive_stable_ids
-
 
 FEATURE_TEXT = """
 Feature: Addition

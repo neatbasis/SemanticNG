@@ -67,14 +67,16 @@ def test_observer_preserved_in_persisted_episode_json(tmp_path: Path, make_episo
     out = tmp_path / "episodes.jsonl"
     append_jsonl(out, serialized)
 
-    (_, rec), = list(read_jsonl(out))
+    ((_, rec),) = list(read_jsonl(out))
     assert rec["observer"]["role"] == "assistant"
     assert rec["observer"]["capabilities"] == ["baseline.dialog"]
     assert rec["observer"]["authorization_level"] == "baseline"
     assert rec["observer"]["evaluation_invariants"] == ["prediction_availability.v1"]
 
 
-def test_observer_passed_through_decision_and_evaluation_artifacts(make_episode, make_ask_result) -> None:
+def test_observer_passed_through_decision_and_evaluation_artifacts(
+    make_episode, make_ask_result
+) -> None:
     prev_ep = make_episode()
     curr_ep = make_episode(ask=make_ask_result(sentence="hello"))
 
@@ -86,13 +88,19 @@ def test_observer_passed_through_decision_and_evaluation_artifacts(make_episode,
         ep=curr_ep,
         scope="scope:test",
         prediction_key=None,
-        projection_state=ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+        projection_state=ProjectionState(
+            current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"
+        ),
         prediction_log_available=False,
     )
-    invariant_artifact = next(a for a in curr_ep.artifacts if a.get("artifact_kind") == "invariant_outcomes")
+    invariant_artifact = next(
+        a for a in curr_ep.artifacts if a.get("artifact_kind") == "invariant_outcomes"
+    )
     assert invariant_artifact["observer"]["role"] == "assistant"
 
-    halt_observation = next(a for a in curr_ep.artifacts if a.get("artifact_kind") == "halt_observation")
+    halt_observation = next(
+        a for a in curr_ep.artifacts if a.get("artifact_kind") == "halt_observation"
+    )
     assert halt_observation["observation_type"] == "halt"
 
 
@@ -104,7 +112,7 @@ def test_episode_serialization_supports_null_observer(tmp_path: Path, make_episo
 
     out = tmp_path / "episodes.jsonl"
     append_jsonl(out, serialized)
-    (_, rec), = list(read_jsonl(out))
+    ((_, rec),) = list(read_jsonl(out))
     assert rec["observer"] is None
 
 
@@ -117,21 +125,28 @@ def test_observer_enforcement_hooks_limit_invariant_evaluation(make_episode, mak
         ep=ep,
         scope="scope:test",
         prediction_key="scope:test",
-        projection_state=ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+        projection_state=ProjectionState(
+            current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"
+        ),
         prediction_log_available=True,
     )
 
     assert isinstance(gate, GateSuccessOutcome)
     assert gate.artifact.pre_consume == ()
 
-    invariant_artifact = next(a for a in ep.artifacts if a.get("artifact_kind") == "invariant_outcomes")
+    invariant_artifact = next(
+        a for a in ep.artifacts if a.get("artifact_kind") == "invariant_outcomes"
+    )
     assert invariant_artifact["observer_enforcement"]["enforced"] is True
     assert invariant_artifact["observer_enforcement"]["authorization_level"] == "baseline"
     assert invariant_artifact["observer_enforcement"]["requested_evaluation_invariants"] == [
         "evidence_link_completeness.v1"
     ]
 
-def test_build_episode_attaches_stable_ids_from_feature_doc(tmp_path: Path, make_policy_decision) -> None:
+
+def test_build_episode_attaches_stable_ids_from_feature_doc(
+    tmp_path: Path, make_policy_decision
+) -> None:
     feature = tmp_path / "sample.feature"
     feature.write_text(
         """
@@ -172,7 +187,9 @@ def test_observer_included_in_schema_and_utterance_artifacts(make_episode, make_
     ep, _ = apply_utterance_interpretation(ep, belief)
 
     schema_artifact = next(a for a in ep.artifacts if a.get("kind") == "schema_selection")
-    utterance_artifact = next(a for a in ep.artifacts if a.get("kind") == "utterance_interpretation")
+    utterance_artifact = next(
+        a for a in ep.artifacts if a.get("kind") == "utterance_interpretation"
+    )
     assert schema_artifact["observer"]["role"] == "assistant"
     assert utterance_artifact["observer"]["role"] == "assistant"
     assert utterance_artifact["interpretation_frame"]["authorization_level"] == "baseline"
@@ -211,7 +228,9 @@ def test_evaluate_invariant_gates_blocks_unauthorized_observer(make_episode, mak
         ep=ep,
         scope="scope:test",
         prediction_key=None,
-        projection_state=ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+        projection_state=ProjectionState(
+            current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"
+        ),
         prediction_log_available=True,
     )
 
@@ -219,7 +238,9 @@ def test_evaluate_invariant_gates_blocks_unauthorized_observer(make_episode, mak
     issue = next(a for a in ep.artifacts if a.get("artifact_kind") == "authorization_issue")
     assert issue["issue_type"] == "authorization_scope_violation"
     assert issue["authorization_context"]["action"] == "evaluate_invariant_gates"
-    assert set(issue).issuperset({"halt_id", "invariant_id", "details", "evidence", "retryability", "timestamp"})
+    assert set(issue).issuperset(
+        {"halt_id", "invariant_id", "details", "evidence", "retryability", "timestamp"}
+    )
     assert "stable_halt_id" not in issue
     assert "violated_invariant_id" not in issue
     assert "evidence_refs" not in issue
@@ -227,7 +248,9 @@ def test_evaluate_invariant_gates_blocks_unauthorized_observer(make_episode, mak
     assert "timestamp_iso" not in issue
 
     halt_observation = next(a for a in ep.artifacts if a.get("artifact_kind") == "halt_observation")
-    assert set(halt_observation).issuperset({"halt_id", "invariant_id", "details", "evidence", "retryability", "timestamp"})
+    assert set(halt_observation).issuperset(
+        {"halt_id", "invariant_id", "details", "evidence", "retryability", "timestamp"}
+    )
     assert "stable_halt_id" not in halt_observation
     assert "violated_invariant_id" not in halt_observation
     assert "evidence_refs" not in halt_observation
@@ -235,7 +258,9 @@ def test_evaluate_invariant_gates_blocks_unauthorized_observer(make_episode, mak
     assert "timestamp_iso" not in halt_observation
 
 
-def test_policy_functions_block_unauthorized_actions(make_episode, make_ask_result, make_observer) -> None:
+def test_policy_functions_block_unauthorized_actions(
+    make_episode, make_ask_result, make_observer
+) -> None:
     observer = make_observer(capabilities=["baseline.invariant_evaluation"])
     prev_ep = make_episode(observer=observer)
     curr_ep = make_episode(observer=observer, ask=make_ask_result(sentence="hello"))

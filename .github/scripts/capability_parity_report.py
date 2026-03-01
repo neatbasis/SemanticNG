@@ -65,9 +65,7 @@ def _title_similarity(left: str, right: str) -> float:
 
 def _extract_test_files_from_pytest_command(command: str) -> set[str]:
     return {
-        token
-        for token in command.split()
-        if token.endswith(".py") and token.startswith("tests/")
+        token for token in command.split() if token.endswith(".py") and token.startswith("tests/")
     }
 
 
@@ -231,7 +229,9 @@ def contract_maturity_evidence_mismatches(contract_map_text: str) -> list[str]:
             continue
 
         if "https://" not in line:
-            mismatches.append(f"Contract map changelog transition missing https evidence URL: {line}")
+            mismatches.append(
+                f"Contract map changelog transition missing https evidence URL: {line}"
+            )
 
         transition_match = transition_pattern.match(line)
         if not transition_match:
@@ -244,7 +244,9 @@ def contract_maturity_evidence_mismatches(contract_map_text: str) -> list[str]:
         contract_name, before, after = transition_match.groups()
         row = contract_rows.get(contract_name)
         if row is None:
-            mismatches.append(f"Contract map changelog references unknown contract '{contract_name}'.")
+            mismatches.append(
+                f"Contract map changelog references unknown contract '{contract_name}'."
+            )
             continue
 
         before_rank = maturity_rank.get(before)
@@ -313,7 +315,9 @@ def project_maturity_mismatches(capabilities: list[dict], project_maturity_text:
             )
 
     if "only capability currently marked `in_progress`" in project_maturity_text:
-        in_progress_caps = sorted(cap_id for cap_id, status in manifest_by_id.items() if status == "in_progress")
+        in_progress_caps = sorted(
+            cap_id for cap_id, status in manifest_by_id.items() if status == "in_progress"
+        )
         if len(in_progress_caps) != 1:
             mismatches.append(
                 "Project maturity text claims there is only one in_progress capability, but manifest currently has "
@@ -335,7 +339,9 @@ def _is_contract_exempt(capability: dict) -> bool:
     exemptions = capability.get("contract_map_exemptions")
     if isinstance(exemption_reason, str) and exemption_reason.strip():
         return True
-    if isinstance(exemptions, list) and any(isinstance(item, str) and item.strip() for item in exemptions):
+    if isinstance(exemptions, list) and any(
+        isinstance(item, str) and item.strip() for item in exemptions
+    ):
         return True
     return False
 
@@ -350,7 +356,9 @@ def _match_titles(roadmap_titles: Iterable[str], manifest_titles: Iterable[str])
 
     matched: dict[str, str] = {}
     used_manifest: set[str] = set()
-    for score, road_title, man_title in sorted(pairs, key=lambda item: (-item[0], item[1], item[2])):
+    for score, road_title, man_title in sorted(
+        pairs, key=lambda item: (-item[0], item[1], item[2])
+    ):
         if score < 0.3:
             break
         if road_title in matched or man_title in used_manifest:
@@ -374,7 +382,9 @@ def build_report() -> str:
     matched_manifest_titles = set(matches.values())
 
     roadmap_missing_in_manifest = sorted(title for title in roadmap_titles if title not in matches)
-    manifest_missing_in_roadmap = sorted(title for title in manifest_titles if title not in matched_manifest_titles)
+    manifest_missing_in_roadmap = sorted(
+        title for title in manifest_titles if title not in matched_manifest_titles
+    )
 
     contract_names = {row.name for row in contract_rows}
     manifest_without_contract_match: list[str] = []
@@ -387,7 +397,9 @@ def build_report() -> str:
 
         has_match = any(ref in contract_names for ref in refs if isinstance(ref, str))
         if not has_match:
-            manifest_without_contract_match.append(f"{capability.get('id')} ({capability.get('title')})")
+            manifest_without_contract_match.append(
+                f"{capability.get('id')} ({capability.get('title')})"
+            )
 
     roadmap_by_title = {item.title: item for item in roadmap_items}
     in_progress_done_candidates: list[str] = []
@@ -395,7 +407,11 @@ def build_report() -> str:
         if capability.get("status") != "in_progress":
             continue
         matched_roadmap_title = next(
-            (road_title for road_title, man_title in matches.items() if man_title == capability.get("title")),
+            (
+                road_title
+                for road_title, man_title in matches.items()
+                if man_title == capability.get("title")
+            ),
             None,
         )
         if not matched_roadmap_title:
@@ -405,13 +421,17 @@ def build_report() -> str:
         manifest_commands = set(capability.get("pytest_commands") or [])
         roadmap_commands = set(match.pytest_commands)
         if manifest_commands and manifest_commands.issubset(roadmap_commands):
-            in_progress_done_candidates.append(f"{capability.get('id')} ({capability.get('title')})")
+            in_progress_done_candidates.append(
+                f"{capability.get('id')} ({capability.get('title')})"
+            )
 
     prototype_operational_candidates: list[str] = []
     for row in sorted(contract_rows, key=lambda r: r.name):
         if row.maturity != "prototype":
             continue
-        referencing_caps = [cap for cap in capabilities if row.name in (cap.get("contract_map_refs") or [])]
+        referencing_caps = [
+            cap for cap in capabilities if row.name in (cap.get("contract_map_refs") or [])
+        ]
         if not referencing_caps or not row.test_refs:
             continue
 
@@ -422,7 +442,9 @@ def build_report() -> str:
 
     roadmap_status_mismatches = roadmap_alignment_mismatches(capabilities, roadmap_text)
     contract_maturity_mismatches = contract_maturity_evidence_mismatches(contract_map_text)
-    project_maturity_status_mismatches = project_maturity_mismatches(capabilities, project_maturity_text)
+    project_maturity_status_mismatches = project_maturity_mismatches(
+        capabilities, project_maturity_text
+    )
 
     lines = [
         "Capability Parity Report",
@@ -452,11 +474,13 @@ def build_report() -> str:
     if not exempt_capabilities:
         lines.append("- none")
 
-    lines.extend([
-        "",
-        "4) Candidate promotions from listed pytest command coverage",
-        "4a) in_progress -> done candidates",
-    ])
+    lines.extend(
+        [
+            "",
+            "4) Candidate promotions from listed pytest command coverage",
+            "4a) in_progress -> done candidates",
+        ]
+    )
     lines.extend(f"- {item}" for item in in_progress_done_candidates)
     if not in_progress_done_candidates:
         lines.append("- none")

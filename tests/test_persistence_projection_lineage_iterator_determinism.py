@@ -71,7 +71,10 @@ def test_iter_projection_lineage_records_deterministic_filtering_and_stability(
 
     # 3) Canonical halt payload rows are included only when HaltRecord validates.
     assert mixed_projection_rows[2] in first_read
-    assert HaltRecord.from_payload(mixed_projection_rows[2]).to_canonical_payload() == mixed_projection_rows[2]
+    assert (
+        HaltRecord.from_payload(mixed_projection_rows[2]).to_canonical_payload()
+        == mixed_projection_rows[2]
+    )
 
     # 4) Non-lineage and malformed halt-like rows are excluded deterministically.
     assert mixed_projection_rows[1] not in first_read

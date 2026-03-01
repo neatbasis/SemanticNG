@@ -6,9 +6,11 @@ import inspect
 import pytest
 
 from state_renormalization.adapters.schema_selector import (
+    RULE_PHASES,
+    RULE_REGISTRY,
     BaseRule,
-    SelectorDecisionStatus,
     SelectorContext,
+    SelectorDecisionStatus,
     _decide_selection_policy,
     _legacy_naive_schema_selector,
     _propose_candidates,
@@ -16,11 +18,13 @@ from state_renormalization.adapters.schema_selector import (
     build_selector_context,
     naive_schema_selector,
     register_rule,
-    RULE_REGISTRY,
-    RULE_PHASES,
 )
-from state_renormalization.contracts import CaptureOutcome, CaptureStatus, SchemaHit, SchemaSelection
-
+from state_renormalization.contracts import (
+    CaptureOutcome,
+    CaptureStatus,
+    SchemaHit,
+    SchemaSelection,
+)
 
 SELECTOR_FIXTURES: list[tuple[str | None, CaptureOutcome | None]] = [
     (None, CaptureOutcome(status=CaptureStatus.NO_RESPONSE)),
@@ -62,8 +66,18 @@ def test_schema_selector_signature_is_channel_agnostic() -> None:
         ("", None, ["clarify.empty_input"], "cli.input.empty"),
         ("quit", None, ["exit_intent"], "user.intent.exit"),
         ("they are coming", None, ["clarify.actor", "clarification_needed"], "event.actor"),
-        ("https://example.com", None, ["clarify.link_intent", "clarification_needed"], "task.intent.link"),
-        ("set timer for ten", None, ["clarify.duration_unit", "clarification_needed"], "timer.duration"),
+        (
+            "https://example.com",
+            None,
+            ["clarify.link_intent", "clarification_needed"],
+            "task.intent.link",
+        ),
+        (
+            "set timer for ten",
+            None,
+            ["clarify.duration_unit", "clarification_needed"],
+            "timer.duration",
+        ),
         ("maybe", None, ["clarify.goal", "clarification_needed"], "user.goal"),
         ("turn on the lights", None, ["actionable_intent"], "user.intent"),
     ],
@@ -83,7 +97,9 @@ def test_schema_selector_regression_snapshots(
 
 
 @pytest.mark.parametrize(("text", "error"), SELECTOR_FIXTURES)
-def test_refactored_selector_matches_legacy_snapshots(text: str | None, error: CaptureOutcome | None) -> None:
+def test_refactored_selector_matches_legacy_snapshots(
+    text: str | None, error: CaptureOutcome | None
+) -> None:
     legacy = _legacy_naive_schema_selector(text=text, error=error)
     refactored = naive_schema_selector(text=text, error=error)
 
@@ -135,8 +151,12 @@ def test_variant_addition_can_be_localized_to_a_single_phase_rule() -> None:
             prepend=True,
         )
 
-        localized = naive_schema_selector("turn on kitchen lights", error=None, domain="home-assistant")
-        baseline = naive_schema_selector("turn on bedroom lights", error=None, domain="home-assistant")
+        localized = naive_schema_selector(
+            "turn on kitchen lights", error=None, domain="home-assistant"
+        )
+        baseline = naive_schema_selector(
+            "turn on bedroom lights", error=None, domain="home-assistant"
+        )
         default_domain = naive_schema_selector("turn on kitchen lights", error=None)
 
         assert [hit.name for hit in localized.schemas] == ["lights.kitchen"]
@@ -187,4 +207,6 @@ def test_selector_pipeline_surfaces_policy_findings_for_ambiguity_phase() -> Non
     assert decision.status == SelectorDecisionStatus.OK
     assert decision.chosen is not None
     assert decision.chosen.rule_name == "vague_actor"
-    assert any(f.code == "selector.prefer_clarification_on_ambiguity.v1" for f in decision.policy_findings)
+    assert any(
+        f.code == "selector.prefer_clarification_on_ambiguity.v1" for f in decision.policy_findings
+    )

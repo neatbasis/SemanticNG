@@ -1,13 +1,12 @@
 import argparse
 import json
 import os
+import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-import xml.etree.ElementTree as ET
-
 
 REQUIRED_EVENT_KEYS = {
     "ts",
@@ -64,7 +63,9 @@ def _load_manifest(manifest_path: Path) -> list[CommandMembership]:
     return memberships
 
 
-def _normalize_test_identifier(test_file: str | None, classname: str | None, name: str | None) -> str:
+def _normalize_test_identifier(
+    test_file: str | None, classname: str | None, name: str | None
+) -> str:
     if test_file and name:
         return f"{test_file}::{name}"
     if classname and name:
@@ -89,10 +90,16 @@ def _parse_junit_results(junit_paths: list[Path]) -> list[TestResult]:
             error_node = testcase.find("error")
             if failure_node is not None or error_node is not None:
                 failure = failure_node if failure_node is not None else error_node
-                cause = (failure.attrib.get("message") or (failure.text or "").strip() or "test_failure")
-                results.append(TestResult(test=test_id, test_file=test_file, status="fail", cause=cause))
+                cause = (
+                    failure.attrib.get("message") or (failure.text or "").strip() or "test_failure"
+                )
+                results.append(
+                    TestResult(test=test_id, test_file=test_file, status="fail", cause=cause)
+                )
             else:
-                results.append(TestResult(test=test_id, test_file=test_file, status="pass", cause=""))
+                results.append(
+                    TestResult(test=test_id, test_file=test_file, status="pass", cause="")
+                )
     return results
 
 
@@ -135,7 +142,9 @@ def _parse_rerun_metadata(path: Path | None) -> dict[str, dict[str, Any]]:
     return parsed
 
 
-def _map_test_to_memberships(test_file: str | None, memberships: list[CommandMembership]) -> list[CommandMembership]:
+def _map_test_to_memberships(
+    test_file: str | None, memberships: list[CommandMembership]
+) -> list[CommandMembership]:
     if not test_file:
         return []
     return [membership for membership in memberships if test_file in membership.test_files]
@@ -163,7 +172,9 @@ def _append_events(path: Path, events: list[dict[str, Any]]) -> None:
 
 
 def _derive_capability_run_statuses(
-    memberships: list[CommandMembership], results: list[TestResult], rerun_meta: dict[str, dict[str, Any]]
+    memberships: list[CommandMembership],
+    results: list[TestResult],
+    rerun_meta: dict[str, dict[str, Any]],
 ) -> dict[str, str]:
     statuses: dict[str, str] = {membership.capability_id: "pass" for membership in memberships}
 
@@ -286,7 +297,10 @@ def _gather_failure_and_flake_events(
 
 
 def _calculate_rates(
-    history: list[dict[str, Any]], current_ci_run: str, current_statuses: dict[str, str], last_n_runs: int
+    history: list[dict[str, Any]],
+    current_ci_run: str,
+    current_statuses: dict[str, str],
+    last_n_runs: int,
 ) -> tuple[dict[str, tuple[float, float, int]], Counter[str], Counter[str]]:
     per_run_capability: dict[str, dict[str, str]] = defaultdict(dict)
     for event in history:
@@ -389,16 +403,20 @@ def _default_ci_run() -> str:
 
 
 def _default_timestamp() -> str:
-    return datetime.now(tz=timezone.utc).isoformat()
+    return datetime.now(tz=UTC).isoformat()
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate reliability telemetry artifacts from CI test outputs.")
+    parser = argparse.ArgumentParser(
+        description="Generate reliability telemetry artifacts from CI test outputs."
+    )
     parser.add_argument("--manifest", type=Path, default=Path("docs/dod_manifest.json"))
     parser.add_argument("--junit", action="append", type=Path, default=[])
     parser.add_argument("--junit-glob", default="artifacts/junit*.xml")
     parser.add_argument("--rerun-metadata", type=Path, default=None)
-    parser.add_argument("--history", type=Path, default=Path("docs/reliability/flaky_history.jsonl"))
+    parser.add_argument(
+        "--history", type=Path, default=Path("docs/reliability/flaky_history.jsonl")
+    )
     parser.add_argument("--summary", type=Path, default=Path("artifacts/reliability_summary.md"))
     parser.add_argument("--ci-run", default=_default_ci_run())
     parser.add_argument("--artifact-ref", default="")

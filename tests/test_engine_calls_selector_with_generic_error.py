@@ -25,4 +25,7 @@ def test_apply_schema_bubbling_calls_selector_with_error_kwarg(
 
     monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
 
-    apply_schema_bubbling(make_episode(turn_index=1, assistant_prompt_asked="prompt", ask=make_ask_result()), BeliefState())
+    apply_schema_bubbling(
+        make_episode(turn_index=1, assistant_prompt_asked="prompt", ask=make_ask_result()),
+        BeliefState(),
+    )

@@ -3,7 +3,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from state_renormalization.contracts import AskResult, AskStatus, BeliefState, Episode, ProjectionState
+from state_renormalization.contracts import (
+    AskResult,
+    AskStatus,
+    BeliefState,
+    Episode,
+    ProjectionState,
+)
 from state_renormalization.engine import run_mission_loop
 
 

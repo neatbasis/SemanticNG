@@ -4,17 +4,16 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from pathlib import Path
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from pathlib import Path
+from typing import Any
 
-from behave import given, when, then
+from behave import given, then, when
 from gherkin.parser import Parser
 from gherkin.token_scanner import TokenScanner
 
 from state_renormalization.gherkin_document import GherkinDocument
 from state_renormalization.stable_ids import derive_stable_ids
-
 
 # ----------------------------
 # Minimal helpers used in steps
@@ -43,25 +42,25 @@ def content_addressed_id(hash_hex: str) -> str:
 @dataclass(frozen=True)
 class ValidationResult:
     ok: bool
-    code: Optional[str] = None
-    warning: Optional[str] = None
+    code: str | None = None
+    warning: str | None = None
 
 
 class AppendOnlyStore:
     def __init__(self) -> None:
-        self._by_id: Dict[str, Dict[str, Any]] = {}
+        self._by_id: dict[str, dict[str, Any]] = {}
 
-    def put(self, resource: Dict[str, Any]) -> None:
+    def put(self, resource: dict[str, Any]) -> None:
         rid = resource["meta"]["dc:identifier"]
         if rid in self._by_id:
             raise ValueError("IMMUTABLE_OVERWRITE_FORBIDDEN")
         self._by_id[rid] = resource
 
-    def get(self, rid: str) -> Dict[str, Any]:
+    def get(self, rid: str) -> dict[str, Any]:
         return self._by_id[rid]
 
 
-def kernel_validate(resource: Dict[str, Any]) -> ValidationResult:
+def kernel_validate(resource: dict[str, Any]) -> ValidationResult:
     """
     Kernel validator:
       - MUST have meta, payload, integrity
@@ -90,10 +89,10 @@ def kernel_validate(resource: Dict[str, Any]) -> ValidationResult:
 
 
 def build_resource(
-    meta: Dict[str, Any],
+    meta: dict[str, Any],
     payload: Any,
-    extensions: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    extensions: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Build a Resource with content-addressed dc:identifier and sha256 integrity.
     Important: dc:identifier and integrity depend on canonical content.
@@ -102,7 +101,7 @@ def build_resource(
     meta = dict(meta)  # copy
     meta.setdefault("dc:format", "application/json")
 
-    resource: Dict[str, Any] = {
+    resource: dict[str, Any] = {
         "meta": meta,
         "payload": payload,
     }
@@ -120,7 +119,7 @@ def build_resource(
     return resource
 
 
-def _derive_context_stable_ids(context) -> Dict[str, str]:
+def _derive_context_stable_ids(context) -> dict[str, str]:
     feature_path = getattr(getattr(context, "feature", None), "filename", None)
     scenario = getattr(context, "scenario", None)
     step = getattr(context, "step", None)
@@ -138,7 +137,7 @@ def _derive_context_stable_ids(context) -> Dict[str, str]:
         return {}
 
     stable = derive_stable_ids(doc, uri=feature_path)
-    out: Dict[str, str] = {"feature_id": stable.feature_id}
+    out: dict[str, str] = {"feature_id": stable.feature_id}
 
     scenario_name = getattr(scenario, "name", None)
     if isinstance(scenario_name, str) and scenario_name.strip():
@@ -193,13 +192,14 @@ def _build_and_store_resource(context) -> None:
     context.store.put(context.resource)
 
 
-def _resource_for_validation(context) -> Dict[str, Any]:
+def _resource_for_validation(context) -> dict[str, Any]:
     return json.loads(canonical_json(context.resource))
 
 
 # ----------------------------
 # Behave steps
 # ----------------------------
+
 
 @given("a canonical JSON serializer for Resources")
 def step_given_canonical_serializer(context) -> None:
@@ -247,7 +247,7 @@ def step_when_create_resource_table(context) -> None:
       | dc:creator    | adapter:discord.v1   |
       | dc:format     | application/json     |
     """
-    meta: Dict[str, Any] = {}
+    meta: dict[str, Any] = {}
     for row in context.table:
         key = row["dc:identifier"] if "dc:identifier" in row else row[0]  # defensive
         val = row["(auto)"] if "(auto)" in row else row[1]  # defensive
@@ -340,7 +340,7 @@ def step_then_extension_key_pattern(context, pattern: str) -> None:
         assert rx.match(k), f"Extension key '{k}' does not match /{pattern}/"
 
 
-@then("the kernel validator MUST pass even if \"extensions\" is removed")
+@then('the kernel validator MUST pass even if "extensions" is removed')
 def step_then_kernel_validator_pass_without_extensions(context) -> None:
     r = _resource_for_validation(context)
     r.pop("extensions", None)

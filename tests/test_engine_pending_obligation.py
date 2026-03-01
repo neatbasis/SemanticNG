@@ -7,15 +7,14 @@ from state_renormalization.contracts import (
     AskMetrics,
     AskResult,
     AskStatus,
+    BeliefState,
     CaptureOutcome,
     CaptureStatus,
-    BeliefState,
     Channel,
     Episode,
     VerbosityDecision,
-    VerbosityLevel,
 )
-from state_renormalization.engine import ingest_observation, apply_schema_bubbling
+from state_renormalization.engine import apply_schema_bubbling, ingest_observation
 
 
 def test_apply_schema_bubbling_sets_pending_and_emits_schema_selection_artifact(
@@ -44,4 +43,6 @@ def test_apply_schema_bubbling_sets_pending_and_emits_schema_selection_artifact(
 
         assert pending_about is not None, "pending_about should not evaporate"
         assert isinstance(pending_about, dict), "pending_about should be a dict (Option A)"
-        assert isinstance(pending_question, str) and pending_question.strip(), "pending_question must be set"
+        assert isinstance(pending_question, str) and pending_question.strip(), (
+            "pending_question must be set"
+        )

@@ -48,18 +48,26 @@ def _is_docs_only_change(changed_files: list[str], filters: dict[str, Any]) -> b
 
 def _touches_impacting_docs(changed_files: list[str], filters: dict[str, Any]) -> bool:
     impacting = filters.get("impacting_docs_paths", [])
-    return any(_matches_path(path, configured) for path in changed_files for configured in impacting)
+    return any(
+        _matches_path(path, configured) for path in changed_files for configured in impacting
+    )
 
 
 def select_milestone_commands(
-    *, changed_files: list[str], head_manifest: dict[str, Any], base_manifest: dict[str, Any], surface_manifest: dict[str, Any]
+    *,
+    changed_files: list[str],
+    head_manifest: dict[str, Any],
+    base_manifest: dict[str, Any],
+    surface_manifest: dict[str, Any],
 ) -> dict[str, Any]:
     capabilities = head_manifest.get("capabilities", [])
     filters = surface_manifest.get("change_scope_filters", {})
 
     docs_only = _is_docs_only_change(changed_files, filters)
     impacting_docs = _touches_impacting_docs(changed_files, filters)
-    touches_state_renorm = any(path.startswith("src/state_renormalization/") for path in changed_files)
+    touches_state_renorm = any(
+        path.startswith("src/state_renormalization/") for path in changed_files
+    )
     manifest_changed = "docs/dod_manifest.json" in changed_files
 
     commands: list[str] = []
@@ -98,14 +106,19 @@ def select_milestone_commands(
         base_capability = base_by_id.get(capability_id)
         if not base_capability:
             continue
-        if base_capability.get("status") == "in_progress" and head_capability.get("status") == "done":
+        if (
+            base_capability.get("status") == "in_progress"
+            and head_capability.get("status") == "done"
+        ):
             for command in head_capability.get("pytest_commands", []):
                 commands.append(command)
                 reasons.setdefault(command, []).append(f"transition_only:{capability_id}")
 
     deduped = _dedupe(commands)
 
-    baseline_covered = set(surface_manifest.get("baseline", {}).get("guaranteed_pytest_commands", []))
+    baseline_covered = set(
+        surface_manifest.get("baseline", {}).get("guaranteed_pytest_commands", [])
+    )
     selected: list[str] = []
     for command in deduped:
         if command in baseline_covered:
@@ -142,7 +155,9 @@ def _render_summary(selection: dict[str, Any]) -> str:
     selected = selection.get("selected_commands", [])
     if selected:
         for command in selected:
-            reasons = ", ".join(selection.get("selection_reasons", {}).get(command, [])) or "unspecified"
+            reasons = (
+                ", ".join(selection.get("selection_reasons", {}).get(command, [])) or "unspecified"
+            )
             lines.append(f"- `{command}`")
             lines.append(f"  - why: {reasons}")
     else:
@@ -156,7 +171,9 @@ def _render_summary(selection: dict[str, Any]) -> str:
     else:
         lines.append("- none")
 
-    lines.extend(["", "### Scope filters", f"- docs_only_change: `{selection.get('docs_only_change')}`"])
+    lines.extend(
+        ["", "### Scope filters", f"- docs_only_change: `{selection.get('docs_only_change')}`"]
+    )
     lines.append(f"- impacting_docs_change: `{selection.get('impacting_docs_change')}`")
     return "\n".join(lines)
 

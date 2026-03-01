@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / ".github" / "scripts" / "validate_doc_freshness_slo.py"
@@ -76,7 +75,7 @@ def test_doc_freshness_slo_accepts_compliant_metadata_and_commit_lag(tmp_path: P
     issues = validate_doc_freshness_slo._validate_doc_freshness(
         _base_config(),
         tmp_path,
-        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        datetime(2026, 3, 1, tzinfo=UTC),
         git_runner=_git_runner,
     )
 
@@ -91,7 +90,7 @@ def test_doc_freshness_slo_rejects_missing_metadata(tmp_path: Path) -> None:
     issues = validate_doc_freshness_slo._validate_doc_freshness(
         _base_config(),
         tmp_path,
-        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        datetime(2026, 3, 1, tzinfo=UTC),
         git_runner=_git_runner,
     )
 
@@ -110,7 +109,7 @@ def test_doc_freshness_slo_rejects_stale_document(tmp_path: Path) -> None:
     issues = validate_doc_freshness_slo._validate_doc_freshness(
         _base_config(),
         tmp_path,
-        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        datetime(2026, 3, 1, tzinfo=UTC),
         git_runner=_git_runner,
     )
 
@@ -132,7 +131,7 @@ def test_doc_freshness_slo_commit_lag_at_threshold_passes(tmp_path: Path) -> Non
     issues = validate_doc_freshness_slo._validate_doc_freshness(
         config,
         tmp_path,
-        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        datetime(2026, 3, 1, tzinfo=UTC),
         git_runner=_git_runner,
     )
 
@@ -153,7 +152,7 @@ def test_doc_freshness_slo_commit_lag_above_threshold_fails(tmp_path: Path) -> N
     issues = validate_doc_freshness_slo._validate_doc_freshness(
         config,
         tmp_path,
-        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        datetime(2026, 3, 1, tzinfo=UTC),
         git_runner=_git_runner,
     )
 
@@ -176,7 +175,7 @@ def test_doc_freshness_slo_source_tip_reference_uses_source_commit_distance(tmp_
     issues = validate_doc_freshness_slo._validate_doc_freshness(
         config,
         tmp_path,
-        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        datetime(2026, 3, 1, tzinfo=UTC),
         git_runner=_git_runner,
     )
 
@@ -205,7 +204,7 @@ def test_doc_freshness_slo_source_tip_reference_violation_fails(tmp_path: Path) 
     issues = validate_doc_freshness_slo._validate_doc_freshness(
         config,
         tmp_path,
-        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        datetime(2026, 3, 1, tzinfo=UTC),
         git_runner=lagging_runner,
     )
 
@@ -227,7 +226,7 @@ def test_doc_freshness_slo_rejects_missing_source_mapping(tmp_path: Path) -> Non
     issues = validate_doc_freshness_slo._validate_doc_freshness(
         config,
         tmp_path,
-        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        datetime(2026, 3, 1, tzinfo=UTC),
         git_runner=_git_runner,
     )
 
@@ -249,13 +248,12 @@ def test_doc_freshness_slo_rejects_missing_source_commit_metadata(tmp_path: Path
     issues = validate_doc_freshness_slo._validate_doc_freshness(
         config,
         tmp_path,
-        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        datetime(2026, 3, 1, tzinfo=UTC),
         git_runner=_git_runner,
     )
 
     assert len(issues) == 1
     assert "missing source commit metadata" in issues[0]["message"]
-
 
 
 def test_doc_freshness_slo_config_error_invalid_max_commit_lag(tmp_path: Path) -> None:
@@ -272,7 +270,7 @@ def test_doc_freshness_slo_config_error_invalid_max_commit_lag(tmp_path: Path) -
     issues = validate_doc_freshness_slo._validate_doc_freshness(
         config,
         tmp_path,
-        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        datetime(2026, 3, 1, tzinfo=UTC),
         git_runner=_git_runner,
     )
 
@@ -280,7 +278,9 @@ def test_doc_freshness_slo_config_error_invalid_max_commit_lag(tmp_path: Path) -
     assert "invalid max_commit_lag" in issues[0]["message"]
 
 
-def test_doc_freshness_slo_main_prints_release_checklist_remediation_on_failure(tmp_path: Path, capsys) -> None:
+def test_doc_freshness_slo_main_prints_release_checklist_remediation_on_failure(
+    tmp_path: Path, capsys
+) -> None:
     config_path = tmp_path / "doc_freshness_slo.json"
     config_path.write_text(json.dumps(_base_config()), encoding="utf-8")
 

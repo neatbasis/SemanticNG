@@ -33,7 +33,9 @@ def select_governance_commands(
     """Select pytest commands relevant to the changed staged files."""
     capabilities = head_manifest.get("capabilities", [])
 
-    touches_state_renorm = any(path.startswith("src/state_renormalization/") for path in changed_files)
+    touches_state_renorm = any(
+        path.startswith("src/state_renormalization/") for path in changed_files
+    )
     manifest_changed = "docs/dod_manifest.json" in changed_files
 
     commands: list[str] = []
@@ -43,8 +45,14 @@ def select_governance_commands(
             continue
 
         capability_paths = capability.get("code_paths", [])
-        capability_changed = touches_state_renorm or manifest_changed or any(
-            _matches_code_path(changed, code_path) for changed in changed_files for code_path in capability_paths
+        capability_changed = (
+            touches_state_renorm
+            or manifest_changed
+            or any(
+                _matches_code_path(changed, code_path)
+                for changed in changed_files
+                for code_path in capability_paths
+            )
         )
 
         if capability_changed:
@@ -59,12 +67,16 @@ def select_governance_commands(
             base_capability = base_by_id.get(capability_id)
             if not base_capability:
                 continue
-            if base_capability.get("status") == "in_progress" and head_capability.get("status") == "done":
+            if (
+                base_capability.get("status") == "in_progress"
+                and head_capability.get("status") == "done"
+            ):
                 transitioned_to_done.append(head_capability)
 
         if transitioned_to_done:
             docs_updated = any(
-                path == "README.md" or (path.startswith("docs/") and path != "docs/dod_manifest.json")
+                path == "README.md"
+                or (path.startswith("docs/") and path != "docs/dod_manifest.json")
                 for path in changed_files
             )
             if not docs_updated:

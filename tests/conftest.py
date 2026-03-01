@@ -130,7 +130,13 @@ def make_observer() -> Callable[..., ObserverFrame]:
     ) -> ObserverFrame:
         return ObserverFrame(
             role=role,
-            capabilities=capabilities or ["baseline.dialog", "baseline.schema_selection", "baseline.invariant_evaluation", "baseline.evaluation"],
+            capabilities=capabilities
+            or [
+                "baseline.dialog",
+                "baseline.schema_selection",
+                "baseline.invariant_evaluation",
+                "baseline.evaluation",
+            ],
             authorization_level=authorization_level,
             evaluation_invariants=evaluation_invariants or [],
         )

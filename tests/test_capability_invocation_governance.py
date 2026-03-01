@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from state_renormalization.contracts import HaltRecord, PredictionRecord, ProjectionState
 from state_renormalization.adapters.persistence import read_jsonl
+from state_renormalization.contracts import HaltRecord, PredictionRecord, ProjectionState
 from state_renormalization.engine import append_prediction_record
 
 
@@ -21,9 +21,13 @@ def _prediction(prediction_id: str, scope_key: str) -> PredictionRecord:
     )
 
 
-def test_capability_invocation_allows_side_effect_after_policy_checks(make_episode, make_observer) -> None:
+def test_capability_invocation_allows_side_effect_after_policy_checks(
+    make_episode, make_observer
+) -> None:
     pred = _prediction("pred:allow", "scope:allow")
-    projection = ProjectionState(current_predictions={pred.scope_key: pred}, updated_at_iso="2026-02-13T00:00:00+00:00")
+    projection = ProjectionState(
+        current_predictions={pred.scope_key: pred}, updated_at_iso="2026-02-13T00:00:00+00:00"
+    )
     ep = make_episode(observer=make_observer(capabilities=["baseline.invariant_evaluation"]))
 
     log_path = Path("artifacts/test-capability-allow.jsonl")
@@ -52,9 +56,13 @@ def test_capability_invocation_allows_side_effect_after_policy_checks(make_episo
     assert not halt_path.exists()
 
 
-def test_capability_invocation_denial_persists_explainable_halt_and_skips_side_effect(make_episode) -> None:
+def test_capability_invocation_denial_persists_explainable_halt_and_skips_side_effect(
+    make_episode,
+) -> None:
     pred = _prediction("pred:deny", "scope:deny")
-    projection = ProjectionState(current_predictions={pred.scope_key: pred}, updated_at_iso="2026-02-13T00:00:00+00:00")
+    projection = ProjectionState(
+        current_predictions={pred.scope_key: pred}, updated_at_iso="2026-02-13T00:00:00+00:00"
+    )
     ep = make_episode()
 
     log_path = Path("artifacts/test-capability-deny.jsonl")

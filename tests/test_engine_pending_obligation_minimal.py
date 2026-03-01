@@ -12,7 +12,7 @@ from state_renormalization.contracts import (
     Episode,
     VerbosityDecision,
 )
-from state_renormalization.engine import ingest_observation, apply_schema_bubbling
+from state_renormalization.engine import apply_schema_bubbling, ingest_observation
 
 
 def test_apply_schema_bubbling_sets_minimal_pending_obligation(

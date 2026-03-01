@@ -7,10 +7,9 @@ import argparse
 import difflib
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_PATH = ROOT / "docs" / "dod_manifest.json"
@@ -38,7 +37,9 @@ def _status_transitions(base_manifest: dict, head_manifest: dict) -> set[str]:
     return transitioned
 
 
-def _transitioned_capability_commands(head_manifest: dict, transitioned_cap_ids: set[str]) -> dict[str, list[str]]:
+def _transitioned_capability_commands(
+    head_manifest: dict, transitioned_cap_ids: set[str]
+) -> dict[str, list[str]]:
     commands_by_capability: dict[str, list[str]] = {}
     for capability in head_manifest.get("capabilities", []):
         cap_id = capability.get("id")
@@ -46,7 +47,9 @@ def _transitioned_capability_commands(head_manifest: dict, transitioned_cap_ids:
             continue
 
         pytest_commands = capability.get("pytest_commands") or []
-        commands = [command for command in pytest_commands if isinstance(command, str) and command.strip()]
+        commands = [
+            command for command in pytest_commands if isinstance(command, str) and command.strip()
+        ]
         commands_by_capability[cap_id] = commands
 
     return commands_by_capability
@@ -70,7 +73,9 @@ def _render_block(commands_by_capability: dict[str, list[str]]) -> str:
         lines.append("<!-- transition-evidence:end -->")
         return "\n".join(lines)
 
-    lines.append("Use the generated CI run URL for each command. Override with MILESTONE_EVIDENCE_URL if needed.")
+    lines.append(
+        "Use the generated CI run URL for each command. Override with MILESTONE_EVIDENCE_URL if needed."
+    )
     lines.append("")
     for cap_id, commands in sorted(commands_by_capability.items()):
         lines.append(f"#### {cap_id}")
@@ -97,7 +102,9 @@ def _commands_for_pr_template_examples(manifest: dict) -> dict[str, dict[str, ob
 
         status = capability.get("status")
         pytest_commands = capability.get("pytest_commands") or []
-        commands = [command for command in pytest_commands if isinstance(command, str) and command.strip()]
+        commands = [
+            command for command in pytest_commands if isinstance(command, str) and command.strip()
+        ]
         if commands:
             commands_by_capability[cap_id] = {
                 "status": status,
@@ -215,14 +222,18 @@ def _autogen_command_semantics_match(actual_template: str, expected_template: st
 def check_pr_template_autogen_section() -> int:
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     template = PR_TEMPLATE_PATH.read_text(encoding="utf-8")
-    expected_template = _replace_between_markers(template, _render_pr_template_autogen_section(manifest))
+    expected_template = _replace_between_markers(
+        template, _render_pr_template_autogen_section(manifest)
+    )
 
     if template == expected_template:
         print("PR template AUTOGEN section is up to date.")
         return 0
 
     if _autogen_command_semantics_match(template, expected_template):
-        print("PR template AUTOGEN section uses legacy command grouping but equivalent pytest coverage; treating as up to date.")
+        print(
+            "PR template AUTOGEN section uses legacy command grouping but equivalent pytest coverage; treating as up to date."
+        )
         return 0
 
     diff = difflib.unified_diff(

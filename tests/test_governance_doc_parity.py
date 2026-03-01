@@ -16,6 +16,7 @@ VALID_STATUSES = {"done", "in_progress", "planned"}
 ALLOWED_DONE_MILESTONES = {"Now"}
 ALLOWED_DONE_MATURITY = {"operational", "proven"}
 
+
 class CapabilityRecord(TypedDict, total=False):
     id: str
     status: str
@@ -215,7 +216,9 @@ def test_roadmap_capability_status_alignment_matches_manifest() -> None:
 def test_done_capabilities_only_reference_allowed_contract_maturity_rows() -> None:
     manifest = _load_manifest()
     capabilities = manifest.get("capabilities", [])
-    contract_map = _extract_contract_maturity_rows(SYSTEM_CONTRACT_MAP_PATH.read_text(encoding="utf-8"))
+    contract_map = _extract_contract_maturity_rows(
+        SYSTEM_CONTRACT_MAP_PATH.read_text(encoding="utf-8")
+    )
 
     mismatches: list[str] = []
 
@@ -280,7 +283,9 @@ def test_project_maturity_status_claims_do_not_contradict_manifest() -> None:
                 f"source='{source_line}'"
             )
 
-    for cap_id, declared_status, source_line in _extract_project_maturity_status_mentions(maturity_text):
+    for cap_id, declared_status, source_line in _extract_project_maturity_status_mentions(
+        maturity_text
+    ):
         expected_status = manifest_status.get(cap_id)
         if expected_status is None:
             mismatches.append(
@@ -411,7 +416,9 @@ def test_contract_map_maturity_transitions_reference_manifest_capability_and_evi
     contract_map_text = SYSTEM_CONTRACT_MAP_PATH.read_text(encoding="utf-8")
 
     mismatches: list[str] = []
-    for capability_id, source_line in _extract_maturity_changelog_capability_refs(contract_map_text):
+    for capability_id, source_line in _extract_maturity_changelog_capability_refs(
+        contract_map_text
+    ):
         if not capability_id:
             mismatches.append(
                 "System contract-map changelog mismatch: maturity transition entry missing capability_id=... "

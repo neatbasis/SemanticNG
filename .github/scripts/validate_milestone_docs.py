@@ -2,18 +2,14 @@ import json
 import os
 import re
 import subprocess
-import sys
 from datetime import date
 from pathlib import Path
-
 
 MISSING_PR_EVIDENCE_MARKER = "MILESTONE_VALIDATION_ERROR=MISSING_PR_EVIDENCE"
 MISSING_PR_HEADING_MARKER = "MILESTONE_VALIDATION_ERROR=MISSING_PR_TEMPLATE_HEADING"
 MISSING_PR_FIELD_MARKER = "MILESTONE_VALIDATION_ERROR=MISSING_PR_TEMPLATE_FIELD"
 MISSING_ROLLBACK_PLAN_MARKER = "MILESTONE_VALIDATION_ERROR=MISSING_ROLLBACK_PLAN"
 MISSING_GOVERNANCE_HANDOFF_MARKER = "MILESTONE_VALIDATION_ERROR=MISSING_GOVERNANCE_HANDOFF_FIELDS"
-
-
 
 
 def _documentation_change_control_mismatches() -> list[str]:
@@ -49,12 +45,16 @@ def _documentation_change_control_mismatches() -> list[str]:
         )
 
     release_text = Path("docs/release_checklist.md").read_text(encoding="utf-8")
-    if "docs/documentation_change_control.md" not in release_text and "documentation_change_control.md" not in release_text:
+    if (
+        "docs/documentation_change_control.md" not in release_text
+        and "documentation_change_control.md" not in release_text
+    ):
         mismatches.append(
             "docs/release_checklist.md must reference docs/documentation_change_control.md for release governance routing."
         )
 
     return mismatches
+
 
 def _load_manifest(rev: str) -> dict:
     raw = subprocess.check_output(["git", "show", f"{rev}:docs/dod_manifest.json"], text=True)
@@ -108,7 +108,9 @@ def _policy_waiver_mismatches(policy: dict, today: date | None = None) -> list[s
         try:
             rollback_date = date.fromisoformat(rollback_by)
         except ValueError:
-            mismatches.append(f"waivers[{idx}] rollback_by must use ISO format YYYY-MM-DD (found '{rollback_by}').")
+            mismatches.append(
+                f"waivers[{idx}] rollback_by must use ISO format YYYY-MM-DD (found '{rollback_by}')."
+            )
             continue
 
         if rollback_date < today:
@@ -143,7 +145,9 @@ def _done_capability_no_regression_budget_mismatches(
             for entry in base_capability.get("ci_evidence_links", [])
             if isinstance(entry, dict) and isinstance(entry.get("command"), str)
         }
-        head_links = [entry for entry in capability.get("ci_evidence_links", []) if isinstance(entry, dict)]
+        head_links = [
+            entry for entry in capability.get("ci_evidence_links", []) if isinstance(entry, dict)
+        ]
         refreshed = False
         for entry in head_links:
             command = entry.get("command")
@@ -165,7 +169,9 @@ def _done_capability_no_regression_budget_mismatches(
             if result != "fail":
                 continue
 
-            covered = any(_waiver_scope_covers_failure(waiver, cap_id, command) for waiver in waivers)
+            covered = any(
+                _waiver_scope_covers_failure(waiver, cap_id, command) for waiver in waivers
+            )
             if not covered:
                 mismatches.append(
                     f"{cap_id}: evidence refreshed with failing command pack and no active waiver for '{command}'."
@@ -454,19 +460,25 @@ def _maturity_transition_changelog_mismatches(
     return mismatches
 
 
-def _transitioned_capability_commands(head_manifest: dict, transitioned_cap_ids: set[str]) -> dict[str, list[str]]:
+def _transitioned_capability_commands(
+    head_manifest: dict, transitioned_cap_ids: set[str]
+) -> dict[str, list[str]]:
     commands_by_capability: dict[str, list[str]] = {}
     for capability in head_manifest.get("capabilities", []):
         cap_id = capability.get("id")
         if cap_id not in transitioned_cap_ids:
             continue
         pytest_commands = capability.get("pytest_commands") or []
-        commands = [command for command in pytest_commands if isinstance(command, str) and command.strip()]
+        commands = [
+            command for command in pytest_commands if isinstance(command, str) and command.strip()
+        ]
         commands_by_capability[cap_id] = commands
     return commands_by_capability
 
 
-def _ci_evidence_links_command_mismatches(head_manifest: dict, transitioned_cap_ids: set[str]) -> list[str]:
+def _ci_evidence_links_command_mismatches(
+    head_manifest: dict, transitioned_cap_ids: set[str]
+) -> list[str]:
     mismatches: list[str] = []
     for capability in head_manifest.get("capabilities", []):
         cap_id = capability.get("id", "<unknown>")
@@ -568,7 +580,9 @@ def _commands_missing_evidence(pr_body: str, commands: list[str]) -> list[str]:
             if idx + 1 >= len(lines):
                 continue
             evidence_idx = idx + 1
-            while evidence_idx < len(normalized_lines) and html_comment_pattern.match(normalized_lines[evidence_idx]):
+            while evidence_idx < len(normalized_lines) and html_comment_pattern.match(
+                normalized_lines[evidence_idx]
+            ):
                 evidence_idx += 1
             if evidence_idx >= len(normalized_lines):
                 continue
@@ -673,7 +687,9 @@ def _validate_pr_template_fields(pr_body: str, require_governance_fields: bool) 
             "Cross-capability risk if this change regresses:",
         ]
         for field in _find_missing_prefixed_fields(dependency_section, dependency_fields):
-            mismatches.append(f"{MISSING_PR_FIELD_MARKER};heading={dependency_heading};field={field}")
+            mismatches.append(
+                f"{MISSING_PR_FIELD_MARKER};heading={dependency_heading};field={field}"
+            )
 
     budget_heading = "No-regression budget and rollback plan (mandatory)"
     budget_section = _extract_pr_section(pr_body, budget_heading)
@@ -687,7 +703,9 @@ def _validate_pr_template_fields(pr_body: str, require_governance_fields: bool) 
         for field in _find_missing_prefixed_fields(budget_section, budget_fields):
             mismatches.append(f"{MISSING_PR_FIELD_MARKER};heading={budget_heading};field={field}")
 
-        rollback_field = "If waiver requested, include owner + rollback-by date + mitigation command packs:"
+        rollback_field = (
+            "If waiver requested, include owner + rollback-by date + mitigation command packs:"
+        )
         rollback_missing = _find_missing_prefixed_fields(budget_section, [rollback_field])
         if rollback_missing:
             mismatches.append(
@@ -715,7 +733,10 @@ def _validate_pr_template_fields(pr_body: str, require_governance_fields: bool) 
 
 
 def main() -> int:
-    head_sha = os.environ.get("HEAD_SHA") or subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    head_sha = (
+        os.environ.get("HEAD_SHA")
+        or subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    )
     base_sha = os.environ.get("BASE_SHA")
     if not base_sha:
         merge_base = subprocess.run(
@@ -727,7 +748,9 @@ def main() -> int:
         if merge_base.returncode == 0:
             base_sha = merge_base.stdout.strip()
         else:
-            base_sha = subprocess.check_output(["git", "rev-parse", f"{head_sha}~1"], text=True).strip()
+            base_sha = subprocess.check_output(
+                ["git", "rev-parse", f"{head_sha}~1"], text=True
+            ).strip()
 
     if not base_sha or not head_sha:
         print("Unable to determine BASE_SHA or HEAD_SHA.")
@@ -749,7 +772,9 @@ def main() -> int:
     event_name = os.environ.get("GITHUB_EVENT_NAME", "")
     if event_name in {"pull_request", "pull_request_target"}:
         pr_body = _load_pr_body()
-        pr_template_mismatches = _validate_pr_template_fields(pr_body, require_governance_fields=True)
+        pr_template_mismatches = _validate_pr_template_fields(
+            pr_body, require_governance_fields=True
+        )
         if pr_template_mismatches:
             print("Pull request body is missing mandatory milestone governance fields.")
             for mismatch in pr_template_mismatches:
@@ -795,12 +820,16 @@ def main() -> int:
             head_manifest, set(status_transitions), contract_rows
         )
         if contract_map_mismatches:
-            print("Capability status transitions must be mirrored in docs/system_contract_map.md contract rows.")
+            print(
+                "Capability status transitions must be mirrored in docs/system_contract_map.md contract rows."
+            )
             for mismatch in contract_map_mismatches:
                 print(f"  - {mismatch}")
             return 1
 
-        ci_command_mismatches = _ci_evidence_links_command_mismatches(head_manifest, set(status_transitions))
+        ci_command_mismatches = _ci_evidence_links_command_mismatches(
+            head_manifest, set(status_transitions)
+        )
         if ci_command_mismatches:
             print(
                 "Transitioned capabilities must keep ci_evidence_links.command exactly synchronized with pytest_commands."

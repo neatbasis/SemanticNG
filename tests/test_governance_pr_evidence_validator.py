@@ -3,7 +3,6 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / ".github" / "scripts" / "validate_milestone_docs.py"
 
@@ -36,9 +35,9 @@ def test_mismatched_command_string_fails() -> None:
         ]
     )
 
-    assert validate_milestone_docs._commands_missing_evidence(pr_body, [expected_command]) == [expected_command]
-
-
+    assert validate_milestone_docs._commands_missing_evidence(pr_body, [expected_command]) == [
+        expected_command
+    ]
 
 
 def test_command_and_evidence_inside_code_fence_passes() -> None:
@@ -68,6 +67,7 @@ def test_command_with_comment_then_blank_line_before_evidence_fails() -> None:
 
     assert validate_milestone_docs._commands_missing_evidence(pr_body, [command]) == [command]
 
+
 def test_roadmap_status_transition_mismatch_detected() -> None:
     transitions = {"observer_authorization_contract": ("planned", "done")}
     roadmap_text = "\n".join(
@@ -78,7 +78,9 @@ def test_roadmap_status_transition_mismatch_detected() -> None:
         ]
     )
 
-    mismatches = validate_milestone_docs._roadmap_status_transition_mismatches(transitions, roadmap_text)
+    mismatches = validate_milestone_docs._roadmap_status_transition_mismatches(
+        transitions, roadmap_text
+    )
 
     assert len(mismatches) == 1
     assert "observer_authorization_contract" in mismatches[0]
@@ -94,4 +96,7 @@ def test_roadmap_status_transition_sync_passes_when_updated() -> None:
         ]
     )
 
-    assert validate_milestone_docs._roadmap_status_transition_mismatches(transitions, roadmap_text) == []
+    assert (
+        validate_milestone_docs._roadmap_status_transition_mismatches(transitions, roadmap_text)
+        == []
+    )

@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from state_renormalization.contracts import PredictionOutcome, PredictionRecord
 from state_renormalization.engine import bind_prediction_outcome
-from state_renormalization.invariants import InvariantId, REGISTRY, default_check_context
-
+from state_renormalization.invariants import REGISTRY, InvariantId, default_check_context
 
 FIXED_PREDICTION = {
     "prediction_id": "pred:1",
@@ -59,7 +58,9 @@ def test_bind_prediction_outcome_updates_prediction_and_emits_contract() -> None
 
 def test_prediction_outcome_binding_invariant_passes_for_bound_outcome() -> None:
     pred = PredictionRecord.model_validate(FIXED_PREDICTION)
-    _, outcome = bind_prediction_outcome(pred, observed_outcome=1.0, recorded_at_iso="2026-02-13T00:01:00+00:00")
+    _, outcome = bind_prediction_outcome(
+        pred, observed_outcome=1.0, recorded_at_iso="2026-02-13T00:01:00+00:00"
+    )
 
     ctx = default_check_context(
         scope=pred.scope_key,

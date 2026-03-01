@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from state_renormalization.contracts import CapabilityAdapterGate
 from state_renormalization.adapters.persistence import append_prediction_record_event, read_jsonl
+from state_renormalization.contracts import CapabilityAdapterGate
 
 
 def test_adapter_guard_requires_policy_gate(tmp_path: Path) -> None:

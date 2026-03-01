@@ -4,9 +4,21 @@ from collections.abc import Callable
 from pathlib import Path
 
 from state_renormalization.adapters.persistence import append_jsonl, read_jsonl
-from state_renormalization.contracts import AskResult, AskStatus, BeliefState, Episode, HaltRecord, PredictionRecord, ProjectionState
-from state_renormalization.engine import evaluate_invariant_gates, replay_projection_analytics, run_mission_loop, to_jsonable_episode
-
+from state_renormalization.contracts import (
+    AskResult,
+    AskStatus,
+    BeliefState,
+    Episode,
+    HaltRecord,
+    PredictionRecord,
+    ProjectionState,
+)
+from state_renormalization.engine import (
+    evaluate_invariant_gates,
+    replay_projection_analytics,
+    run_mission_loop,
+    to_jsonable_episode,
+)
 
 FIXED_PENDING_PREDICTION = {
     "prediction_id": "pred:base",
@@ -49,7 +61,10 @@ def test_append_only_replay_reconstructs_projection_state_deterministically(
     replay_twice = replay_projection_analytics(prediction_log)
 
     assert replay_once.model_dump(mode="json") == replay_twice.model_dump(mode="json")
-    assert replay_once.projection_state.current_predictions.keys() == online_projection.current_predictions.keys()
+    assert (
+        replay_once.projection_state.current_predictions.keys()
+        == online_projection.current_predictions.keys()
+    )
     assert replay_once.projection_state.correction_metrics == online_projection.correction_metrics
 
 
@@ -102,7 +117,11 @@ def test_append_only_replay_is_deterministic_across_simulated_restart_runs(
         prediction_log_path=log_b,
     )
 
-    assert projection_after_first_turn.correction_metrics == replay_projection_a.correction_metrics == replay_projection_b.correction_metrics
+    assert (
+        projection_after_first_turn.correction_metrics
+        == replay_projection_a.correction_metrics
+        == replay_projection_b.correction_metrics
+    )
     assert restarted_a.current_predictions.keys() == restarted_b.current_predictions.keys()
     assert restarted_a.correction_metrics == restarted_b.correction_metrics
 
@@ -130,7 +149,7 @@ def test_halt_explainability_payload_fields_remain_intact_through_projection_rep
 
     _ = replay_projection_analytics(prediction_log)
 
-    (_, persisted), = list(read_jsonl(episode_log))
+    ((_, persisted),) = list(read_jsonl(episode_log))
     halt_payloads = [
         artifact
         for artifact in persisted["artifacts"]

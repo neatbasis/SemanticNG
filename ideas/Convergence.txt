@@ -1,0 +1,17 @@
+Convergence:
+
+presenting multiple instances the same invariant test to make it easy to constrain probable next thing
+
+As in this prompt example to collect projections after a session which has dealt with identities related to the ask:
+
+
+```
+Add `MISSION.md` (or expand `README.md` with a first section) containing:
+
+* One-sentence mission
+* 3–5 north-star principles (invariants, evidence, contracts, behavior tests)
+* Clear non-goals for current phase
+
+Use wording that references current modules (`contracts.py`, `invariants.py`, `engine.py`) so readers can jump from concept to code quickly.
+
+```

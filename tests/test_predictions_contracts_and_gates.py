@@ -50,7 +50,9 @@ FIXED_PREDICTION = {
 }
 
 REGISTERED_INVARIANTS = tuple(REGISTRY.keys())
-REGISTERED_INVARIANT_IDS_FROM_REGISTRY = tuple(invariant_id.value for invariant_id in REGISTERED_INVARIANTS)
+REGISTERED_INVARIANT_IDS_FROM_REGISTRY = tuple(
+    invariant_id.value for invariant_id in REGISTERED_INVARIANTS
+)
 REPLAY_ANALYTICS_SCOPE_REQUIRES_COMPLETE_MATRIX = True
 
 
@@ -101,7 +103,10 @@ def _build_allow_context_for_evidence_link_completeness() -> Any:
         prediction_key="scope:test",
         current_predictions={"scope:test": "pred:test"},
         prediction_log_available=True,
-        just_written_prediction={"key": "scope:test", "evidence_refs": [{"kind": "jsonl", "ref": "predictions.jsonl@1"}]},
+        just_written_prediction={
+            "key": "scope:test",
+            "evidence_refs": [{"kind": "jsonl", "ref": "predictions.jsonl@1"}],
+        },
     )
 
 
@@ -148,7 +153,9 @@ def _build_allow_context_for_explainable_halt_payload() -> Any:
             flow=Flow.STOP,
             validity=Validity.INVALID,
             code="no_predictions_projected",
-            details={"message": "Action selection requires at least one projected current prediction."},
+            details={
+                "message": "Action selection requires at least one projected current prediction."
+            },
             evidence=({"kind": "scope", "value": "scope:test"},),
             action_hints=({"kind": "rebuild_view", "scope": "scope:test"},),
         ),
@@ -210,7 +217,10 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 expected_code="evidence_links_complete",
                 rationale="Post-write append has evidence links and projection is current.",
                 gate_inputs={
-                    "just_written_prediction": {"key": "scope:test", "evidence_refs": [{"kind": "jsonl", "ref": "predictions.jsonl@1"}]},
+                    "just_written_prediction": {
+                        "key": "scope:test",
+                        "evidence_refs": [{"kind": "jsonl", "ref": "predictions.jsonl@1"}],
+                    },
                     "has_projected_prediction": True,
                 },
             ),
@@ -221,7 +231,10 @@ INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
                 expected_flow=Flow.STOP,
                 expected_code="missing_evidence_links",
                 rationale="Prediction append without evidence links must halt.",
-                gate_inputs={"just_written_prediction": {"key": "scope:test", "evidence_refs": []}, "has_projected_prediction": True},
+                gate_inputs={
+                    "just_written_prediction": {"key": "scope:test", "evidence_refs": []},
+                    "has_projected_prediction": True,
+                },
             ),
         ),
     ),
@@ -283,8 +296,7 @@ MATRIX_CASES = [
 ]
 
 INVARIANT_MATRIX_CASES_BY_ID = [
-    pytest.param(invariant_id, id=invariant_id.value)
-    for invariant_id in REGISTERED_INVARIANTS
+    pytest.param(invariant_id, id=invariant_id.value) for invariant_id in REGISTERED_INVARIANTS
 ]
 
 MATRIX_SCENARIO_NAMES_BY_INVARIANT = {
@@ -317,7 +329,9 @@ def _assert_result_contract(result: GateDecision) -> None:
         assert result.halt_id.startswith("halt:")
         assert result.invariant_id
         assert result.reason
-        assert set(result.to_canonical_payload().keys()) == set(HaltRecord.required_payload_fields())
+        assert set(result.to_canonical_payload().keys()) == set(
+            HaltRecord.required_payload_fields()
+        )
 
 
 def test_halt_payload_schema_is_canonical_for_stop_emitters() -> None:
@@ -335,6 +349,7 @@ def test_halt_payload_schema_is_canonical_for_stop_emitters() -> None:
     assert HaltRecord.required_payload_fields() == tuple(expected_schema)
     assert HaltRecord.canonical_payload_schema() == expected_schema
 
+
 def test_gate_flow_contract_parity_for_continue_and_stop(tmp_path: Path) -> None:
     scope = FIXED_PREDICTION["scope_key"]
     projected = project_current(
@@ -348,7 +363,10 @@ def test_gate_flow_contract_parity_for_continue_and_stop(tmp_path: Path) -> None
         prediction_key=scope,
         projection_state=projected,
         prediction_log_available=True,
-        just_written_prediction={"key": scope, "evidence_refs": [{"kind": "jsonl", "ref": "predictions.jsonl@1"}]},
+        just_written_prediction={
+            "key": scope,
+            "evidence_refs": [{"kind": "jsonl", "ref": "predictions.jsonl@1"}],
+        },
         halt_log_path=tmp_path / "continue_halts.jsonl",
     )
     stop_gate = evaluate_invariant_gates(
@@ -387,7 +405,10 @@ def test_registered_invariant_parameterization_matches_registry() -> None:
 def test_invariant_identifiers_are_enumerated_and_registered() -> None:
     assert REGISTERED_INVARIANT_IDS == REGISTERED_INVARIANT_IDS_FROM_REGISTRY
     enumerated_identifiers = tuple(invariant.value for invariant in InvariantId)
-    assert tuple(InvariantId(identifier) for identifier in enumerated_identifiers) == REGISTERED_INVARIANTS
+    assert (
+        tuple(InvariantId(identifier) for identifier in enumerated_identifiers)
+        == REGISTERED_INVARIANTS
+    )
 
 
 def test_invariant_matrix_release_gate_has_required_coverage() -> None:
@@ -395,13 +416,19 @@ def test_invariant_matrix_release_gate_has_required_coverage() -> None:
     assert set(REGISTERED_INVARIANTS) == set(REGISTERED_INVARIANT_BRANCH_BEHAVIORS)
 
     for invariant_id, coverage in INVARIANT_RELEASE_GATE_MATRIX.items():
-        assert any(s.expected_passed for s in coverage.scenarios), f"{invariant_id.value} has no pass scenario"
+        assert any(s.expected_passed for s in coverage.scenarios), (
+            f"{invariant_id.value} has no pass scenario"
+        )
         if coverage.supports_stop:
-            assert any(not s.expected_passed for s in coverage.scenarios), f"{invariant_id.value} has no stop scenario"
+            assert any(not s.expected_passed for s in coverage.scenarios), (
+                f"{invariant_id.value} has no stop scenario"
+            )
 
 
 @pytest.mark.parametrize("invariant_id", INVARIANT_MATRIX_CASES_BY_ID)
-def test_invariant_matrix_has_explicit_pass_stop_scenarios_per_invariant(invariant_id: InvariantId) -> None:
+def test_invariant_matrix_has_explicit_pass_stop_scenarios_per_invariant(
+    invariant_id: InvariantId,
+) -> None:
     scenario_names = MATRIX_SCENARIO_NAMES_BY_INVARIANT[invariant_id]
     assert scenario_names == ("pass", "stop"), (
         f"{invariant_id.value} must define deterministic pass/stop scenarios; got {scenario_names}"
@@ -421,7 +448,9 @@ def test_invariant_matrix_guard_fails_when_registry_gains_uncovered_invariant() 
         + ", ".join(sorted(invariant.value for invariant in stale_matrix_entries))
     )
 
-    uncovered_branch_contracts = set(REGISTERED_INVARIANTS) - set(REGISTERED_INVARIANT_BRANCH_BEHAVIORS)
+    uncovered_branch_contracts = set(REGISTERED_INVARIANTS) - set(
+        REGISTERED_INVARIANT_BRANCH_BEHAVIORS
+    )
     stale_branch_contracts = set(REGISTERED_INVARIANT_BRANCH_BEHAVIORS) - set(REGISTERED_INVARIANTS)
     assert not uncovered_branch_contracts, (
         "REGISTERED_INVARIANT_BRANCH_BEHAVIORS is missing registered invariants: "
@@ -538,7 +567,9 @@ def test_gate_decisions_and_artifacts_are_deterministic_by_invariant(
         non_applicable = INVARIANT_RELEASE_GATE_MATRIX[invariant_id].gate_non_applicable
         assert non_applicable is not None
         assert non_applicable.rationale
-        pytest.skip(f"{invariant_id.value} is not directly evaluated by evaluate_invariant_gates: {non_applicable.rationale}")
+        pytest.skip(
+            f"{invariant_id.value} is not directly evaluated by evaluate_invariant_gates: {non_applicable.rationale}"
+        )
 
     just_written_prediction = scenario.gate_inputs["just_written_prediction"]
     has_projected_prediction = scenario.gate_inputs["has_projected_prediction"]
@@ -607,13 +638,20 @@ def test_gate_decisions_and_artifacts_are_deterministic_by_invariant(
         assert first_artifact["kind"] == "halt"
         assert set(first_artifact["halt"]) == set(HaltRecord.required_payload_fields())
         if just_written_prediction is None:
-            assert [check["passed"] for check in first_artifact["invariant_checks"]] == [False, True]
+            assert [check["passed"] for check in first_artifact["invariant_checks"]] == [
+                False,
+                True,
+            ]
             assert [check["invariant_id"] for check in first_artifact["invariant_checks"]] == [
                 InvariantId.PREDICTION_AVAILABILITY.value,
                 InvariantId.EXPLAINABLE_HALT_PAYLOAD.value,
             ]
         else:
-            assert [check["passed"] for check in first_artifact["invariant_checks"]] == [True, False, True]
+            assert [check["passed"] for check in first_artifact["invariant_checks"]] == [
+                True,
+                False,
+                True,
+            ]
             assert [check["invariant_id"] for check in first_artifact["invariant_checks"]] == [
                 InvariantId.PREDICTION_AVAILABILITY.value,
                 InvariantId.EVIDENCE_LINK_COMPLETENESS.value,
@@ -622,7 +660,9 @@ def test_gate_decisions_and_artifacts_are_deterministic_by_invariant(
     else:
         assert isinstance(first, Success)
         assert isinstance(second, Success)
-        assert [out.code for out in first.artifact.combined] == [out.code for out in second.artifact.combined]
+        assert [out.code for out in first.artifact.combined] == [
+            out.code for out in second.artifact.combined
+        ]
         assert first_artifact["kind"] == "prediction"
         if just_written_prediction is None:
             assert [out.flow for out in first.artifact.combined] == [Flow.CONTINUE]
@@ -647,7 +687,9 @@ def test_gate_decisions_and_artifacts_are_deterministic_by_invariant(
         if scenario.gate_inputs is not None
     ],
 )
-def test_gate_matrix_covers_all_gate_evaluated_invariants(invariant_id: InvariantId, scenario_name: str) -> None:
+def test_gate_matrix_covers_all_gate_evaluated_invariants(
+    invariant_id: InvariantId, scenario_name: str
+) -> None:
     assert invariant_id in {
         InvariantId.PREDICTION_AVAILABILITY,
         InvariantId.EVIDENCE_LINK_COMPLETENESS,
@@ -656,24 +698,34 @@ def test_gate_matrix_covers_all_gate_evaluated_invariants(invariant_id: Invarian
 
 
 @pytest.mark.parametrize("invariant_id", INVARIANT_MATRIX_CASES_BY_ID)
-def test_gate_matrix_explicitly_marks_non_applicable_gate_coverage(invariant_id: InvariantId) -> None:
+def test_gate_matrix_explicitly_marks_non_applicable_gate_coverage(
+    invariant_id: InvariantId,
+) -> None:
     coverage = INVARIANT_RELEASE_GATE_MATRIX[invariant_id]
     has_gate_scenarios = any(scenario.gate_inputs is not None for scenario in coverage.scenarios)
     if has_gate_scenarios:
-        assert coverage.gate_non_applicable is None, f"{invariant_id.value} unexpectedly marked non-applicable"
+        assert coverage.gate_non_applicable is None, (
+            f"{invariant_id.value} unexpectedly marked non-applicable"
+        )
     else:
-        assert coverage.gate_non_applicable is not None, f"{invariant_id.value} must declare non-applicable gate rationale"
+        assert coverage.gate_non_applicable is not None, (
+            f"{invariant_id.value} must declare non-applicable gate rationale"
+        )
         assert coverage.gate_non_applicable.rationale
 
 
 @pytest.mark.parametrize("invariant_id", INVARIANT_MATRIX_CASES_BY_ID)
-def test_each_registered_invariant_is_exercised_by_matrix_parameterization(invariant_id: InvariantId) -> None:
+def test_each_registered_invariant_is_exercised_by_matrix_parameterization(
+    invariant_id: InvariantId,
+) -> None:
     coverage = INVARIANT_RELEASE_GATE_MATRIX[invariant_id]
     assert tuple(sorted(s.name for s in coverage.scenarios)) == ("pass", "stop")
 
 
 @pytest.mark.parametrize("invariant_id", INVARIANT_MATRIX_CASES_BY_ID)
-def test_registry_guard_requires_matrix_coverage_for_each_invariant(invariant_id: InvariantId) -> None:
+def test_registry_guard_requires_matrix_coverage_for_each_invariant(
+    invariant_id: InvariantId,
+) -> None:
     assert invariant_id in INVARIANT_RELEASE_GATE_MATRIX, (
         "INVARIANT_RELEASE_GATE_MATRIX must add deterministic pass/stop (or explicit non-applicable gate rationale) "
         f"for new registry invariant: {invariant_id.value}"
@@ -726,7 +778,9 @@ def test_post_write_gate_halts_when_append_evidence_missing(tmp_path: Path) -> N
     assert halt.stage == "pre-decision:post_write"
     assert halt.invariant_id == "evidence_link_completeness.v1"
     assert halt.reason == "Prediction append did not produce linked evidence."
-    assert [e.model_dump(mode="json") for e in halt.evidence] == [{"kind": "scope", "ref": pred.scope_key}]
+    assert [e.model_dump(mode="json") for e in halt.evidence] == [
+        {"kind": "scope", "ref": pred.scope_key}
+    ]
     assert halt.retryability is True
 
 
@@ -821,7 +875,9 @@ def test_pre_consume_gate_halts_without_any_projected_predictions(tmp_path: Path
         ep=None,
         scope="scope:test",
         prediction_key="scope:test",
-        projection_state=ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+        projection_state=ProjectionState(
+            current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"
+        ),
         prediction_log_available=True,
         halt_log_path=tmp_path / "halts.jsonl",
     )
@@ -850,7 +906,9 @@ def test_append_prediction_record_persists_supplied_stable_ids(tmp_path: Path) -
         assert rec["step_id"] == "stp_1"
 
 
-def test_gate_invariants_remain_stable_when_capability_policy_denies_side_effect(tmp_path: Path) -> None:
+def test_gate_invariants_remain_stable_when_capability_policy_denies_side_effect(
+    tmp_path: Path,
+) -> None:
     pred = PredictionRecord.model_validate(FIXED_PREDICTION)
     projected = project_current(
         pred,
@@ -862,7 +920,10 @@ def test_gate_invariants_remain_stable_when_capability_policy_denies_side_effect
         prediction_key=pred.scope_key,
         projection_state=projected,
         prediction_log_available=True,
-        just_written_prediction={"key": pred.scope_key, "evidence_refs": [e.model_dump(mode="json") for e in pred.evidence_links]},
+        just_written_prediction={
+            "key": pred.scope_key,
+            "evidence_refs": [e.model_dump(mode="json") for e in pred.evidence_links],
+        },
     )
     assert isinstance(gate, Success)
 
@@ -884,7 +945,14 @@ def test_gate_invariants_remain_stable_when_capability_policy_denies_side_effect
 def test_evaluate_invariant_gates_persists_halt_with_episode_stable_ids(tmp_path: Path) -> None:
     class DummyEpisode:
         def __init__(self) -> None:
-            self.artifacts = [{"kind": "stable_ids", "feature_id": "feat_1", "scenario_id": "scn_1", "step_id": "stp_1"}]
+            self.artifacts = [
+                {
+                    "kind": "stable_ids",
+                    "feature_id": "feat_1",
+                    "scenario_id": "scn_1",
+                    "step_id": "stp_1",
+                }
+            ]
 
     pred = PredictionRecord.model_validate(FIXED_PREDICTION)
     projected = project_current(
@@ -902,7 +970,7 @@ def test_evaluate_invariant_gates_persists_halt_with_episode_stable_ids(tmp_path
         halt_log_path=tmp_path / "halts.jsonl",
     )
 
-    (_, rec), = list(read_jsonl(tmp_path / "halts.jsonl"))
+    ((_, rec),) = list(read_jsonl(tmp_path / "halts.jsonl"))
     assert rec["feature_id"] == "feat_1"
     assert rec["scenario_id"] == "scn_1"
     assert rec["step_id"] == "stp_1"
@@ -959,7 +1027,9 @@ def test_gate_deterministic_continue_outcome_has_stable_branches() -> None:
     assert isinstance(first, Success)
     assert isinstance(second, Success)
     assert [out.flow.value for out in first.artifact.combined] == ["continue", "continue"]
-    assert [out.code for out in first.artifact.combined] == [out.code for out in second.artifact.combined]
+    assert [out.code for out in first.artifact.combined] == [
+        out.code for out in second.artifact.combined
+    ]
 
 
 def test_gate_flow_parity_continue_and_stop_payloads(tmp_path: Path) -> None:
@@ -1035,7 +1105,9 @@ def test_evaluate_invariant_gates_rejects_malformed_halt_outcome_payload(monkeyp
             scope="scope:test",
             prediction_key="scope:test",
             projection_state=ProjectionState(
-                current_predictions={"scope:test": PredictionRecord.model_validate(FIXED_PREDICTION)},
+                current_predictions={
+                    "scope:test": PredictionRecord.model_validate(FIXED_PREDICTION)
+                },
                 updated_at_iso="2026-02-13T00:00:00+00:00",
             ),
             prediction_log_available=True,

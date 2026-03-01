@@ -3,10 +3,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from state_renormalization.contracts import AskStatus, BeliefState, Episode, PredictionRecord, ProjectionState
+from state_renormalization.contracts import (
+    AskStatus,
+    BeliefState,
+    Episode,
+    PredictionRecord,
+    ProjectionState,
+)
 from state_renormalization.engine import replay_projection_analytics, run_mission_loop
 from state_renormalization.invariants import InvariantHandlingMode
-
 
 FIXED_PENDING_PREDICTION = {
     "prediction_id": "pred:repair-base",
@@ -31,7 +36,9 @@ def _seed_projection() -> ProjectionState:
 
 
 def _read_jsonl(path: Path) -> list[dict[str, object]]:
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [
+        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
+    ]
 
 
 def test_repair_mode_emits_repair_events_and_replay_applies_acceptance(
@@ -57,10 +64,16 @@ def test_repair_mode_emits_repair_events_and_replay_applies_acceptance(
 
     rows = _read_jsonl(prediction_log)
     assert any(row.get("event_kind") == "repair_proposal" for row in rows)
-    assert any(row.get("event_kind") == "repair_resolution" and row.get("decision") == "accepted" for row in rows)
+    assert any(
+        row.get("event_kind") == "repair_resolution" and row.get("decision") == "accepted"
+        for row in rows
+    )
 
     replay = replay_projection_analytics(prediction_log)
-    assert replay.projection_state.current_predictions.keys() == live_projection.current_predictions.keys()
+    assert (
+        replay.projection_state.current_predictions.keys()
+        == live_projection.current_predictions.keys()
+    )
     assert replay.projection_state.correction_metrics == live_projection.correction_metrics
 
 

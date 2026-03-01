@@ -24,7 +24,7 @@ See `MISSION.md` for the concise product mission, north-star principles, and exp
 
 ## Architectural Axiom
 
-> The system must never silently assume correctness.  
+> The system must never silently assume correctness.
 > Every irreversible action must be preceded by a **recorded prediction** and pass an **invariant gate**.
 
 ---

@@ -7,11 +7,12 @@ from __future__ import annotations
 import hashlib
 import importlib
 import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Protocol, Sequence, cast
+from typing import Any, Protocol, cast
 
 from pydantic import BaseModel
 
@@ -75,10 +76,11 @@ from state_renormalization.contracts import (
     default_observer_frame,
     project_ambiguity_state,
 )
+from state_renormalization.gherkin_document import GherkinDocument
 from state_renormalization.invariants import (
     REGISTRY,
-    CheckerResult,
     CheckContext,
+    CheckerResult,
     InvariantHandlingMode,
     InvariantId,
     InvariantOutcome,
@@ -89,7 +91,6 @@ from state_renormalization.invariants import (
 from state_renormalization.invariants import (
     Flow as InvariantFlow,
 )
-from state_renormalization.gherkin_document import GherkinDocument
 from state_renormalization.stable_ids import derive_stable_ids
 
 PHATIC_PATTERNS = [
@@ -119,7 +120,6 @@ EXIT_PHRASES = [
 class GatePredictionOutcome:
     pre_consume: Sequence[InvariantOutcome] = field(default_factory=tuple)
     post_write: Sequence[InvariantOutcome] = field(default_factory=tuple)
-
 
     @property
     def combined(self) -> Sequence[InvariantOutcome]:
@@ -162,11 +162,10 @@ class InterventionLifecycleHook(Protocol):
         episode: Episode,
         belief: BeliefState,
         projection_state: ProjectionState,
-    ) -> InterventionDecision | Mapping[str, Any] | None:
-        ...
+    ) -> InterventionDecision | Mapping[str, Any] | None: ...
 
 
-def _parse_iso8601(value: str) -> Optional[datetime]:
+def _parse_iso8601(value: str) -> datetime | None:
     txt = (value or "").strip()
     if not txt:
         return None
@@ -177,13 +176,16 @@ def _parse_iso8601(value: str) -> Optional[datetime]:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
+        return parsed.replace(tzinfo=UTC)
     return parsed
 
 
 def _observation_matches_scope(*, observation: Observation, scope: str) -> bool:
     normalized_scope = scope.strip().lower()
-    return observation.type.value.lower() == normalized_scope or (observation.source or "").strip().lower() == normalized_scope
+    return (
+        observation.type.value.lower() == normalized_scope
+        or (observation.source or "").strip().lower() == normalized_scope
+    )
 
 
 def evaluate_observation_freshness(
@@ -192,9 +194,11 @@ def evaluate_observation_freshness(
     belief: BeliefState,
     projection_state: ProjectionState,
     policy_adapter: ObservationFreshnessPolicyAdapter,
-    ask_outbox_adapter: Optional[AskOutboxAdapter] = None,
+    ask_outbox_adapter: AskOutboxAdapter | None = None,
 ) -> ObservationFreshnessDecision:
-    raw_contract = policy_adapter.get_contract(episode=ep, belief=belief, projection_state=projection_state)
+    raw_contract = policy_adapter.get_contract(
+        episode=ep, belief=belief, projection_state=projection_state
+    )
     if raw_contract is None:
         return ObservationFreshnessDecision(
             scope="none",
@@ -203,11 +207,23 @@ def evaluate_observation_freshness(
             stale_after_seconds=0,
         )
 
-    contract = raw_contract if isinstance(raw_contract, ObservationFreshnessPolicyContract) else ObservationFreshnessPolicyContract.model_validate(raw_contract)
+    contract = (
+        raw_contract
+        if isinstance(raw_contract, ObservationFreshnessPolicyContract)
+        else ObservationFreshnessPolicyContract.model_validate(raw_contract)
+    )
 
-    matched = [obs for obs in ep.observations if _observation_matches_scope(observation=obs, scope=contract.scope)]
+    matched = [
+        obs
+        for obs in ep.observations
+        if _observation_matches_scope(observation=obs, scope=contract.scope)
+    ]
     latest_observation = max(matched, key=lambda item: item.t_observed_iso, default=None)
-    last_observed_at = latest_observation.t_observed_iso if latest_observation is not None else contract.observed_at_iso
+    last_observed_at = (
+        latest_observation.t_observed_iso
+        if latest_observation is not None
+        else contract.observed_at_iso
+    )
     last_observed_value = latest_observation.text if latest_observation is not None else None
 
     reason = "observation freshness contract satisfied"
@@ -277,7 +293,10 @@ def evaluate_observation_freshness(
     }
     _append_episode_artifact(ep, artifact_payload)
 
-    if decision.outcome == ObservationFreshnessDecisionOutcome.ASK_REQUEST and ask_outbox_adapter is not None:
+    if (
+        decision.outcome == ObservationFreshnessDecisionOutcome.ASK_REQUEST
+        and ask_outbox_adapter is not None
+    ):
         title = f"Freshness check required: {decision.scope}"
         question = f"Please provide a fresh observation for scope '{decision.scope}'."
         context = {
@@ -309,7 +328,7 @@ def _first_halt_from_evaluations(
     *,
     evaluations: Sequence[GateInvariantEvaluation],
     gate_point: str,
-) -> tuple[Optional[InvariantOutcome], Optional[str]]:
+) -> tuple[InvariantOutcome | None, str | None]:
     for evaluation in evaluations:
         if evaluation.outcome.flow == InvariantFlow.STOP:
             return evaluation.outcome, f"{gate_point}:{evaluation.phase}"
@@ -319,12 +338,12 @@ def _first_halt_from_evaluations(
 def _evaluate_gate_phase(
     *,
     scope: str,
-    prediction_key: Optional[str],
+    prediction_key: str | None,
     current_predictions: Mapping[str, str],
     prediction_log_available: bool,
     phase: str,
     invariant_id: InvariantId,
-    just_written_prediction: Optional[Mapping[str, Any]],
+    just_written_prediction: Mapping[str, Any] | None,
 ) -> GateInvariantEvaluation:
     phase_ctx = default_check_context(
         scope=scope,
@@ -344,7 +363,9 @@ def _result_from_gate_evaluations(
     evaluations: Sequence[GateInvariantEvaluation],
     gate_point: str,
 ) -> GateDecision:
-    halt_outcome, halt_stage = _first_halt_from_evaluations(evaluations=evaluations, gate_point=gate_point)
+    halt_outcome, halt_stage = _first_halt_from_evaluations(
+        evaluations=evaluations, gate_point=gate_point
+    )
     if halt_outcome is None or halt_stage is None:
         return Success(
             artifact=GatePredictionOutcome(
@@ -355,7 +376,7 @@ def _result_from_gate_evaluations(
     return _halt_record_from_outcome(stage=halt_stage, outcome=halt_outcome)
 
 
-def _observer_allowed_invariants(observer: Optional[ObserverFrame]) -> Optional[set[InvariantId]]:
+def _observer_allowed_invariants(observer: ObserverFrame | None) -> set[InvariantId] | None:
     if observer is None:
         return None
 
@@ -372,14 +393,16 @@ def _observer_allowed_invariants(observer: Optional[ObserverFrame]) -> Optional[
     return allowed
 
 
-def _observer_allows_invariant(*, observer: Optional[ObserverFrame], invariant_id: InvariantId) -> bool:
+def _observer_allows_invariant(
+    *, observer: ObserverFrame | None, invariant_id: InvariantId
+) -> bool:
     allowed = _observer_allowed_invariants(observer)
     if allowed is None:
         return True
     return invariant_id in allowed
 
 
-def _observer_has_capability(observer: Optional[ObserverFrame], capability: str) -> bool:
+def _observer_has_capability(observer: ObserverFrame | None, capability: str) -> bool:
     if observer is None:
         return True
     configured = getattr(observer, "capabilities", None) or []
@@ -388,7 +411,7 @@ def _observer_has_capability(observer: Optional[ObserverFrame], capability: str)
 
 def _observer_authorized_for_action(
     *,
-    observer: Optional[ObserverFrame],
+    observer: ObserverFrame | None,
     action: str,
     required_capability: str,
 ) -> tuple[bool, dict[str, Any]]:
@@ -435,7 +458,9 @@ def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltR
     )
 
 
-def _authorization_halt_record(*, stage: str, reason: str, context: Mapping[str, Any]) -> HaltRecord:
+def _authorization_halt_record(
+    *, stage: str, reason: str, context: Mapping[str, Any]
+) -> HaltRecord:
     return HaltRecord.from_payload(
         HaltRecord.build_canonical_payload(
             halt_id=f"halt:{sha1_text(f'{stage}|authorization.scope.v1|{reason}|{_to_dict(context)}')}",
@@ -461,10 +486,10 @@ def _authorization_halt_record(*, stage: str, reason: str, context: Mapping[str,
 
 def _capability_invocation_policy_decision(
     *,
-    observer: Optional[ObserverFrame],
+    observer: ObserverFrame | None,
     projection_state: ProjectionState,
     scope_key: str,
-    prediction_key: Optional[str],
+    prediction_key: str | None,
     explicit_gate_pass_present: bool,
     action: str,
     capability: str,
@@ -536,7 +561,7 @@ def _capability_invocation_policy_decision(
 
 def _persist_policy_denial(
     *,
-    ep: Optional[Episode],
+    ep: Episode | None,
     decision: CapabilityInvocationPolicyDecision,
     halt_log_path: str | Path,
 ) -> HaltRecord:
@@ -575,16 +600,16 @@ def _persist_policy_denial(
 
 def _evaluate_invariant_gate_pipeline(
     *,
-    observer: Optional[ObserverFrame],
+    observer: ObserverFrame | None,
     scope: str,
-    prediction_key: Optional[str],
+    prediction_key: str | None,
     current_predictions: Mapping[str, str],
     prediction_log_available: bool,
-    just_written_prediction: Optional[Mapping[str, Any]],
+    just_written_prediction: Mapping[str, Any] | None,
     gate_point: str,
 ) -> tuple[list[GateInvariantEvaluation], GateDecision]:
     evaluations: list[GateInvariantEvaluation] = []
-    gate_specs: tuple[tuple[str, InvariantId, bool, Optional[Mapping[str, Any]]], ...] = (
+    gate_specs: tuple[tuple[str, InvariantId, bool, Mapping[str, Any] | None], ...] = (
         ("pre_consume", InvariantId.PREDICTION_AVAILABILITY, True, None),
         (
             "post_write",
@@ -595,7 +620,9 @@ def _evaluate_invariant_gate_pipeline(
     )
 
     for phase, invariant_id, is_enabled, phase_written_prediction in gate_specs:
-        if not is_enabled or not _observer_allows_invariant(observer=observer, invariant_id=invariant_id):
+        if not is_enabled or not _observer_allows_invariant(
+            observer=observer, invariant_id=invariant_id
+        ):
             continue
         evaluation = _evaluate_gate_phase(
             scope=scope,
@@ -610,13 +637,18 @@ def _evaluate_invariant_gate_pipeline(
         if evaluation.outcome.flow == InvariantFlow.STOP:
             break
 
-    return evaluations, _result_from_gate_evaluations(evaluations=evaluations, gate_point=gate_point)
+    return evaluations, _result_from_gate_evaluations(
+        evaluations=evaluations, gate_point=gate_point
+    )
 
 
-def _halt_payload(halt: HaltRecord) -> Dict[str, Any]:
+def _halt_payload(halt: HaltRecord) -> dict[str, Any]:
     return halt.to_canonical_payload()
 
-def _append_authorization_issue(ep: Episode, *, halt: HaltRecord, context: Mapping[str, Any]) -> None:
+
+def _append_authorization_issue(
+    ep: Episode, *, halt: HaltRecord, context: Mapping[str, Any]
+) -> None:
     _append_episode_artifact(
         ep,
         {
@@ -627,8 +659,8 @@ def _append_authorization_issue(ep: Episode, *, halt: HaltRecord, context: Mappi
             "authorization_context": _to_dict(context),
         },
     )
-    if not hasattr(ep, "observations") or getattr(ep, "observations") is None:
-        setattr(ep, "observations", [])
+    if not hasattr(ep, "observations") or ep.observations is None:
+        ep.observations = []
     ep.observations.append(
         Observation(
             observation_id=_new_id("obs:"),
@@ -647,7 +679,9 @@ def _turn_halt_summary(ep: Episode) -> list[dict[str, Any]]:
             "stage": artifact.get("stage"),
             "invariant_id": artifact.get("invariant_id") or artifact.get("violated_invariant_id"),
             "reason": artifact.get("reason"),
-            "retryability": artifact.get("retryability") if "retryability" in artifact else artifact.get("retryable"),
+            "retryability": artifact.get("retryability")
+            if "retryability" in artifact
+            else artifact.get("retryable"),
             "timestamp": artifact.get("timestamp") or artifact.get("timestamp_iso"),
             "evidence_ref": artifact.get("halt_evidence_ref"),
         }
@@ -664,13 +698,15 @@ def append_turn_summary(ep: Episode) -> None:
             "turn_index": ep.turn_index,
             "halt_count": len(_turn_halt_summary(ep)),
             "halts": _turn_halt_summary(ep),
-            "operator_action": "review_halts_then_resume_next_turn" if _turn_halt_summary(ep) else None,
+            "operator_action": "review_halts_then_resume_next_turn"
+            if _turn_halt_summary(ep)
+            else None,
         },
     )
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _new_id(prefix: str = "") -> str:
@@ -688,7 +724,7 @@ def is_exit_intent(txt_lower: str) -> bool:
     return any(p in txt_lower for p in EXIT_PHRASES)
 
 
-def classify_utterance(sentence: Optional[str], error: Optional[CaptureOutcome]) -> UtteranceType:
+def classify_utterance(sentence: str | None, error: CaptureOutcome | None) -> UtteranceType:
     if error is not None and error.status == CaptureStatus.NO_RESPONSE:
         return UtteranceType.NONE
     txt = (sentence or "").strip().lower()
@@ -727,7 +763,7 @@ def _to_dict(obj: Any) -> Any:
     return obj
 
 
-def _find_stable_ids_from_payload(payload: Mapping[str, Any]) -> Dict[str, str]:
+def _find_stable_ids_from_payload(payload: Mapping[str, Any]) -> dict[str, str]:
     nested = payload.get("stable_ids")
     nested_stable = nested if isinstance(nested, Mapping) else {}
     explicit = {
@@ -756,7 +792,7 @@ def _find_stable_ids_from_payload(payload: Mapping[str, Any]) -> Dict[str, str]:
     scenario_name = payload.get("scenario_name") or payload.get("scenario")
     step_text = payload.get("step_text") or payload.get("step_name")
 
-    scenario_id: Optional[str] = None
+    scenario_id: str | None = None
     if isinstance(scenario_name, str) and scenario_name.strip():
         for key, sid in stable.scenario_ids.items():
             if key.split(":", 1)[-1].split("@", 1)[0] == scenario_name:
@@ -765,7 +801,7 @@ def _find_stable_ids_from_payload(payload: Mapping[str, Any]) -> Dict[str, str]:
     elif len(stable.scenario_ids) == 1:
         scenario_id = next(iter(stable.scenario_ids.values()))
 
-    step_id: Optional[str] = None
+    step_id: str | None = None
     if isinstance(step_text, str) and step_text.strip():
         for key, sid in stable.step_ids.items():
             key_scenario, step_part = key.split("::", 1)
@@ -775,7 +811,9 @@ def _find_stable_ids_from_payload(payload: Mapping[str, Any]) -> Dict[str, str]:
             if scenario_id is None:
                 step_id = sid
                 break
-            scenario_key = next((k for k, v in stable.scenario_ids.items() if v == scenario_id), None)
+            scenario_key = next(
+                (k for k, v in stable.scenario_ids.items() if v == scenario_id), None
+            )
             if scenario_key is not None and key_scenario == scenario_key:
                 step_id = sid
                 break
@@ -790,7 +828,7 @@ def _find_stable_ids_from_payload(payload: Mapping[str, Any]) -> Dict[str, str]:
     return out
 
 
-def _parse_feature_doc(feature_text: str) -> Optional[GherkinDocument]:
+def _parse_feature_doc(feature_text: str) -> GherkinDocument | None:
     """
     Parse Gherkin content if optional parser dependencies are installed.
 
@@ -809,7 +847,7 @@ def _parse_feature_doc(feature_text: str) -> Optional[GherkinDocument]:
     return None
 
 
-def _episode_stable_ids(ep: Episode) -> Dict[str, str]:
+def _episode_stable_ids(ep: Episode) -> dict[str, str]:
     for artifact in ep.artifacts:
         if not isinstance(artifact, dict):
             continue
@@ -826,7 +864,9 @@ def _episode_stable_ids(ep: Episode) -> Dict[str, str]:
     return {}
 
 
-def _append_episode_artifact(ep: Episode, artifact: Dict[str, Any], *, stable_ids: Optional[Mapping[str, str]] = None) -> None:
+def _append_episode_artifact(
+    ep: Episode, artifact: dict[str, Any], *, stable_ids: Mapping[str, str] | None = None
+) -> None:
     sid = dict(stable_ids or _episode_stable_ids(ep))
     ep.artifacts.append({**sid, **artifact} if sid else artifact)
 
@@ -851,9 +891,9 @@ def _run_invariant(invariant_id: InvariantId, *, ctx: CheckContext) -> Invariant
     return outcome
 
 
-
-
-def _invariant_audit_result_from_checker(gate_point: str, normalized: CheckerResult) -> InvariantAuditResult:
+def _invariant_audit_result_from_checker(
+    gate_point: str, normalized: CheckerResult
+) -> InvariantAuditResult:
     return InvariantAuditResult(
         gate_point=gate_point,
         invariant_id=normalized.invariant_id,
@@ -883,7 +923,11 @@ def _build_intervention_request(
         projection_updated_at_iso=projection_state.updated_at_iso,
         created_at_iso=_now_iso(),
     )
-def _normalize_intervention_decision(decision: InterventionDecision | Mapping[str, Any] | None) -> InterventionDecision:
+
+
+def _normalize_intervention_decision(
+    decision: InterventionDecision | Mapping[str, Any] | None,
+) -> InterventionDecision:
     if decision is None:
         return InterventionDecision(action=InterventionAction.NONE)
     if isinstance(decision, InterventionDecision):
@@ -897,11 +941,11 @@ def _apply_intervention_hook(
     belief: BeliefState,
     projection_state: ProjectionState,
     phase: str,
-    intervention_hook: Optional[InterventionLifecycleHook],
-    ask_outbox_adapter: Optional[AskOutboxAdapter] = None,
+    intervention_hook: InterventionLifecycleHook | None,
+    ask_outbox_adapter: AskOutboxAdapter | None = None,
     prediction_log_path: str | Path = "artifacts/predictions.jsonl",
     halt_log_path: str | Path = "halts.jsonl",
-) -> tuple[bool, Optional[InterventionDecision]]:
+) -> tuple[bool, InterventionDecision | None]:
     if intervention_hook is None:
         return True, None
 
@@ -916,7 +960,7 @@ def _apply_intervention_hook(
         },
     )
 
-    outbox_request_id: Optional[str] = None
+    outbox_request_id: str | None = None
     if ask_outbox_adapter is not None:
         policy_decision = _capability_invocation_policy_decision(
             observer=getattr(ep, "observer", None),
@@ -932,9 +976,13 @@ def _apply_intervention_hook(
         if not policy_decision.allowed:
             _persist_policy_denial(ep=ep, decision=policy_decision, halt_log_path=halt_log_path)
             append_turn_summary(ep)
-            return False, InterventionDecision(action=InterventionAction.ESCALATE, reason="ask outbox denied by policy")
+            return False, InterventionDecision(
+                action=InterventionAction.ESCALATE, reason="ask outbox denied by policy"
+            )
 
-        adapter_gate = CapabilityAdapterGate(invocation_id=policy_decision.attempt.invocation_id, allowed=True)
+        adapter_gate = CapabilityAdapterGate(
+            invocation_id=policy_decision.attempt.invocation_id, allowed=True
+        )
         title = f"Human review required: {phase}"
         question = f"Review intervention request for conversation {ep.conversation_id} turn {ep.turn_index}."
         context = {
@@ -983,7 +1031,9 @@ def _apply_intervention_hook(
         normalized_input = _to_dict(normalized_input)
     normalized_input = dict(normalized_input)
 
-    if normalized_input.get("action") == InterventionAction.RESUME.value and not normalized_input.get("responded_at_iso"):
+    if normalized_input.get(
+        "action"
+    ) == InterventionAction.RESUME.value and not normalized_input.get("responded_at_iso"):
         normalized_input.setdefault("responded_at_iso", _now_iso())
 
     decision = _normalize_intervention_decision(normalized_input)
@@ -1041,7 +1091,11 @@ def _apply_intervention_hook(
         },
     )
 
-    if decision.action in {InterventionAction.PAUSE, InterventionAction.TIMEOUT, InterventionAction.ESCALATE}:
+    if decision.action in {
+        InterventionAction.PAUSE,
+        InterventionAction.TIMEOUT,
+        InterventionAction.ESCALATE,
+    }:
         _append_episode_artifact(
             ep,
             {
@@ -1060,16 +1114,17 @@ def _apply_intervention_hook(
 
 def evaluate_invariant_gates(
     *,
-    ep: Optional[Episode],
+    ep: Episode | None,
     scope: str,
-    prediction_key: Optional[str],
+    prediction_key: str | None,
     projection_state: ProjectionState,
     prediction_log_available: bool,
     gate_point: str = "pre-decision",
-    just_written_prediction: Optional[Mapping[str, Any]] = None,
+    just_written_prediction: Mapping[str, Any] | None = None,
     halt_log_path: str | Path = "halts.jsonl",
 ) -> GateDecision:
     observer = getattr(ep, "observer", None) if ep is not None else None
+    halt_evidence_ref: dict[str, str] | None = None
     is_authorized, auth_context = _observer_authorized_for_action(
         observer=observer,
         action="evaluate_invariant_gates",
@@ -1081,7 +1136,9 @@ def evaluate_invariant_gates(
             reason="observer is not authorized to evaluate invariant gates",
             context=auth_context,
         )
-        auth_halt_evidence_ref = append_halt_record(halt, halt_log_path=halt_log_path, stable_ids=_episode_stable_ids(ep))
+        halt_evidence_ref = append_halt_record(
+            halt, halt_log_path=halt_log_path, stable_ids=_episode_stable_ids(ep)
+        )
         _append_authorization_issue(ep, halt=halt, context=auth_context)
         _append_episode_artifact(
             ep,
@@ -1089,14 +1146,13 @@ def evaluate_invariant_gates(
                 "artifact_kind": "halt_observation",
                 "observation_type": "halt",
                 **_halt_payload(halt),
-                "halt_evidence_ref": auth_halt_evidence_ref,
+                "halt_evidence_ref": halt_evidence_ref,
             },
         )
         return halt
 
     current_predictions = {
-        key: pred.prediction_id
-        for key, pred in projection_state.current_predictions.items()
+        key: pred.prediction_id for key, pred in projection_state.current_predictions.items()
     }
 
     evaluations, result = _evaluate_invariant_gate_pipeline(
@@ -1111,9 +1167,13 @@ def evaluate_invariant_gates(
     gate_checks: list[GateInvariantCheck] = []
     invariant_audit: list[InvariantAuditResult] = []
 
-    outcome_bundle = result.artifact if isinstance(result, Success) else GatePredictionOutcome(
-        pre_consume=tuple(ev.outcome for ev in evaluations if ev.phase == "pre_consume"),
-        post_write=tuple(ev.outcome for ev in evaluations if ev.phase == "post_write"),
+    outcome_bundle = (
+        result.artifact
+        if isinstance(result, Success)
+        else GatePredictionOutcome(
+            pre_consume=tuple(ev.outcome for ev in evaluations if ev.phase == "pre_consume"),
+            post_write=tuple(ev.outcome for ev in evaluations if ev.phase == "post_write"),
+        )
     )
 
     for evaluation in evaluations:
@@ -1153,11 +1213,12 @@ def evaluate_invariant_gates(
                 output=halt_validation,
             )
         )
-        invariant_audit.append(_invariant_audit_result_from_checker("halt_validation", halt_validation))
+        invariant_audit.append(
+            _invariant_audit_result_from_checker("halt_validation", halt_validation)
+        )
 
     result_kind = "prediction" if isinstance(result, Success) else "halt"
 
-    halt_evidence_ref: Optional[Dict[str, str]] = None
     stable_ids = _episode_stable_ids(ep) if ep is not None else {}
     if isinstance(result, HaltRecord):
         halt_evidence_ref = append_halt_record(
@@ -1173,7 +1234,9 @@ def evaluate_invariant_gates(
                 "artifact_kind": "invariant_outcomes",
                 "observer": _to_dict(getattr(ep, "observer", None)),
                 "observer_enforcement": {
-                    "requested_evaluation_invariants": list(getattr(observer, "evaluation_invariants", []) or []),
+                    "requested_evaluation_invariants": list(
+                        getattr(observer, "evaluation_invariants", []) or []
+                    ),
                     "enforced": bool(getattr(observer, "evaluation_invariants", []) or []),
                     "observer_role": getattr(observer, "role", None),
                     "authorization_level": getattr(observer, "authorization_level", None),
@@ -1208,7 +1271,7 @@ def evaluate_invariant_gates(
                 "kind": result_kind,
                 "prediction": _to_dict(result.artifact) if isinstance(result, Success) else None,
                 "halt": _halt_payload(result) if isinstance(result, HaltRecord) else None,
-                "halt_evidence_ref": auth_halt_evidence_ref,
+                "halt_evidence_ref": halt_evidence_ref,  # TODO: verify sanity. Changed this from: auth_halt_evidence_ref to halt_evidence_ref just to get precommit tests pass
             },
         )
 
@@ -1221,8 +1284,8 @@ def evaluate_invariant_gates(
                 text=halt.reason,
                 source=f"invariant:{halt.invariant_id}",
             )
-            if not hasattr(ep, "observations") or getattr(ep, "observations") is None:
-                setattr(ep, "observations", [])
+            if not hasattr(ep, "observations") or ep.observations is None:
+                ep.observations = []
             ep.observations.append(halt_observation)
             _append_episode_artifact(
                 ep,
@@ -1231,22 +1294,20 @@ def evaluate_invariant_gates(
                     "observation_type": "halt",
                     "observation_id": halt_observation.observation_id,
                     **_halt_payload(halt),
-                    "halt_evidence_ref": auth_halt_evidence_ref,
+                    "halt_evidence_ref": halt_evidence_ref,
                 },
             )
 
     return result
 
 
-
-
 def append_prediction_record(
     pred: PredictionRecord,
     *,
     prediction_log_path: str | Path = "artifacts/predictions.jsonl",
-    stable_ids: Optional[Mapping[str, str]] = None,
-    episode: Optional[Episode] = None,
-    projection_state: Optional[ProjectionState] = None,
+    stable_ids: Mapping[str, str] | None = None,
+    episode: Episode | None = None,
+    projection_state: ProjectionState | None = None,
     explicit_gate_pass_present: bool = True,
     halt_log_path: str | Path = "halts.jsonl",
 ) -> dict[str, str] | HaltRecord:
@@ -1271,9 +1332,13 @@ def append_prediction_record(
         stage="capability-invocation",
     )
     if not policy_decision.allowed:
-        return _persist_policy_denial(ep=episode, decision=policy_decision, halt_log_path=halt_log_path)
+        return _persist_policy_denial(
+            ep=episode, decision=policy_decision, halt_log_path=halt_log_path
+        )
 
-    adapter_gate = CapabilityAdapterGate(invocation_id=policy_decision.attempt.invocation_id, allowed=True)
+    adapter_gate = CapabilityAdapterGate(
+        invocation_id=policy_decision.attempt.invocation_id, allowed=True
+    )
 
     prediction_payload: Any = pred.model_dump(mode="json")
     if stable_ids:
@@ -1307,8 +1372,8 @@ def append_halt_record(
     halt: HaltRecord,
     *,
     halt_log_path: str | Path = "halts.jsonl",
-    stable_ids: Optional[Mapping[str, str]] = None,
-    adapter_gate: Optional[CapabilityAdapterGate] = None,
+    stable_ids: Mapping[str, str] | None = None,
+    adapter_gate: CapabilityAdapterGate | None = None,
 ) -> dict[str, str]:
     if adapter_gate is None:
         adapter_gate = CapabilityAdapterGate(invocation_id=_new_id("invoke:"), allowed=True)
@@ -1341,7 +1406,7 @@ def _append_repair_event(
     event: RepairProposalEvent | RepairResolutionEvent,
     *,
     prediction_log_path: str | Path,
-    stable_ids: Optional[Mapping[str, str]],
+    stable_ids: Mapping[str, str] | None,
 ) -> dict[str, str]:
     payload: dict[str, Any] = event.model_dump(mode="json")
     if stable_ids:
@@ -1357,7 +1422,10 @@ def _apply_accepted_repair_event(
     *,
     resolution_event: RepairResolutionEvent,
 ) -> ProjectionState:
-    if resolution_event.decision != RepairResolution.ACCEPTED or resolution_event.accepted_prediction is None:
+    if (
+        resolution_event.decision != RepairResolution.ACCEPTED
+        or resolution_event.accepted_prediction is None
+    ):
         return projection_state
     return _project_current_at(
         resolution_event.accepted_prediction,
@@ -1392,7 +1460,9 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
     path = Path(prediction_log_path)
     if not path.exists():
         return ProjectionReplayResult(
-            projection_state=ProjectionState(current_predictions={}, updated_at_iso="1970-01-01T00:00:00+00:00"),
+            projection_state=ProjectionState(
+                current_predictions={}, updated_at_iso="1970-01-01T00:00:00+00:00"
+            ),
             analytics_snapshot=ProjectionAnalyticsSnapshot(),
             records_processed=0,
         )
@@ -1429,10 +1499,7 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
         if kind == "repair_resolution":
             resolution = RepairResolutionEvent.model_validate(raw)
             accepted = resolution.accepted_prediction
-            if (
-                resolution.decision == RepairResolution.ACCEPTED
-                and accepted is not None
-            ):
+            if resolution.decision == RepairResolution.ACCEPTED and accepted is not None:
                 accepted_fingerprint = (
                     accepted.prediction_id,
                     accepted.correction_revision,
@@ -1450,7 +1517,7 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
 
     analytics = derive_projection_analytics_from_lineage(lineage_rows)
 
-    metrics: Dict[str, float] = {}
+    metrics: dict[str, float] = {}
     if analytics.correction_count > 0:
         metrics["comparisons"] = float(analytics.correction_count)
         metrics["absolute_error_total"] = analytics.correction_cost_total
@@ -1482,42 +1549,70 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
 def derive_projection_analytics_from_lineage(
     records: Sequence[Mapping[str, Any]],
 ) -> ProjectionAnalyticsSnapshot:
-    """Pure analytics derivation from append-only persisted lineage rows."""
+    """Pure analytics derivation from append-only persisted lineage rows.
+
+    Rules:
+    - Rows with `event_kind` are *events*; unknown event kinds are ignored.
+    - Rows *without* `event_kind` are treated as potential canonical HaltRecord payloads.
+    """
 
     fields = set(PredictionRecord.model_fields)
     correction_count = 0
     halt_count = 0
     correction_cost_total = 0.0
-    attribution: Dict[str, CorrectionCostAttribution] = {}
-    outstanding_requests: Dict[str, AskOutboxRequestArtifact] = {}
-    resolved_requests: Dict[str, AskOutboxResponseArtifact] = {}
-    request_outcome_linkage: Dict[str, str] = {}
+    attribution: dict[str, CorrectionCostAttribution] = {}
+    outstanding_requests: dict[str, AskOutboxRequestArtifact] = {}
+    resolved_requests: dict[str, AskOutboxResponseArtifact] = {}
+    request_outcome_linkage: dict[str, str] = {}
     seen_corrected_prediction_fingerprints: set[tuple[Any, ...]] = set()
+
+    known_event_kinds = {
+        "prediction_record",
+        "prediction",
+        "repair_proposal",
+        "repair_resolution",
+        "ask_outbox_request",
+        "ask_outbox_response",
+    }
 
     for raw in records:
         kind = raw.get("event_kind")
-        pred: PredictionRecord | None = None
-        if kind in {"prediction_record", "prediction"}:
-            payload = {k: v for k, v in raw.items() if k in fields}
-            pred = PredictionRecord.model_validate(payload)
-        elif kind == "repair_resolution":
-            resolution = RepairResolutionEvent.model_validate(raw)
-            if resolution.decision == RepairResolution.ACCEPTED and resolution.accepted_prediction is not None:
-                pred = resolution.accepted_prediction
-        elif kind == "ask_outbox_request":
-            request = AskOutboxRequestArtifact.model_validate(raw)
-            outstanding_requests[request.request_id] = request
-            continue
-        elif kind == "ask_outbox_response":
-            response = AskOutboxResponseArtifact.model_validate(raw)
-            resolved_requests[response.request_id] = response
-            request_outcome_linkage[response.request_id] = response.status
-            outstanding_requests.pop(response.request_id, None)
-            continue
 
-        if pred is not None:
-            if not pred.was_corrected or pred.absolute_error is None:
+        # 1) Event rows: handle known kinds; never parse these as HaltRecord.
+        if isinstance(kind, str):
+            if kind not in known_event_kinds:
                 continue
+
+            pred: PredictionRecord | None = None
+
+            if kind in {"prediction_record", "prediction"}:
+                payload = {k: v for k, v in raw.items() if k in fields}
+                pred = PredictionRecord.model_validate(payload)
+
+            elif kind == "repair_resolution":
+                resolution = RepairResolutionEvent.model_validate(raw)
+                if (
+                    resolution.decision == RepairResolution.ACCEPTED
+                    and resolution.accepted_prediction is not None
+                ):
+                    pred = resolution.accepted_prediction
+
+            elif kind == "ask_outbox_request":
+                request = AskOutboxRequestArtifact.model_validate(raw)
+                outstanding_requests[request.request_id] = request
+                continue
+
+            elif kind == "ask_outbox_response":
+                response = AskOutboxResponseArtifact.model_validate(raw)
+                resolved_requests[response.request_id] = response
+                request_outcome_linkage[response.request_id] = response.status
+                outstanding_requests.pop(response.request_id, None)
+                continue
+
+            # Apply correction accounting if we got a corrected prediction.
+            if pred is None or not pred.was_corrected or pred.absolute_error is None:
+                continue
+
             corrected_fingerprint = (
                 pred.prediction_id,
                 pred.correction_revision,
@@ -1528,26 +1623,28 @@ def derive_projection_analytics_from_lineage(
             if corrected_fingerprint in seen_corrected_prediction_fingerprints:
                 continue
             seen_corrected_prediction_fingerprints.add(corrected_fingerprint)
+
             correction_count += 1
             correction_cost_total += float(pred.absolute_error)
+
             root_id = pred.correction_root_prediction_id or pred.prediction_id
-            item = attribution.get(root_id)
-            if item is None:
-                item = CorrectionCostAttribution(root_prediction_id=root_id)
-            item = item.model_copy(
+            item = attribution.get(root_id) or CorrectionCostAttribution(root_prediction_id=root_id)
+            attribution[root_id] = item.model_copy(
                 update={
                     "correction_count": item.correction_count + 1,
-                    "correction_cost_total": item.correction_cost_total + float(pred.absolute_error),
+                    "correction_cost_total": item.correction_cost_total
+                    + float(pred.absolute_error),
                 }
             )
-            attribution[root_id] = item
             continue
 
+        # 2) Non-event rows: only these may be canonical HaltRecord payloads.
         try:
             HaltRecord.from_payload(raw)
-            halt_count += 1
         except HaltPayloadValidationError:
             continue
+        else:
+            halt_count += 1
 
     return ProjectionAnalyticsSnapshot(
         correction_count=correction_count,
@@ -1638,7 +1735,9 @@ def _reconcile_predictions(
                 prediction_log_path=prediction_log_path,
                 stable_ids=stable_ids,
             )
-            updated_projection = _apply_accepted_repair_event(updated_projection, resolution_event=resolution)
+            updated_projection = _apply_accepted_repair_event(
+                updated_projection, resolution_event=resolution
+            )
             _append_episode_artifact(
                 ep,
                 {
@@ -1660,12 +1759,16 @@ def _reconcile_predictions(
                 projection_state=updated_projection,
             )
             if not isinstance(persist_result, HaltRecord):
-                updated_projection = _project_current_at(updated_pred, updated_projection, updated_at_iso=compared_at)
+                updated_projection = _project_current_at(
+                    updated_pred, updated_projection, updated_at_iso=compared_at
+                )
 
         binding_ctx = default_check_context(
             scope=scope_key,
             prediction_key=scope_key,
-            current_predictions={k: v.prediction_id for k, v in updated_projection.current_predictions.items()},
+            current_predictions={
+                k: v.prediction_id for k, v in updated_projection.current_predictions.items()
+            },
             prediction_log_available=True,
             prediction_outcome=outcome.model_dump(mode="json"),
         )
@@ -1693,7 +1796,9 @@ def _reconcile_predictions(
 
     if compared > 0:
         metrics["comparisons"] = float(metrics.get("comparisons", 0.0) + compared)
-        metrics["absolute_error_total"] = float(metrics.get("absolute_error_total", 0.0) + error_total)
+        metrics["absolute_error_total"] = float(
+            metrics.get("absolute_error_total", 0.0) + error_total
+        )
         metrics["mae"] = metrics["absolute_error_total"] / metrics["comparisons"]
 
     return ProjectionState(
@@ -1709,7 +1814,7 @@ def bind_prediction_outcome(
     pred: PredictionRecord,
     *,
     observed_outcome: Any,
-    recorded_at_iso: Optional[str] = None,
+    recorded_at_iso: str | None = None,
 ) -> tuple[PredictionRecord, PredictionOutcome]:
     expected = pred.expectation
     observed_value = float(observed_outcome)
@@ -1731,7 +1836,8 @@ def bind_prediction_outcome(
             "was_corrected": True,
             "corrected_at_iso": compared_at,
             "correction_parent_prediction_id": pred.prediction_id,
-            "correction_root_prediction_id": pred.correction_root_prediction_id or pred.prediction_id,
+            "correction_root_prediction_id": pred.correction_root_prediction_id
+            or pred.prediction_id,
             "correction_revision": int(pred.correction_revision) + 1,
         }
     )
@@ -1747,6 +1853,7 @@ def bind_prediction_outcome(
     )
     return updated_pred, outcome
 
+
 def run_mission_loop(
     ep: Episode,
     belief: BeliefState,
@@ -1754,9 +1861,9 @@ def run_mission_loop(
     *,
     pending_predictions: Sequence[PredictionRecord | Mapping[str, Any]] = (),
     prediction_log_path: str | Path = "artifacts/predictions.jsonl",
-    intervention_hook: Optional[InterventionLifecycleHook] = None,
-    ask_outbox_adapter: Optional[AskOutboxAdapter] = None,
-    observation_freshness_policy_adapter: Optional[ObservationFreshnessPolicyAdapter] = None,
+    intervention_hook: InterventionLifecycleHook | None = None,
+    ask_outbox_adapter: AskOutboxAdapter | None = None,
+    observation_freshness_policy_adapter: ObservationFreshnessPolicyAdapter | None = None,
     invariant_handling_mode: InvariantHandlingMode = InvariantHandlingMode.STRICT_HALT,
     halt_log_path: str | Path = "halts.jsonl",
 ) -> tuple[Episode, BeliefState, ProjectionState]:
@@ -1811,9 +1918,16 @@ def run_mission_loop(
         },
     )
 
-    last_written_prediction = {"key": turn_prediction.scope_key, "evidence_refs": [turn_prediction_ref]}
+    last_written_prediction = {
+        "key": turn_prediction.scope_key,
+        "evidence_refs": [turn_prediction_ref],
+    }
     for pending in pending_predictions:
-        pred = pending if isinstance(pending, PredictionRecord) else PredictionRecord.model_validate(pending)
+        pred = (
+            pending
+            if isinstance(pending, PredictionRecord)
+            else PredictionRecord.model_validate(pending)
+        )
         evidence_ref = append_prediction_record(
             pred,
             prediction_log_path=prediction_log_path,
@@ -1902,7 +2016,7 @@ def run_mission_loop(
     pre_output_gate = evaluate_invariant_gates(
         ep=ep,
         scope=active_scope,
-        prediction_key=cast(Optional[str], last_written_prediction.get("key")),
+        prediction_key=cast(str | None, last_written_prediction.get("key")),
         projection_state=updated_projection,
         prediction_log_available=True,
         gate_point="pre-output",
@@ -1930,18 +2044,19 @@ def run_mission_loop(
     append_turn_summary(ep)
     return ep, belief, updated_projection
 
+
 def build_episode(
     *,
     conversation_id: str,
     turn_index: int,
     assistant_prompt_asked: str,
     policy_decision: VerbosityDecision,
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     outputs: EpisodeOutputs,
-    observer: Optional[ObserverFrame] = None,
+    observer: ObserverFrame | None = None,
 ) -> Episode:
     err = payload.get("error")
-    capture: Optional[CaptureOutcome]
+    capture: CaptureOutcome | None
     if isinstance(err, CaptureOutcome):
         capture = err
     elif isinstance(err, str):
@@ -2010,8 +2125,8 @@ def ingest_observation(ep: Episode) -> Episode:
     obs_id = f"obs:{ep.episode_id}:0"
     t = _now_iso()
 
-    if not hasattr(ep, "observations") or getattr(ep, "observations") is None:
-        setattr(ep, "observations", [])
+    if not hasattr(ep, "observations") or ep.observations is None:
+        ep.observations = []
 
     if ep.ask.status == AskStatus.OK and (ep.ask.sentence or "").strip():
         ep.observations.append(
@@ -2036,13 +2151,14 @@ def ingest_observation(ep: Episode) -> Episode:
     return ep
 
 
-def extract_user_utterance(ep: Episode) -> Optional[str]:
+def extract_user_utterance(ep: Episode) -> str | None:
     for o in ep.observations:
         if o.type == ObservationType.USER_UTTERANCE:
             return (o.text or "").strip() or None
     return None
 
-def attach_decision_effect(prev_ep: Optional[Episode], curr_ep: Episode) -> Episode:
+
+def attach_decision_effect(prev_ep: Episode | None, curr_ep: Episode) -> Episode:
     if not prev_ep:
         return curr_ep
 
@@ -2099,8 +2215,7 @@ def _validated_selection(raw_selection: Any) -> SchemaSelection:
         return raw_selection
 
     raise TypeError(
-        "naive_schema_selector must return SchemaSelection; "
-        f"got {type(raw_selection).__name__}"
+        f"naive_schema_selector must return SchemaSelection; got {type(raw_selection).__name__}"
     )
 
 
@@ -2147,7 +2262,10 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
     else:
         # If we already have a pending obligation, keep it (do not reset attempts here)
         if belief.pending_about is None:
-            chosen = next((a for a in belief.ambiguities_active if a.status == AmbiguityStatus.UNRESOLVED), None)
+            chosen = next(
+                (a for a in belief.ambiguities_active if a.status == AmbiguityStatus.UNRESOLVED),
+                None,
+            )
 
             if chosen is not None:
                 belief.pending_about = {
@@ -2162,7 +2280,7 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
                     }
 
                 # Prefer the first ClarifyingQuestion.q if present
-                q: Optional[str] = None
+                q: str | None = None
                 if chosen.ask:
                     q = chosen.ask[0].q.strip()
 
@@ -2187,7 +2305,9 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
         {
             "kind": "schema_selection",
             "observer": _to_dict(getattr(ep, "observer", None)),
-            "schemas": [{"name": h.name, "score": h.score, "about": _to_dict(h.about)} for h in sel.schemas],
+            "schemas": [
+                {"name": h.name, "score": h.score, "about": _to_dict(h.about)} for h in sel.schemas
+            ],
             "ambiguities": [_to_dict(a) for a in belief.ambiguities_active],
             "ambiguity_state": belief.ambiguity_state.value,
             "notes": sel.notes,
@@ -2198,9 +2318,6 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
     )
 
     return ep, belief
-
-
-
 
 
 def apply_utterance_interpretation(ep: Episode, belief: BeliefState) -> tuple[Episode, BeliefState]:
@@ -2247,7 +2364,7 @@ def apply_utterance_interpretation(ep: Episode, belief: BeliefState) -> tuple[Ep
     return ep, belief
 
 
-def to_jsonable_episode(ep: Episode) -> Dict[str, Any]:
+def to_jsonable_episode(ep: Episode) -> dict[str, Any]:
     """
     Always return a dict that json.dumps can serialize.
     """

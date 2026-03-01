@@ -286,14 +286,14 @@ Phase 1: Define the Invariant Contract (invariants.py)
         Mypy Requirement: Explicitly type evidence (e.g., dict[str, Any]) and details (e.g., str | None) to avoid Any leaks that mypy will later flag.
     Functional Purity: Implement checker functions with a signature of (state: ProjectState) -> InvariantResult.
         Mypy Requirement: Add full type hints for all arguments and return values. If ProjectState is not yet stable, use a Protocol to define the minimal required interface.
-    The Registry: Create a REGISTRY: dict[InvariantId, Callable[[ProjectState], InvariantResult]]. 
+    The Registry: Create a REGISTRY: dict[InvariantId, Callable[[ProjectState], InvariantResult]].
 
 Phase 2: Implementation Guidelines
 To ensure this code survives the eventual "rule hammer":
 
     Avoid Circular Imports: Place invariants.py at a low level in your src/ hierarchy to prevent dependency cycles.
     Defensive Logic: Since rules aren't enforced, manually use absolute imports (e.g., from state_renormalization.models import ...) which Ruff's TID rules will eventually require.
-    Documentation: Every checker must have a docstring. Ruff (via D rules) will likely require this for public functions in the future. 
+    Documentation: Every checker must have a docstring. Ruff (via D rules) will likely require this for public functions in the future.
 
 Phase 3: Integration in engine.py
 
@@ -301,20 +301,20 @@ Phase 3: Integration in engine.py
     Structured Observability:
         Iterate through the REGISTRY and collect all InvariantResult objects.
         Fail-Fast vs. Report: Decide if a passed=False should raise an exception or just log. For an unstable project, structured logging is better than crashing.
-    Artifact Injection: Convert the list of InvariantResult to a serializable format and append it to your episode metadata. 
+    Artifact Injection: Convert the list of InvariantResult to a serializable format and append it to your episode metadata.
 
 How to Start Enforcing Rules
-Don't wait for "stability" to run the tools. You can adopt them incrementally: 
+Don't wait for "stability" to run the tools. You can adopt them incrementally:
 
     Ruff: Run ruff check --select E,F,I now. These are low-noise rules (errors, syntax, imports) that stabilize your codebase without being "annoying."
-    Mypy: Set check_untyped_defs = True but keep disallow_untyped_calls = False in your pyproject.toml. This allows you to type your new invariant code while ignoring older, unstable parts of the engine. 
-    
-    
-    
-    
-    
-    
-    
+    Mypy: Set check_untyped_defs = True but keep disallow_untyped_calls = False in your pyproject.toml. This allows you to type your new invariant code while ignoring older, unstable parts of the engine.
+
+
+
+
+
+
+
     Create HaltRecord in contracts.py with fields: halt_id, stage, invariant_id, reason, evidence_refs, timestamp_iso, retryable.
 
 Define a small union-like output shape for gate functions in engine.py, e.g.:

@@ -5,10 +5,9 @@ import json
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable
-
 
 _GLOB_META_CHARS = set("*?[]")
 _HEX_COMMIT_PATTERN = re.compile(r"^[0-9a-f]{7,40}$")
@@ -24,11 +23,11 @@ def _load_config(config_path: Path) -> dict:
 
 def _parse_now(now_utc: str | None) -> datetime:
     if now_utc is None:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
     parsed = datetime.fromisoformat(now_utc.replace("Z", "+00:00"))
     if parsed.tzinfo is None:
         raise ValueError("--now-utc must include timezone information (e.g., trailing 'Z').")
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def _extract_timestamp(content: str, pattern: str) -> str | None:
@@ -54,7 +53,9 @@ def _resolve_governed_paths(base_dir: Path, configured_path: str) -> list[str]:
         return []
 
     if _contains_glob(candidate):
-        return sorted(str(path.relative_to(base_dir)) for path in base_dir.glob(candidate) if path.is_file())
+        return sorted(
+            str(path.relative_to(base_dir)) for path in base_dir.glob(candidate) if path.is_file()
+        )
 
     return [candidate]
 
@@ -74,7 +75,9 @@ def _run_git_command(base_dir: Path, args: list[str]) -> str | None:
     return stdout or None
 
 
-def _resolve_git_commit(base_dir: Path, repo_relative_path: str, git_runner: GitCommandRunner) -> str | None:
+def _resolve_git_commit(
+    base_dir: Path, repo_relative_path: str, git_runner: GitCommandRunner
+) -> str | None:
     return git_runner(base_dir, ["rev-list", "-1", "HEAD", "--", repo_relative_path])
 
 
@@ -133,7 +136,9 @@ def _lookup_source_map(file_path: str, policy: dict) -> list[str] | None:
                 return normalized
 
     wildcard = source_map.get("*")
-    if isinstance(wildcard, list) and all(isinstance(item, str) and item.strip() for item in wildcard):
+    if isinstance(wildcard, list) and all(
+        isinstance(item, str) and item.strip() for item in wildcard
+    ):
         return wildcard
 
     return None
@@ -156,33 +161,61 @@ def _validate_doc_freshness(
     file_classes = config.get("file_classes", {})
     governed_files = config.get("governed_files", [])
     source_commit_policy = config.get("source_commit_policy", {})
-    source_files = source_commit_policy.get("source_files", {}) if isinstance(source_commit_policy, dict) else {}
+    source_files = (
+        source_commit_policy.get("source_files", {})
+        if isinstance(source_commit_policy, dict)
+        else {}
+    )
 
     for entry in governed_files:
         configured_path = str(entry.get("path", "")).strip()
         file_class = str(entry.get("class", "")).strip()
 
         if file_class not in file_classes:
-            issues.append({"file_path": configured_path, "message": f"references unknown class '{file_class}'."})
+            issues.append(
+                {
+                    "file_path": configured_path,
+                    "message": f"references unknown class '{file_class}'.",
+                }
+            )
             continue
 
-        class_policy = file_classes[file_class] if isinstance(file_classes[file_class], dict) else {}
+        class_policy = (
+            file_classes[file_class] if isinstance(file_classes[file_class], dict) else {}
+        )
         max_age_days = class_policy.get("max_age_days")
         max_commit_lag = class_policy.get("max_commit_lag")
 
         if max_age_days is not None and (not isinstance(max_age_days, int) or max_age_days < 0):
-            issues.append({"file_path": configured_path, "message": "has invalid max_age_days in configured class."})
+            issues.append(
+                {
+                    "file_path": configured_path,
+                    "message": "has invalid max_age_days in configured class.",
+                }
+            )
             continue
         if not isinstance(max_commit_lag, int) or max_commit_lag < 0:
-            issues.append({"file_path": configured_path, "message": "has invalid max_commit_lag in configured class."})
+            issues.append(
+                {
+                    "file_path": configured_path,
+                    "message": "has invalid max_commit_lag in configured class.",
+                }
+            )
             continue
 
         resolved_paths = _resolve_governed_paths(base_dir, configured_path)
         if not resolved_paths:
             if _contains_glob(configured_path):
-                issues.append({"file_path": configured_path, "message": "glob pattern did not match any files."})
+                issues.append(
+                    {
+                        "file_path": configured_path,
+                        "message": "glob pattern did not match any files.",
+                    }
+                )
             else:
-                issues.append({"file_path": configured_path, "message": "governed file does not exist."})
+                issues.append(
+                    {"file_path": configured_path, "message": "governed file does not exist."}
+                )
             continue
 
         for file_path in resolved_paths:
@@ -194,12 +227,22 @@ def _validate_doc_freshness(
             if source_commit_policy:
                 source_aliases = _lookup_source_map(file_path, source_commit_policy)
                 if not source_aliases:
-                    issues.append({"file_path": file_path, "message": "missing source mapping for governed document."})
+                    issues.append(
+                        {
+                            "file_path": file_path,
+                            "message": "missing source mapping for governed document.",
+                        }
+                    )
                     continue
 
                 commit_binding = _lookup_commit_binding(file_path, source_commit_policy)
                 if commit_binding is None:
-                    issues.append({"file_path": file_path, "message": "missing source commit metadata for governed document."})
+                    issues.append(
+                        {
+                            "file_path": file_path,
+                            "message": "missing source commit metadata for governed document.",
+                        }
+                    )
                     continue
 
                 for source_alias in source_aliases:
@@ -210,32 +253,65 @@ def _validate_doc_freshness(
                         source_path = source_entry
                     elif isinstance(source_entry, dict):
                         source_path = source_entry.get("path")
-                        lag_reference = str(source_entry.get("lag_reference", "head")).strip().lower()
+                        lag_reference = (
+                            str(source_entry.get("lag_reference", "head")).strip().lower()
+                        )
 
                     if not isinstance(source_path, str) or not source_path.strip():
-                        issues.append({"file_path": file_path, "message": f"source alias '{source_alias}' is not configured in source_commit_policy.source_files."})
+                        issues.append(
+                            {
+                                "file_path": file_path,
+                                "message": f"source alias '{source_alias}' is not configured in source_commit_policy.source_files.",
+                            }
+                        )
                         continue
 
                     if lag_reference not in {"head", "source_tip"}:
-                        issues.append({"file_path": file_path, "message": f"source alias '{source_alias}' has invalid lag_reference '{lag_reference}'."})
+                        issues.append(
+                            {
+                                "file_path": file_path,
+                                "message": f"source alias '{source_alias}' has invalid lag_reference '{lag_reference}'.",
+                            }
+                        )
                         continue
 
                     expected_commit = commit_binding.get(source_alias)
-                    if not isinstance(expected_commit, str) or not _HEX_COMMIT_PATTERN.fullmatch(expected_commit.lower()):
-                        issues.append({"file_path": file_path, "message": f"source alias '{source_alias}' has invalid commit hash metadata '{expected_commit}'."})
+                    if not isinstance(expected_commit, str) or not _HEX_COMMIT_PATTERN.fullmatch(
+                        expected_commit.lower()
+                    ):
+                        issues.append(
+                            {
+                                "file_path": file_path,
+                                "message": f"source alias '{source_alias}' has invalid commit hash metadata '{expected_commit}'.",
+                            }
+                        )
                         continue
 
                     reference_commit = "head"
                     if lag_reference == "source_tip":
-                        resolved_source_commit = _resolve_git_commit(base_dir, source_path, git_runner)
+                        resolved_source_commit = _resolve_git_commit(
+                            base_dir, source_path, git_runner
+                        )
                         if resolved_source_commit is None:
-                            issues.append({"file_path": file_path, "message": f"unable to resolve git commit for source file '{source_path}'."})
+                            issues.append(
+                                {
+                                    "file_path": file_path,
+                                    "message": f"unable to resolve git commit for source file '{source_path}'.",
+                                }
+                            )
                             continue
                         reference_commit = resolved_source_commit
 
-                    commit_lag = _resolve_commit_lag(base_dir, expected_commit.lower(), reference_commit, git_runner)
+                    commit_lag = _resolve_commit_lag(
+                        base_dir, expected_commit.lower(), reference_commit, git_runner
+                    )
                     if commit_lag is None:
-                        issues.append({"file_path": file_path, "message": f"unable to resolve commit lag for source alias '{source_alias}' from '{expected_commit}' to '{reference_commit}'."})
+                        issues.append(
+                            {
+                                "file_path": file_path,
+                                "message": f"unable to resolve commit lag for source alias '{source_alias}' from '{expected_commit}' to '{reference_commit}'.",
+                            }
+                        )
                         continue
 
                     if commit_lag > max_commit_lag:
@@ -253,25 +329,42 @@ def _validate_doc_freshness(
             content = absolute_path.read_text(encoding="utf-8")
             extracted = _extract_timestamp(content, timestamp_pattern)
             if extracted is None:
-                issues.append({"file_path": file_path, "message": "missing freshness metadata line matching configured timestamp policy."})
+                issues.append(
+                    {
+                        "file_path": file_path,
+                        "message": "missing freshness metadata line matching configured timestamp policy.",
+                    }
+                )
                 continue
 
             try:
-                timestamp = datetime.strptime(extracted, timestamp_format).replace(tzinfo=timezone.utc)
+                timestamp = datetime.strptime(extracted, timestamp_format).replace(tzinfo=UTC)
             except ValueError:
-                issues.append({"file_path": file_path, "message": f"metadata timestamp '{extracted}' does not match format '{timestamp_format}'."})
+                issues.append(
+                    {
+                        "file_path": file_path,
+                        "message": f"metadata timestamp '{extracted}' does not match format '{timestamp_format}'.",
+                    }
+                )
                 continue
 
             if max_age_days is not None:
                 age_days = (now_utc - timestamp).total_seconds() / 86400
                 if age_days > max_age_days:
-                    issues.append({"file_path": file_path, "message": f"stale freshness metadata: age={age_days:.1f} days exceeds max_age_days={max_age_days} for class '{file_class}'."})
+                    issues.append(
+                        {
+                            "file_path": file_path,
+                            "message": f"stale freshness metadata: age={age_days:.1f} days exceeds max_age_days={max_age_days} for class '{file_class}'.",
+                        }
+                    )
 
     return issues
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate governed documentation freshness metadata SLOs.")
+    parser = argparse.ArgumentParser(
+        description="Validate governed documentation freshness metadata SLOs."
+    )
     parser.add_argument(
         "--config",
         default="docs/doc_freshness_slo.json",
@@ -299,7 +392,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    print(f"Documentation freshness SLO validation passed for {len(config.get('governed_files', []))} governed file(s).")
+    print(
+        f"Documentation freshness SLO validation passed for {len(config.get('governed_files', []))} governed file(s)."
+    )
     return 0
 
 

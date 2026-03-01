@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from state_renormalization.adapters.persistence import append_jsonl, read_jsonl
-from collections.abc import Callable
-
-from state_renormalization.contracts import AskResult, AskStatus, BeliefState, Episode, HaltRecord, PredictionRecord, ProjectionState
+from state_renormalization.contracts import (
+    AskResult,
+    AskStatus,
+    BeliefState,
+    Episode,
+    HaltRecord,
+    PredictionRecord,
+    ProjectionState,
+)
 from state_renormalization.engine import (
     derive_projection_analytics_from_lineage,
     evaluate_invariant_gates,
@@ -13,7 +20,6 @@ from state_renormalization.engine import (
     run_mission_loop,
     to_jsonable_episode,
 )
-
 
 FIXED_PREDICTION = {
     "prediction_id": "pred:base",
@@ -54,8 +60,14 @@ def test_replay_projection_analytics_is_deterministic_across_repeated_runs(
 
     assert replay_a.model_dump(mode="json") == replay_b.model_dump(mode="json")
     assert replay_a.records_processed == 3
-    assert replay_a.projection_state.current_predictions.keys() == online_projection.current_predictions.keys()
-    assert replay_a.projection_state.correction_metrics["comparisons"] == online_projection.correction_metrics["comparisons"]
+    assert (
+        replay_a.projection_state.current_predictions.keys()
+        == online_projection.current_predictions.keys()
+    )
+    assert (
+        replay_a.projection_state.correction_metrics["comparisons"]
+        == online_projection.correction_metrics["comparisons"]
+    )
     assert replay_a.analytics_snapshot.correction_count == 1
     assert replay_a.analytics_snapshot.correction_cost_total == 0.25
 
@@ -117,7 +129,9 @@ def test_replay_projection_analytics_snapshot_matches_for_independent_consumers(
     consumer_a_snapshot = replay_projection_analytics(log_path).analytics_snapshot
     consumer_b_snapshot = replay_projection_analytics(log_path).analytics_snapshot
 
-    assert consumer_a_snapshot.model_dump(mode="json") == consumer_b_snapshot.model_dump(mode="json")
+    assert consumer_a_snapshot.model_dump(mode="json") == consumer_b_snapshot.model_dump(
+        mode="json"
+    )
     assert consumer_a_snapshot.correction_count == 1
     assert consumer_a_snapshot.correction_cost_total == 0.25
     assert consumer_a_snapshot.correction_cost_attribution["pred:base"].correction_count == 1
@@ -135,7 +149,9 @@ def test_halt_explainability_fields_survive_episode_persistence_roundtrip(
         ep=ep,
         scope="scope:test",
         prediction_key=None,
-        projection_state=ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+        projection_state=ProjectionState(
+            current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"
+        ),
         prediction_log_available=True,
         halt_log_path=tmp_path / "halts.jsonl",
     )
@@ -144,11 +160,15 @@ def test_halt_explainability_fields_survive_episode_persistence_roundtrip(
     expected = gate.to_canonical_payload()
 
     append_jsonl(episode_path, to_jsonable_episode(ep))
-    (_, persisted), = list(read_jsonl(episode_path))
+    ((_, persisted),) = list(read_jsonl(episode_path))
 
-    authorization_issue = next(a for a in persisted["artifacts"] if a.get("artifact_kind") == "authorization_issue")
-    halt_observation = next(a for a in persisted["artifacts"] if a.get("artifact_kind") == "halt_observation")
-    (_, persisted_halt), = list(read_jsonl(tmp_path / "halts.jsonl"))
+    authorization_issue = next(
+        a for a in persisted["artifacts"] if a.get("artifact_kind") == "authorization_issue"
+    )
+    halt_observation = next(
+        a for a in persisted["artifacts"] if a.get("artifact_kind") == "halt_observation"
+    )
+    ((_, persisted_halt),) = list(read_jsonl(tmp_path / "halts.jsonl"))
 
     assert HaltRecord.from_payload(authorization_issue).to_canonical_payload() == expected
     assert HaltRecord.from_payload(halt_observation).to_canonical_payload() == expected
@@ -235,7 +255,9 @@ def test_derive_projection_analytics_from_lineage_ignores_non_lineage_rows() -> 
     assert analytics.correction_cost_attribution == {}
 
 
-def test_replay_projection_analytics_uses_lineage_iterator_and_ignores_runtime_only_rows(tmp_path: Path) -> None:
+def test_replay_projection_analytics_uses_lineage_iterator_and_ignores_runtime_only_rows(
+    tmp_path: Path,
+) -> None:
     log_path = tmp_path / "lineage.jsonl"
     append_jsonl(
         log_path,

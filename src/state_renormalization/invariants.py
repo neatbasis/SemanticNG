@@ -1,31 +1,32 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Any, Callable, Mapping, Optional, Protocol, Sequence
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any, Protocol
 
 from state_renormalization.contracts import EvidenceRef
 
 
-class InvariantId(str, Enum):
+class InvariantId(StrEnum):
     PREDICTION_AVAILABILITY = "prediction_availability.v1"
     EVIDENCE_LINK_COMPLETENESS = "evidence_link_completeness.v1"
     PREDICTION_OUTCOME_BINDING = "prediction_outcome_binding.v1"
     EXPLAINABLE_HALT_PAYLOAD = "explainable_halt_payload.v1"
 
 
-class Flow(str, Enum):
+class Flow(StrEnum):
     CONTINUE = "continue"
     STOP = "stop"
 
 
-class InvariantHandlingMode(str, Enum):
+class InvariantHandlingMode(StrEnum):
     STRICT_HALT = "strict_halt"
     REPAIR_EVENTS = "repair_events"
 
 
-class Validity(str, Enum):
+class Validity(StrEnum):
     VALID = "valid"
     DEGRADED = "degraded"
     INVALID = "invalid"
@@ -41,7 +42,7 @@ class InvariantOutcome:
     code: str
     evidence: Sequence[EvidenceRef] = field(default_factory=tuple)
     details: Mapping[str, Any] = field(default_factory=dict)
-    action_hints: Optional[Sequence[Mapping[str, Any]]] = None
+    action_hints: Sequence[Mapping[str, Any]] | None = None
 
 
 @dataclass(frozen=True)
@@ -61,7 +62,7 @@ class CheckerResult:
 @dataclass(frozen=True)
 class InvariantBranchBehavior:
     continue_behavior: str
-    stop_behavior: Optional[str] = None
+    stop_behavior: str | None = None
 
 
 class CheckContext(Protocol):
@@ -72,7 +73,7 @@ class CheckContext(Protocol):
     def scope(self) -> str: ...
 
     @property
-    def prediction_key(self) -> Optional[str]: ...
+    def prediction_key(self) -> str | None: ...
 
     @property
     def current_predictions(self) -> Mapping[str, Any]: ...
@@ -81,31 +82,33 @@ class CheckContext(Protocol):
     def prediction_log_available(self) -> bool: ...
 
     @property
-    def just_written_prediction(self) -> Optional[Mapping[str, Any]]: ...
+    def just_written_prediction(self) -> Mapping[str, Any] | None: ...
 
     @property
-    def halt_candidate(self) -> Optional[InvariantOutcome]: ...
+    def halt_candidate(self) -> InvariantOutcome | None: ...
 
     @property
-    def prediction_outcome(self) -> Optional[Mapping[str, Any]]: ...
+    def prediction_outcome(self) -> Mapping[str, Any] | None: ...
 
 
 @dataclass(frozen=True)
 class InvariantCheckContext:
     now_iso: str
     scope: str
-    prediction_key: Optional[str]
+    prediction_key: str | None
     current_predictions: Mapping[str, Any] = field(default_factory=dict)
     prediction_log_available: bool = True
-    just_written_prediction: Optional[Mapping[str, Any]] = None
-    halt_candidate: Optional[InvariantOutcome] = None
-    prediction_outcome: Optional[Mapping[str, Any]] = None
+    just_written_prediction: Mapping[str, Any] | None = None
+    halt_candidate: InvariantOutcome | None = None
+    prediction_outcome: Mapping[str, Any] | None = None
 
 
 Checker = Callable[[CheckContext], InvariantOutcome]
 
 
-def _ok(invariant_id: InvariantId, code: str, details: Optional[Mapping[str, Any]] = None) -> InvariantOutcome:
+def _ok(
+    invariant_id: InvariantId, code: str, details: Mapping[str, Any] | None = None
+) -> InvariantOutcome:
     detail_map = dict(details or {})
     reason = str(detail_map.get("message") or code)
     return InvariantOutcome(
@@ -129,7 +132,9 @@ def check_prediction_availability(ctx: CheckContext) -> InvariantOutcome:
             validity=Validity.INVALID,
             code="no_predictions_projected",
             evidence=(EvidenceRef(kind="scope", ref=ctx.scope),),
-            details={"message": "Action selection requires at least one projected current prediction."},
+            details={
+                "message": "Action selection requires at least one projected current prediction."
+            },
             action_hints=({"kind": "rebuild_view", "scope": ctx.scope},),
         )
 
@@ -145,12 +150,19 @@ def check_prediction_availability(ctx: CheckContext) -> InvariantOutcome:
             flow=Flow.STOP,
             validity=Validity.INVALID,
             code="no_current_prediction",
-            evidence=(EvidenceRef(kind="scope", ref=ctx.scope), EvidenceRef(kind="prediction_key", ref=key)),
-            details={"message": "Action selection attempted to consume a missing current prediction."},
+            evidence=(
+                EvidenceRef(kind="scope", ref=ctx.scope),
+                EvidenceRef(kind="prediction_key", ref=key),
+            ),
+            details={
+                "message": "Action selection attempted to consume a missing current prediction."
+            },
             action_hints=({"kind": "rebuild_view", "scope": ctx.scope},),
         )
 
-    return _ok(InvariantId.PREDICTION_AVAILABILITY, "current_prediction_available", {"prediction_key": key})
+    return _ok(
+        InvariantId.PREDICTION_AVAILABILITY, "current_prediction_available", {"prediction_key": key}
+    )
 
 
 def check_evidence_link_completeness(ctx: CheckContext) -> InvariantOutcome:
@@ -198,8 +210,11 @@ def check_evidence_link_completeness(ctx: CheckContext) -> InvariantOutcome:
             action_hints=({"kind": "rebuild_view", "scope": ctx.scope},),
         )
 
-    return _ok(InvariantId.EVIDENCE_LINK_COMPLETENESS, "evidence_links_complete", {"prediction_key": key or None})
-
+    return _ok(
+        InvariantId.EVIDENCE_LINK_COMPLETENESS,
+        "evidence_links_complete",
+        {"prediction_key": key or None},
+    )
 
 
 def check_prediction_outcome_binding(ctx: CheckContext) -> InvariantOutcome:
@@ -240,6 +255,7 @@ def check_prediction_outcome_binding(ctx: CheckContext) -> InvariantOutcome:
         {"prediction_id": prediction_id},
     )
 
+
 def check_explainable_halt_payload(ctx: CheckContext) -> InvariantOutcome:
     candidate = ctx.halt_candidate
     if candidate is None or candidate.flow != Flow.STOP:
@@ -266,7 +282,9 @@ def check_explainable_halt_payload(ctx: CheckContext) -> InvariantOutcome:
             "has_details_field": has_details_field,
             "has_evidence_field": has_evidence_field,
         },
-        action_hints=({"kind": "normalize_halt_payload", "invariant": candidate.invariant_id.value},),
+        action_hints=(
+            {"kind": "normalize_halt_payload", "invariant": candidate.invariant_id.value},
+        ),
     )
 
 
@@ -304,15 +322,15 @@ REGISTERED_INVARIANT_BRANCH_BEHAVIORS: dict[InvariantId, InvariantBranchBehavior
 def default_check_context(
     *,
     scope: str,
-    prediction_key: Optional[str],
+    prediction_key: str | None,
     current_predictions: Mapping[str, Any],
     prediction_log_available: bool,
-    just_written_prediction: Optional[Mapping[str, Any]] = None,
-    halt_candidate: Optional[InvariantOutcome] = None,
-    prediction_outcome: Optional[Mapping[str, Any]] = None,
+    just_written_prediction: Mapping[str, Any] | None = None,
+    halt_candidate: InvariantOutcome | None = None,
+    prediction_outcome: Mapping[str, Any] | None = None,
 ) -> InvariantCheckContext:
     return InvariantCheckContext(
-        now_iso=datetime.now(timezone.utc).isoformat(),
+        now_iso=datetime.now(UTC).isoformat(),
         scope=scope,
         prediction_key=prediction_key,
         current_predictions=current_predictions,
@@ -323,7 +341,9 @@ def default_check_context(
     )
 
 
-def run_checkers(*, gate: str, ctx: CheckContext, invariant_ids: Sequence[InvariantId]) -> tuple[InvariantOutcome, ...]:
+def run_checkers(
+    *, gate: str, ctx: CheckContext, invariant_ids: Sequence[InvariantId]
+) -> tuple[InvariantOutcome, ...]:
     return tuple(REGISTRY[invariant_id](ctx) for invariant_id in invariant_ids)
 
 
@@ -342,15 +362,20 @@ def normalize_outcome(outcome: InvariantOutcome, *, gate: str = "") -> CheckerRe
     )
 
 
-def repair_mode_enabled(mode: InvariantHandlingMode | str = InvariantHandlingMode.STRICT_HALT) -> bool:
+def repair_mode_enabled(
+    mode: InvariantHandlingMode | str = InvariantHandlingMode.STRICT_HALT,
+) -> bool:
     return InvariantHandlingMode(mode) == InvariantHandlingMode.REPAIR_EVENTS
 
 
-def _normalize_evidence_item(item: Mapping[str, Any]) -> Mapping[str, Any]:
-    return {
-        "kind": str(item.get("kind") or "unknown"),
-        "ref": item.get("ref", item.get("value", "")),
-    }
+def _normalize_evidence_item(item: EvidenceRef | Mapping[str, Any]) -> EvidenceRef:
+    # Already normalized
+    if isinstance(item, EvidenceRef):
+        return item
+
+    kind = str(item.get("kind") or "unknown")
+    ref = item.get("ref", item.get("value", ""))
+    return EvidenceRef(kind=kind, ref=str(ref))
 
 
 def _normalize_mapping(item: Mapping[str, Any] | None) -> Mapping[str, Any]:

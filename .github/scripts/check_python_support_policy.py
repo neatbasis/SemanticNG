@@ -10,7 +10,9 @@ from pathlib import Path
 
 def read_requires_python(pyproject_path: Path) -> str:
     pyproject_text = pyproject_path.read_text(encoding="utf-8")
-    match = re.search(r"^requires-python\s*=\s*\"([^\"]+)\"\s*$", pyproject_text, flags=re.MULTILINE)
+    match = re.search(
+        r"^requires-python\s*=\s*\"([^\"]+)\"\s*$", pyproject_text, flags=re.MULTILINE
+    )
     if not match:
         raise ValueError("Could not find [project].requires-python in pyproject.toml.")
     return match.group(1)
@@ -60,7 +62,9 @@ def main() -> int:
             print("  found README line(s): <none>")
         return 1
 
-    ci_default_python = read_ci_default_python_version(Path(".github/actions/python-test-setup/action.yml"))
+    ci_default_python = read_ci_default_python_version(
+        Path(".github/actions/python-test-setup/action.yml")
+    )
     if ci_default_python != expected_ci_version:
         print("CI default Python version is out of sync with pyproject policy.")
         print(f"  pyproject.toml requires-python: {requires_python}")

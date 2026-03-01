@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from collections.abc import Mapping, Set
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import AbstractSet, Any, Mapping, Optional, Protocol
+from enum import StrEnum
+from typing import Any, Protocol
 
 from state_renormalization.contracts import (
     AboutKind,
@@ -14,9 +15,9 @@ from state_renormalization.contracts import (
     AmbiguityStatus,
     AmbiguityType,
     AskFormat,
+    Candidate,
     CaptureOutcome,
     CaptureStatus,
-    Candidate,
     ClarifyingQuestion,
     ResolutionPolicy,
     SchemaHit,
@@ -91,7 +92,7 @@ class SelectorContext:
     raw: str
     normalized: str
     tokens: set[str]
-    error: Optional[CaptureOutcome]
+    error: CaptureOutcome | None
     metadata: dict[str, object] = field(default_factory=dict)
 
 
@@ -103,10 +104,10 @@ class SelectorCheckContext(Protocol):
     def normalized(self) -> str: ...
 
     @property
-    def tokens(self) -> AbstractSet[str]: ...
+    def tokens(self) -> Set[str]: ...
 
     @property
-    def error(self) -> Optional[CaptureOutcome]: ...
+    def error(self) -> CaptureOutcome | None: ...
 
     @property
     def metadata(self) -> Mapping[str, Any]: ...
@@ -121,7 +122,7 @@ class Rule(Protocol):
     def emit(self, ctx: SelectorCheckContext) -> SchemaSelection: ...
 
 
-class SelectorDecisionStatus(str, Enum):
+class SelectorDecisionStatus(StrEnum):
     OK = "ok"
     DEGRADED = "degraded"
     HALT = "halt"
@@ -154,7 +155,7 @@ class PolicyFinding:
 @dataclass(frozen=True)
 class SelectorDecisionOutcome:
     status: SelectorDecisionStatus
-    chosen: Optional[HeuristicCandidate]
+    chosen: HeuristicCandidate | None
     violations: list[InvariantViolation]
     policy_findings: list[PolicyFinding]
     heuristic_candidates: list[HeuristicCandidate]
@@ -171,7 +172,7 @@ class BaseRule:
         raise NotImplementedError
 
 
-def _about(kind: AboutKind, key: str, *, span_text: Optional[str] = None) -> AmbiguityAbout:
+def _about(kind: AboutKind, key: str, *, span_text: str | None = None) -> AmbiguityAbout:
     if span_text is None:
         return AmbiguityAbout(kind=kind, key=key)
     return AmbiguityAbout(kind=kind, key=key, span=TextSpan(text=span_text))
@@ -184,8 +185,8 @@ def _amb(
     ask: list[ClarifyingQuestion],
     evidence: dict[str, object],
     resolution_policy: ResolutionPolicy = ResolutionPolicy.ASK_USER,
-    candidates: Optional[list[Candidate]] = None,
-    notes: Optional[str] = None,
+    candidates: list[Candidate] | None = None,
+    notes: str | None = None,
 ) -> Ambiguity:
     return Ambiguity(
         status=AmbiguityStatus.UNRESOLVED,
@@ -199,7 +200,9 @@ def _amb(
     )
 
 
-def _selection(*, schemas: list[SchemaHit], ambiguities: list[Ambiguity], notes: Optional[str] = None) -> SchemaSelection:
+def _selection(
+    *, schemas: list[SchemaHit], ambiguities: list[Ambiguity], notes: str | None = None
+) -> SchemaSelection:
     return SchemaSelection(
         schemas=sort_schema_hits(schemas),
         ambiguities=ambiguities,
@@ -325,7 +328,11 @@ def _empty_input_emit(ctx: SelectorCheckContext) -> SchemaSelection:
     amb = _amb(
         about=about,
         type_=AmbiguityType.MISSING_CONTEXT,
-        ask=[ClarifyingQuestion(q="I didn't catch anything. What do you want to do?", format=AskFormat.FREEFORM)],
+        ask=[
+            ClarifyingQuestion(
+                q="I didn't catch anything. What do you want to do?", format=AskFormat.FREEFORM
+            )
+        ],
         evidence={"signals": ["empty_text"]},
     )
     return _selection(
@@ -426,7 +433,12 @@ def _uncertainty_emit(ctx: SelectorCheckContext) -> SchemaSelection:
             ClarifyingQuestion(
                 q="What are you trying to achieve right now?",
                 format=AskFormat.MULTICHOICE,
-                options=["find something", "understand something", "plan next step", "something else"],
+                options=[
+                    "find something",
+                    "understand something",
+                    "plan next step",
+                    "something else",
+                ],
             )
         ],
         evidence={"signals": ["uncertainty_phrase"]},
@@ -448,7 +460,7 @@ def _actionable_emit(ctx: SelectorCheckContext) -> SchemaSelection:
     )
 
 
-def build_selector_context(text: Optional[str], *, error: Optional[CaptureOutcome]) -> SelectorContext:
+def build_selector_context(text: str | None, *, error: CaptureOutcome | None) -> SelectorContext:
     raw = text or ""
     normalized = normalize_text(raw)
     tokens = set(norm_tokens(normalized))
@@ -459,12 +471,27 @@ def build_selector_context(text: Optional[str], *, error: Optional[CaptureOutcom
         error=error,
         metadata={
             "has_url": has_url(normalized),
-            "has_numberish": any(tok.isdigit() for tok in tokens) or any(tok in {"ten", "five"} for tok in tokens),
+            "has_numberish": any(tok.isdigit() for tok in tokens)
+            or any(tok in {"ten", "five"} for tok in tokens),
             "has_unit": any(
                 u in tokens
-                for u in {"s", "sec", "second", "seconds", "m", "min", "minute", "minutes", "h", "hour", "hours"}
+                for u in {
+                    "s",
+                    "sec",
+                    "second",
+                    "seconds",
+                    "m",
+                    "min",
+                    "minute",
+                    "minutes",
+                    "h",
+                    "hour",
+                    "hours",
+                }
             ),
-            "mentions_timerish": any(w in normalized for w in ["timer", "remind", "reminder", "in "]),
+            "mentions_timerish": any(
+                w in normalized for w in ["timer", "remind", "reminder", "in "]
+            ),
         },
     )
 
@@ -485,9 +512,13 @@ class RuleRegistry:
         default_factory=lambda: defaultdict(lambda: {phase: [] for phase in RULE_PHASES})
     )
 
-    def register(self, *, phase: str, rule: Rule, domain: str = "default", prepend: bool = False) -> None:
+    def register(
+        self, *, phase: str, rule: Rule, domain: str = "default", prepend: bool = False
+    ) -> None:
         if phase not in self.phases:
-            raise ValueError(f"Unknown rule phase '{phase}'. Expected one of: {', '.join(self.phases)}")
+            raise ValueError(
+                f"Unknown rule phase '{phase}'. Expected one of: {', '.join(self.phases)}"
+            )
         bucket = self._rules_by_domain[domain][phase]
         if prepend:
             bucket.insert(0, rule)
@@ -496,7 +527,9 @@ class RuleRegistry:
 
     def phase_rules(self, *, phase: str, domain: str = "default") -> list[Rule]:
         if phase not in self.phases:
-            raise ValueError(f"Unknown rule phase '{phase}'. Expected one of: {', '.join(self.phases)}")
+            raise ValueError(
+                f"Unknown rule phase '{phase}'. Expected one of: {', '.join(self.phases)}"
+            )
         domain_rules = self._rules_by_domain.get(domain, {}).get(phase, [])
         if domain == "default":
             return list(domain_rules)
@@ -510,7 +543,9 @@ class RuleRegistry:
 RULE_REGISTRY = RuleRegistry()
 
 
-def register_rule(*, phase: str, rule: Rule, domain: str = "default", prepend: bool = False) -> Rule:
+def register_rule(
+    *, phase: str, rule: Rule, domain: str = "default", prepend: bool = False
+) -> Rule:
     RULE_REGISTRY.register(phase=phase, rule=rule, domain=domain, prepend=prepend)
     return rule
 
@@ -595,7 +630,9 @@ def _decide_selection_policy(
     )
 
 
-def _legacy_naive_schema_selector(text: Optional[str], *, error: Optional[CaptureOutcome]) -> SchemaSelection:
+def _legacy_naive_schema_selector(
+    text: str | None, *, error: CaptureOutcome | None
+) -> SchemaSelection:
     """
     Frozen baseline implementation used by tests to verify refactors preserve behavior.
     """
@@ -604,51 +641,51 @@ def _legacy_naive_schema_selector(text: Optional[str], *, error: Optional[Captur
     tokens = set(norm_tokens(t))
 
     if error is not None and error.status == CaptureStatus.NO_RESPONSE:
-        return _no_response_emit(
-            SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
-        )
+        return _no_response_emit(SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error))
 
     if not t.strip():
-        return _empty_input_emit(
-            SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
-        )
+        return _empty_input_emit(SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error))
 
     if is_exit_intent(t):
-        return _exit_emit(
-            SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
-        )
+        return _exit_emit(SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error))
 
     if (tokens & VAGUE_PRONOUNS) and any(w in tokens for w in ARRIVAL_WORDS):
-        return _vague_actor_emit(
-            SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
-        )
+        return _vague_actor_emit(SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error))
 
     if has_url(t):
-        return _url_emit(
-            SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
-        )
+        return _url_emit(SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error))
 
-    numberish = any(tok.isdigit() for tok in tokens) or any(tok in {"ten", "five"} for tok in tokens)
+    numberish = any(tok.isdigit() for tok in tokens) or any(
+        tok in {"ten", "five"} for tok in tokens
+    )
     has_unit_token = any(
-        u in tokens for u in {"s", "sec", "second", "seconds", "m", "min", "minute", "minutes", "h", "hour", "hours"}
+        u in tokens
+        for u in {
+            "s",
+            "sec",
+            "second",
+            "seconds",
+            "m",
+            "min",
+            "minute",
+            "minutes",
+            "h",
+            "hour",
+            "hours",
+        }
     )
     mentions_timerish = any(w in t for w in ["timer", "remind", "reminder", "in "])
     if mentions_timerish and numberish and not has_unit_token:
-        return _timer_unit_emit(
-            SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
-        )
+        return _timer_unit_emit(SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error))
 
     if has_any_phrase(t, UNCERTAIN_PHRASES):
-        return _uncertainty_emit(
-            SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
-        )
+        return _uncertainty_emit(SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error))
 
-    return _actionable_emit(
-        SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error)
-    )
+    return _actionable_emit(SelectorContext(raw=raw, normalized=t, tokens=tokens, error=error))
+
 
 def naive_schema_selector(
-    text: Optional[str], *, error: Optional[CaptureOutcome], domain: str = "default"
+    text: str | None, *, error: CaptureOutcome | None, domain: str = "default"
 ) -> SchemaSelection:
     ctx = build_selector_context(text, error=error)
 

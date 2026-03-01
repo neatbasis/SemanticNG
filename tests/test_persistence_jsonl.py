@@ -2,14 +2,19 @@
 from __future__ import annotations
 
 import json
-
-import pytest
 from pathlib import Path
 
-from state_renormalization.adapters.persistence import append_halt, append_jsonl, read_halt_record, read_jsonl
+import pytest
+from pydantic import ValidationError
+
+from state_renormalization.adapters.persistence import (
+    append_halt,
+    append_jsonl,
+    read_halt_record,
+    read_jsonl,
+)
 from state_renormalization.contracts import CapabilityAdapterGate, HaltRecord
 from state_renormalization.engine import to_jsonable_episode
-
 
 TEST_GATE = CapabilityAdapterGate(invocation_id="invoke:test", allowed=True)
 
@@ -45,7 +50,7 @@ def test_append_halt_jsonl_roundtrip_and_evidence_ref_format(tmp_path: Path) -> 
 
     ref = append_halt(p, halt, adapter_gate=TEST_GATE)
 
-    (meta, rec), = list(read_jsonl(p))
+    ((meta, rec),) = list(read_jsonl(p))
     assert rec["halt_id"] == "halt:1"
     assert rec["invariant_id"] == "evidence_link_completeness.v1"
     assert rec["details"] == {"message": "x", "context": {"gate": "post_write"}}
@@ -81,7 +86,7 @@ def test_append_jsonl_propagates_stable_ids_to_nested_events(tmp_path: Path) -> 
         },
     )
 
-    (_, rec), = list(read_jsonl(p))
+    ((_, rec),) = list(read_jsonl(p))
     assert rec["feature_id"] == "feat_1"
     assert rec["events"][0]["feature_id"] == "feat_1"
     assert rec["events"][0]["scenario_id"] == "scn_1"
@@ -95,12 +100,14 @@ def test_append_jsonl_persists_episode_observer(make_episode, tmp_path: Path) ->
 
     append_jsonl(p, to_jsonable_episode(ep))
 
-    (_, rec), = list(read_jsonl(p))
+    ((_, rec),) = list(read_jsonl(p))
     assert rec["observer"]["role"] == "assistant"
     assert "baseline.dialog" in rec["observer"]["capabilities"]
 
 
-def test_append_jsonl_propagates_stable_ids_to_embedding_and_ontology_records(tmp_path: Path) -> None:
+def test_append_jsonl_propagates_stable_ids_to_embedding_and_ontology_records(
+    tmp_path: Path,
+) -> None:
     p = tmp_path / "records.jsonl"
 
     append_jsonl(
@@ -120,7 +127,7 @@ def test_append_jsonl_propagates_stable_ids_to_embedding_and_ontology_records(tm
         },
     )
 
-    (_, rec), = list(read_jsonl(p))
+    ((_, rec),) = list(read_jsonl(p))
     assert rec["embedding"]["feature_id"] == "feat_1"
     assert rec["ontology_alignment"]["scenario_id"] == "scn_1"
     assert rec["elasticsearch_documents"][0]["step_id"] == "stp_1"
@@ -147,7 +154,7 @@ def test_append_halt_reprojects_alias_payload_to_canonical_shape(tmp_path: Path)
 
     append_halt(p, payload, adapter_gate=TEST_GATE)
 
-    (_, rec), = list(read_jsonl(p))
+    ((_, rec),) = list(read_jsonl(p))
     assert set(rec.keys()) == set(HaltRecord.required_payload_fields())
     assert rec["halt_id"] == payload["halt_id"]
     assert rec["invariant_id"] == payload["invariant_id"]
@@ -158,7 +165,7 @@ def test_append_halt_reprojects_alias_payload_to_canonical_shape(tmp_path: Path)
 def test_append_halt_rejects_missing_explainability_fields(tmp_path: Path) -> None:
     p = tmp_path / "halts.jsonl"
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         append_halt(
             p,
             {
@@ -177,7 +184,7 @@ def test_append_halt_rejects_missing_explainability_fields(tmp_path: Path) -> No
 def test_append_halt_rejects_incomplete_payloads(tmp_path: Path) -> None:
     p = tmp_path / "halts.jsonl"
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         append_halt(
             p,
             {
@@ -196,7 +203,7 @@ def test_append_halt_rejects_incomplete_payloads(tmp_path: Path) -> None:
 def test_append_halt_rejects_conflicting_alias_fields(tmp_path: Path) -> None:
     p = tmp_path / "halts.jsonl"
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         append_halt(
             p,
             {
@@ -271,7 +278,7 @@ def test_append_halt_roundtrip_reprojects_required_fields_without_mutation(tmp_p
     }
 
     append_halt(p, payload, adapter_gate=TEST_GATE)
-    (_, persisted), = list(read_jsonl(p))
+    ((_, persisted),) = list(read_jsonl(p))
     reprojected = HaltRecord.from_payload(persisted).to_canonical_payload()
 
     assert set(reprojected.keys()) == set(HaltRecord.required_payload_fields())
@@ -295,7 +302,7 @@ def test_append_halt_round_trip_preserves_halt_payload_field_integrity(tmp_path:
     }
 
     append_halt(p, payload, adapter_gate=TEST_GATE)
-    (_, persisted), = list(read_jsonl(p))
+    ((_, persisted),) = list(read_jsonl(p))
     roundtrip = HaltRecord.from_payload(persisted).to_canonical_payload()
 
     assert persisted == roundtrip
@@ -326,11 +333,9 @@ def test_halt_reprojection_fails_closed_for_malformed_payload(tmp_path: Path) ->
         },
     )
 
-    (_, malformed), = list(read_jsonl(p))
-    with pytest.raises(Exception):
+    ((_, malformed),) = list(read_jsonl(p))
+    with pytest.raises(ValidationError):
         HaltRecord.from_payload(malformed)
-
-
 
 
 def test_append_halt_round_trip_reload_preserves_explainability_payload(tmp_path: Path) -> None:
@@ -354,14 +359,17 @@ def test_append_halt_round_trip_reload_preserves_explainability_payload(tmp_path
     }
 
     append_halt(p, payload, adapter_gate=TEST_GATE)
-    (_, persisted), = list(read_jsonl(p))
+    ((_, persisted),) = list(read_jsonl(p))
     reloaded = read_halt_record(persisted)
 
     assert reloaded.to_canonical_payload() == payload
     assert reloaded.details == payload["details"]
     assert [item.model_dump(mode="json") for item in reloaded.evidence] == payload["evidence"]
 
-def test_append_halt_round_trip_preserves_all_canonical_and_stable_id_fields(tmp_path: Path) -> None:
+
+def test_append_halt_round_trip_preserves_all_canonical_and_stable_id_fields(
+    tmp_path: Path,
+) -> None:
     p = tmp_path / "halts.jsonl"
 
     payload = {
@@ -380,7 +388,7 @@ def test_append_halt_round_trip_preserves_all_canonical_and_stable_id_fields(tmp
 
     append_halt(p, payload, adapter_gate=TEST_GATE)
 
-    (_, rec), = list(read_jsonl(p))
+    ((_, rec),) = list(read_jsonl(p))
     canonical = HaltRecord.from_payload(payload).to_canonical_payload()
 
     assert rec == {

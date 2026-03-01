@@ -37,7 +37,9 @@ def _parse_manifest(payload: str) -> ManifestDocument:
             "id": str(raw_cap.get("id", "")),
             "status": str(raw_cap.get("status", "")),
             "roadmap_section": str(raw_cap.get("roadmap_section", "")),
-            "code_paths": [str(path) for path in raw_cap.get("code_paths", []) if isinstance(path, str)],
+            "code_paths": [
+                str(path) for path in raw_cap.get("code_paths", []) if isinstance(path, str)
+            ],
             "pytest_commands": [
                 str(command)
                 for command in raw_cap.get("pytest_commands", [])
@@ -81,7 +83,9 @@ def _assert_pytest_command_is_executable(command: str, capability_id: str) -> No
         f"stdout:\n{completed.stdout}\n"
         f"stderr:\n{completed.stderr}"
     )
-    assert re.search(r"(?:collected\s+(?!0\b)\d+\s+items?|(?<!0\s)\d+\s+tests?\s+collected)", output), (
+    assert re.search(
+        r"(?:collected\s+(?!0\b)\d+\s+items?|(?<!0\s)\d+\s+tests?\s+collected)", output
+    ), (
         f"In-progress capability {capability_id} command did not collect any tests: {command}\n"
         f"stdout:\n{completed.stdout}\n"
         f"stderr:\n{completed.stderr}"
@@ -155,7 +159,9 @@ def test_in_progress_capabilities_define_pytest_commands_over_existing_tests() -
             continue
 
         commands = cap["pytest_commands"]
-        assert commands, f"In-progress capability {cap['id']} must define at least one pytest command"
+        assert commands, (
+            f"In-progress capability {cap['id']} must define at least one pytest command"
+        )
 
         for command in commands:
             _assert_pytest_command_targets_existing_tests(command)

@@ -24,10 +24,10 @@
         <rdfs:comment xml:lang="en"
             >An example ontology that contains all constructs required for the various versions of the Pizza Tutorial run by Manchester University</rdfs:comment>
     </owl:Ontology>
-    
 
 
-    <!-- 
+
+    <!--
     ///////////////////////////////////////////////////////////////////////////
     //
     //   OWL Classes
@@ -35,7 +35,7 @@
     ///////////////////////////////////////////////////////////////////////////
      -->
 
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#American -->
@@ -84,7 +84,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#AmericanHot -->
@@ -148,7 +148,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#AnchoviesTopping -->
@@ -160,7 +160,7 @@
             <owl:Class rdf:about="#FishTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#ArtichokeTopping -->
@@ -178,7 +178,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#AsparagusTopping -->
@@ -196,7 +196,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Cajun -->
@@ -260,7 +260,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#CajunSpiceTopping -->
@@ -278,7 +278,7 @@
             <owl:Class rdf:about="#HerbSpiceTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#CaperTopping -->
@@ -296,7 +296,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Capricciosa -->
@@ -367,7 +367,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Caprina -->
@@ -417,7 +417,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#CheeseTopping -->
@@ -429,7 +429,7 @@
             <owl:Class rdf:about="#PizzaTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#CheeseyPizza -->
@@ -450,7 +450,7 @@
             </owl:Class>
         </owl:equivalentClass>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#CheeseyVegetableTopping -->
@@ -467,7 +467,7 @@
             <owl:Class rdf:about="#VegetableTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#ChickenTopping -->
@@ -485,7 +485,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Country -->
@@ -511,7 +511,7 @@
             </owl:Class>
         </owl:equivalentClass>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#DeepPanBase -->
@@ -522,13 +522,13 @@
             <owl:Class rdf:about="#PizzaBase"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#DomainConcept -->
 
     <owl:Class rdf:about="#DomainConcept"/>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Fiorentina -->
@@ -592,7 +592,7 @@
             <owl:Class rdf:about="#NamedPizza"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#FishTopping -->
@@ -610,7 +610,7 @@
             <owl:Class rdf:about="#PizzaTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Food -->
@@ -620,7 +620,7 @@
             <owl:Class rdf:about="#DomainConcept"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#FourCheesesTopping -->
@@ -638,7 +638,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#FourSeasons -->
@@ -709,7 +709,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#FruitTopping -->
@@ -721,7 +721,7 @@
             <owl:Class rdf:about="#PizzaTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#FruttiDiMare -->
@@ -764,7 +764,7 @@
             <owl:Class rdf:about="#NamedPizza"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#GarlicTopping -->
@@ -781,7 +781,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Giardiniera -->
@@ -859,7 +859,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#GoatsCheeseTopping -->
@@ -877,7 +877,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#GorgonzolaTopping -->
@@ -895,7 +895,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#GreenPepperTopping -->
@@ -907,7 +907,7 @@
             <owl:Class rdf:about="#PepperTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#HamTopping -->
@@ -919,7 +919,7 @@
             <owl:Class rdf:about="#MeatTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#HerbSpiceTopping -->
@@ -931,7 +931,7 @@
             <owl:Class rdf:about="#PizzaTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Hot -->
@@ -942,7 +942,7 @@
             <owl:Class rdf:about="#Spiciness"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#HotGreenPepperTopping -->
@@ -960,7 +960,7 @@
             <owl:Class rdf:about="#GreenPepperTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#HotSpicedBeefTopping -->
@@ -978,7 +978,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#IceCream -->
@@ -997,7 +997,7 @@
             <owl:Class rdf:about="#Food"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#InterestingPizza -->
@@ -1019,7 +1019,7 @@
             </owl:Class>
         </owl:equivalentClass>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#JalapenoPepperTopping -->
@@ -1037,7 +1037,7 @@
             <owl:Class rdf:about="#PepperTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#LaReine -->
@@ -1094,7 +1094,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#LeekTopping -->
@@ -1111,7 +1111,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Margherita -->
@@ -1147,7 +1147,7 @@
             <owl:Class rdf:about="#NamedPizza"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#MeatTopping -->
@@ -1159,7 +1159,7 @@
             <owl:Class rdf:about="#PizzaTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#MeatyPizza -->
@@ -1180,7 +1180,7 @@
             </owl:Class>
         </owl:equivalentClass>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Medium -->
@@ -1191,7 +1191,7 @@
             <owl:Class rdf:about="#Spiciness"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Mild -->
@@ -1202,7 +1202,7 @@
             <owl:Class rdf:about="#Spiciness"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#MixedSeafoodTopping -->
@@ -1214,7 +1214,7 @@
             <owl:Class rdf:about="#FishTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#MozzarellaTopping -->
@@ -1238,7 +1238,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Mushroom -->
@@ -1281,7 +1281,7 @@
             <owl:Class rdf:about="#NamedPizza"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#MushroomTopping -->
@@ -1299,7 +1299,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#NamedPizza -->
@@ -1312,7 +1312,7 @@
             <owl:Class rdf:about="#Pizza"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Napoletana -->
@@ -1375,7 +1375,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#NonVegetarianPizza -->
@@ -1398,7 +1398,7 @@
             </owl:Class>
         </owl:equivalentClass>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#NutTopping -->
@@ -1416,7 +1416,7 @@
             <owl:Class rdf:about="#PizzaTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#OliveTopping -->
@@ -1434,7 +1434,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#OnionTopping -->
@@ -1452,7 +1452,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#ParmaHamTopping -->
@@ -1470,7 +1470,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Parmense -->
@@ -1527,7 +1527,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#ParmesanTopping -->
@@ -1545,7 +1545,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#PeperonataTopping -->
@@ -1563,7 +1563,7 @@
             <owl:Class rdf:about="#PepperTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#PeperoniSausageTopping -->
@@ -1581,7 +1581,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#PepperTopping -->
@@ -1593,7 +1593,7 @@
             <owl:Class rdf:about="#VegetableTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#PetitPoisTopping -->
@@ -1611,7 +1611,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#PineKernels -->
@@ -1623,7 +1623,7 @@
             <owl:Class rdf:about="#NutTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Pizza -->
@@ -1640,7 +1640,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#PizzaBase -->
@@ -1651,7 +1651,7 @@
             <owl:Class rdf:about="#Food"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#PizzaTopping -->
@@ -1663,7 +1663,7 @@
             <owl:Class rdf:about="#Food"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#PolloAdAstra -->
@@ -1734,7 +1734,7 @@
             <owl:Class rdf:about="#NamedPizza"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#PrawnsTopping -->
@@ -1746,7 +1746,7 @@
             <owl:Class rdf:about="#FishTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#PrinceCarlo -->
@@ -1804,7 +1804,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#QuattroFormaggi -->
@@ -1840,7 +1840,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#RealItalianPizza -->
@@ -1868,7 +1868,7 @@
             </owl:Class>
         </owl:equivalentClass>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#RedOnionTopping -->
@@ -1880,7 +1880,7 @@
             <owl:Class rdf:about="#OnionTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#RocketTopping -->
@@ -1897,7 +1897,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Rosa -->
@@ -1940,7 +1940,7 @@
             <owl:Class rdf:about="#NamedPizza"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#RosemaryTopping -->
@@ -1958,7 +1958,7 @@
             <owl:Class rdf:about="#HerbSpiceTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#SauceTopping -->
@@ -1970,7 +1970,7 @@
             <owl:Class rdf:about="#PizzaTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Siciliana -->
@@ -2041,7 +2041,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#SlicedTomatoTopping -->
@@ -2059,7 +2059,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#SloppyGiuseppe -->
@@ -2116,7 +2116,7 @@
             <owl:Class rdf:about="#NamedPizza"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Soho -->
@@ -2180,7 +2180,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Spiciness -->
@@ -2202,7 +2202,7 @@
             </owl:Class>
         </owl:equivalentClass>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#SpicyPizza -->
@@ -2223,7 +2223,7 @@
             </owl:Class>
         </owl:equivalentClass>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#SpicyPizzaEquivalent -->
@@ -2255,7 +2255,7 @@
             </owl:Class>
         </owl:equivalentClass>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#SpicyTopping -->
@@ -2277,7 +2277,7 @@
             </owl:Class>
         </owl:equivalentClass>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#SpinachTopping -->
@@ -2295,7 +2295,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#SultanaTopping -->
@@ -2313,7 +2313,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#SundriedTomatoTopping -->
@@ -2331,7 +2331,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#SweetPepperTopping -->
@@ -2349,7 +2349,7 @@
             <owl:Class rdf:about="#PepperTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#ThinAndCrispyBase -->
@@ -2361,7 +2361,7 @@
             <owl:Class rdf:about="#PizzaBase"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#ThinAndCrispyPizza -->
@@ -2379,7 +2379,7 @@
             </owl:Class>
         </owl:equivalentClass>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#TobascoPepperSauce -->
@@ -2397,7 +2397,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#TomatoTopping -->
@@ -2415,7 +2415,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#UnclosedPizza -->
@@ -2434,7 +2434,7 @@
             <owl:Class rdf:about="#NamedPizza"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#ValuePartition -->
@@ -2444,7 +2444,7 @@
         <rdfs:comment rdf:datatype="&xsd;string"
             >A ValuePartition is a pattern that describes a restricted set of classes from which a property can be associated. The parent class is used in restrictions, and the covering axiom means that only members of the subclasses may be used as values. The possible subclasses cannot be extended without updating the ValuePartition class.</rdfs:comment>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#VegetableTopping -->
@@ -2456,7 +2456,7 @@
             <owl:Class rdf:about="#PizzaTopping"/>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#VegetarianPizza -->
@@ -2490,7 +2490,7 @@
             </owl:Class>
         </owl:equivalentClass>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#VegetarianPizzaEquivalent1 -->
@@ -2512,7 +2512,7 @@
             </owl:Class>
         </owl:equivalentClass>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#VegetarianPizzaEquivalent2 -->
@@ -2545,7 +2545,7 @@
             </owl:Class>
         </owl:equivalentClass>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#VegetarianTopping -->
@@ -2573,7 +2573,7 @@
             </owl:Class>
         </owl:equivalentClass>
     </owl:Class>
-    
+
 
 
     <!-- Class: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Veneziana -->
@@ -2650,10 +2650,10 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
 
 
-    <!-- 
+
+    <!--
     ///////////////////////////////////////////////////////////////////////////
     //
     //   OWL Object Properties
@@ -2661,7 +2661,7 @@
     ///////////////////////////////////////////////////////////////////////////
      -->
 
-    
+
 
 
     <!-- Object property: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#hasBase -->
@@ -2679,13 +2679,13 @@
             <owl:Class rdf:about="#PizzaBase"/>
         </rdfs:range>
     </owl:ObjectProperty>
-    
+
 
 
     <!-- Object property: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#hasCountryOfOrigin -->
 
     <owl:ObjectProperty rdf:about="#hasCountryOfOrigin"/>
-    
+
 
 
     <!-- Object property: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#hasIngredient -->
@@ -2704,7 +2704,7 @@
             <owl:Class rdf:about="#Food"/>
         </rdfs:range>
     </owl:ObjectProperty>
-    
+
 
 
     <!-- Object property: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#hasSpiciness -->
@@ -2717,7 +2717,7 @@
             <owl:Class rdf:about="#Spiciness"/>
         </rdfs:range>
     </owl:ObjectProperty>
-    
+
 
 
     <!-- Object property: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#hasTopping -->
@@ -2736,7 +2736,7 @@
             <owl:Class rdf:about="#PizzaTopping"/>
         </rdfs:range>
     </owl:ObjectProperty>
-    
+
 
 
     <!-- Object property: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#isBaseOf -->
@@ -2754,7 +2754,7 @@
             <owl:Class rdf:about="#Pizza"/>
         </rdfs:range>
     </owl:ObjectProperty>
-    
+
 
 
     <!-- Object property: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#isIngredientOf -->
@@ -2773,7 +2773,7 @@
             <owl:Class rdf:about="#Food"/>
         </rdfs:range>
     </owl:ObjectProperty>
-    
+
 
 
     <!-- Object property: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#isToppingOf -->
@@ -2792,10 +2792,10 @@
             <owl:Class rdf:about="#Pizza"/>
         </rdfs:range>
     </owl:ObjectProperty>
-    
 
 
-    <!-- 
+
+    <!--
     ///////////////////////////////////////////////////////////////////////////
     //
     //   OWL Individuals
@@ -2803,7 +2803,7 @@
     ///////////////////////////////////////////////////////////////////////////
      -->
 
-    
+
 
 
     <!-- Individual: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#America -->
@@ -2811,7 +2811,7 @@
     <owl:Thing rdf:about="#America">
         <rdf:type rdf:resource="#Country"/>
     </owl:Thing>
-    
+
 
 
     <!-- Individual: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#England -->
@@ -2819,7 +2819,7 @@
     <owl:Thing rdf:about="#England">
         <rdf:type rdf:resource="#Country"/>
     </owl:Thing>
-    
+
 
 
     <!-- Individual: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#France -->
@@ -2827,7 +2827,7 @@
     <owl:Thing rdf:about="#France">
         <rdf:type rdf:resource="#Country"/>
     </owl:Thing>
-    
+
 
 
     <!-- Individual: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Germany -->
@@ -2835,7 +2835,7 @@
     <owl:Thing rdf:about="#Germany">
         <rdf:type rdf:resource="#Country"/>
     </owl:Thing>
-    
+
 
 
     <!-- Individual: https://raw.githubusercontent.com/owlcs/pizza-ontology/refs/heads/master/pizza.owl#Italy -->
@@ -2843,10 +2843,10 @@
     <owl:Thing rdf:about="#Italy">
         <rdf:type rdf:resource="#Country"/>
     </owl:Thing>
-    
 
 
-    <!-- 
+
+    <!--
     ///////////////////////////////////////////////////////////////////////////
     //
     //   OWL Axioms

@@ -4,7 +4,6 @@ import importlib.util
 import re
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / ".github" / "scripts" / "validate_milestone_docs.py"
 
@@ -123,7 +122,9 @@ def test_done_capability_sync_mismatches_reports_roadmap_milestone_and_maturity_
 
     assert any("roadmap_section='Now'" in mismatch for mismatch in mismatches)
     assert any("Contract A" in mismatch and "Milestone: Now" in mismatch for mismatch in mismatches)
-    assert any("Contract B" in mismatch and "operational/proven" in mismatch for mismatch in mismatches)
+    assert any(
+        "Contract B" in mismatch and "operational/proven" in mismatch for mismatch in mismatches
+    )
 
 
 def test_milestone_policy_mismatches_reports_later_contract_dependency() -> None:
@@ -154,17 +155,27 @@ def test_maturity_promotion_evidence_mismatches_requires_entry_and_url() -> None
         "- 2026-02-28 (Next): Contract A prototype -> operational; promoted without link",
     ]
 
-    mismatches = validate_milestone_docs._maturity_promotion_evidence_mismatches(updates, changelog_lines)
+    mismatches = validate_milestone_docs._maturity_promotion_evidence_mismatches(
+        updates, changelog_lines
+    )
 
-    assert "Contract A: changelog promotion entry must include an evidence URL (http:// or https://)." in mismatches
-    assert "Contract B: missing changelog entry for maturity promotion operational -> proven." in mismatches
+    assert (
+        "Contract A: changelog promotion entry must include an evidence URL (http:// or https://)."
+        in mismatches
+    )
+    assert (
+        "Contract B: missing changelog entry for maturity promotion operational -> proven."
+        in mismatches
+    )
 
 
 def test_maturity_transition_changelog_mismatches_requires_dated_https_entry() -> None:
     updates = [("Contract A", "in_progress", "operational")]
     changelog_lines = ["- Contract A in_progress -> operational; no date and no link"]
 
-    mismatches = validate_milestone_docs._maturity_transition_changelog_mismatches(updates, changelog_lines)
+    mismatches = validate_milestone_docs._maturity_transition_changelog_mismatches(
+        updates, changelog_lines
+    )
 
     assert (
         "Contract A: changelog entry for maturity transition in_progress -> operational must start with '- YYYY-MM-DD (Milestone):'."
@@ -196,7 +207,10 @@ def test_ci_evidence_links_command_mismatches_detects_order_drift() -> None:
     mismatches = validate_milestone_docs._ci_evidence_links_command_mismatches(manifest, {"cap_a"})
 
     assert len(mismatches) == 1
-    assert "cap_a: ci_evidence_links.command values must exactly match pytest_commands in the same order" in mismatches[0]
+    assert (
+        "cap_a: ci_evidence_links.command values must exactly match pytest_commands in the same order"
+        in mismatches[0]
+    )
 
 
 def test_commands_missing_evidence_by_capability_reports_capability_id() -> None:
@@ -206,7 +220,9 @@ def test_commands_missing_evidence_by_capability_reports_capability_id() -> None
         "cap_b": ["pytest tests/test_beta.py"],
     }
 
-    mismatches = validate_milestone_docs._commands_missing_evidence_by_capability(pr_body, commands_by_capability)
+    mismatches = validate_milestone_docs._commands_missing_evidence_by_capability(
+        pr_body, commands_by_capability
+    )
 
     assert len(mismatches) == 1
     assert mismatches[0].startswith("cap_b:")
@@ -234,7 +250,9 @@ def test_contract_map_transition_mismatches_requires_existing_contract_row() -> 
     assert "Missing Contract" in mismatches[0]
 
 
-def test_contract_map_transition_mismatches_requires_done_contract_rows_now_and_operational() -> None:
+def test_contract_map_transition_mismatches_requires_done_contract_rows_now_and_operational() -> (
+    None
+):
     manifest = {
         "capabilities": [
             {
@@ -279,7 +297,12 @@ def test_validate_pr_template_fields_passes_with_all_required_sections() -> None
         ]
     )
 
-    assert validate_milestone_docs._validate_pr_template_fields(pr_body, require_governance_fields=True) == []
+    assert (
+        validate_milestone_docs._validate_pr_template_fields(
+            pr_body, require_governance_fields=True
+        )
+        == []
+    )
 
 
 def test_validate_pr_template_fields_fails_missing_dependency_field() -> None:
@@ -297,10 +320,17 @@ def test_validate_pr_template_fields_fails_missing_dependency_field() -> None:
         ]
     )
 
-    mismatches = validate_milestone_docs._validate_pr_template_fields(pr_body, require_governance_fields=False)
+    mismatches = validate_milestone_docs._validate_pr_template_fields(
+        pr_body, require_governance_fields=False
+    )
 
-    assert any(validate_milestone_docs.MISSING_PR_FIELD_MARKER in mismatch for mismatch in mismatches)
-    assert any("Downstream capabilities/contracts affected or unlocked:" in mismatch for mismatch in mismatches)
+    assert any(
+        validate_milestone_docs.MISSING_PR_FIELD_MARKER in mismatch for mismatch in mismatches
+    )
+    assert any(
+        "Downstream capabilities/contracts affected or unlocked:" in mismatch
+        for mismatch in mismatches
+    )
 
 
 def test_validate_pr_template_fields_fails_missing_budget_declaration() -> None:
@@ -317,9 +347,13 @@ def test_validate_pr_template_fields_fails_missing_budget_declaration() -> None:
         ]
     )
 
-    mismatches = validate_milestone_docs._validate_pr_template_fields(pr_body, require_governance_fields=False)
+    mismatches = validate_milestone_docs._validate_pr_template_fields(
+        pr_body, require_governance_fields=False
+    )
 
-    assert any(validate_milestone_docs.MISSING_PR_FIELD_MARKER in mismatch for mismatch in mismatches)
+    assert any(
+        validate_milestone_docs.MISSING_PR_FIELD_MARKER in mismatch for mismatch in mismatches
+    )
     assert any("Regression budget impact" in mismatch for mismatch in mismatches)
 
 
@@ -338,9 +372,13 @@ def test_validate_pr_template_fields_fails_without_rollback_plan_or_not_applicab
         ]
     )
 
-    mismatches = validate_milestone_docs._validate_pr_template_fields(pr_body, require_governance_fields=False)
+    mismatches = validate_milestone_docs._validate_pr_template_fields(
+        pr_body, require_governance_fields=False
+    )
 
-    assert any(validate_milestone_docs.MISSING_ROLLBACK_PLAN_MARKER in mismatch for mismatch in mismatches)
+    assert any(
+        validate_milestone_docs.MISSING_ROLLBACK_PLAN_MARKER in mismatch for mismatch in mismatches
+    )
 
 
 def test_validate_pr_template_fields_fails_missing_governance_handoff_fields() -> None:
@@ -363,19 +401,28 @@ def test_validate_pr_template_fields_fails_missing_governance_handoff_fields() -
         ]
     )
 
-    mismatches = validate_milestone_docs._validate_pr_template_fields(pr_body, require_governance_fields=True)
+    mismatches = validate_milestone_docs._validate_pr_template_fields(
+        pr_body, require_governance_fields=True
+    )
 
-    assert any(validate_milestone_docs.MISSING_GOVERNANCE_HANDOFF_MARKER in mismatch for mismatch in mismatches)
-    assert any("Governed docs updated with fresh regeneration metadata" in mismatch for mismatch in mismatches)
-    assert any("If `no`, provide timeboxed follow-up issue/PR and owner:" in mismatch for mismatch in mismatches)
+    assert any(
+        validate_milestone_docs.MISSING_GOVERNANCE_HANDOFF_MARKER in mismatch
+        for mismatch in mismatches
+    )
+    assert any(
+        "Governed docs updated with fresh regeneration metadata" in mismatch
+        for mismatch in mismatches
+    )
+    assert any(
+        "If `no`, provide timeboxed follow-up issue/PR and owner:" in mismatch
+        for mismatch in mismatches
+    )
 
 
 def test_live_contract_map_changelog_transitions_include_capability_id_and_evidence_link() -> None:
     manifest = validate_milestone_docs._load_manifest("HEAD")
     capability_ids = {
-        cap.get("id")
-        for cap in manifest.get("capabilities", [])
-        if isinstance(cap.get("id"), str)
+        cap.get("id") for cap in manifest.get("capabilities", []) if isinstance(cap.get("id"), str)
     }
     contract_map_text = (ROOT / "docs" / "system_contract_map.md").read_text(encoding="utf-8")
 
@@ -417,15 +464,10 @@ def test_live_dependency_statements_match_between_roadmap_and_sprint_plan() -> N
     shared = sorted(set(roadmap_map) & set(sprint_map))
     assert shared, "expected at least one shared canonical dependency statement across docs"
 
-    mismatches = [
-        cap_id
-        for cap_id in shared
-        if roadmap_map[cap_id] != sprint_map[cap_id]
-    ]
+    mismatches = [cap_id for cap_id in shared if roadmap_map[cap_id] != sprint_map[cap_id]]
 
     assert not mismatches, (
-        "conflicting dependency statements across docs for capability IDs: "
-        f"{mismatches}"
+        f"conflicting dependency statements across docs for capability IDs: {mismatches}"
     )
 
 
@@ -433,7 +475,9 @@ def test_documentation_change_control_mismatches_passes_with_current_docs() -> N
     assert validate_milestone_docs._documentation_change_control_mismatches() == []
 
 
-def test_documentation_change_control_mismatches_reports_missing_references(tmp_path, monkeypatch) -> None:
+def test_documentation_change_control_mismatches_reports_missing_references(
+    tmp_path, monkeypatch
+) -> None:
     repo_root = tmp_path
     docs_dir = repo_root / "docs"
     docs_dir.mkdir(parents=True)
@@ -460,7 +504,10 @@ def test_documentation_change_control_mismatches_reports_missing_references(tmp_
 
     mismatches = validate_milestone_docs._documentation_change_control_mismatches()
 
-    assert "README.md must reference docs/documentation_change_control.md for canonical DMAIC change-control policy." in mismatches
+    assert (
+        "README.md must reference docs/documentation_change_control.md for canonical DMAIC change-control policy."
+        in mismatches
+    )
     assert (
         "docs/release_checklist.md must reference docs/documentation_change_control.md for release governance routing."
         in mismatches

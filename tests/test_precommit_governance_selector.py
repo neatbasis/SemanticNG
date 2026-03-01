@@ -3,8 +3,9 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-
-SCRIPT_PATH = Path(__file__).resolve().parents[1] / ".github/scripts/run_precommit_governance_checks.py"
+SCRIPT_PATH = (
+    Path(__file__).resolve().parents[1] / ".github/scripts/run_precommit_governance_checks.py"
+)
 SPEC = importlib.util.spec_from_file_location("run_precommit_governance_checks", SCRIPT_PATH)
 assert SPEC and SPEC.loader
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -64,11 +65,17 @@ def test_dedupes_commands_when_multiple_capabilities_map_to_same_pytest() -> Non
 def test_transition_to_done_requires_non_manifest_docs_update() -> None:
     base_manifest = {
         "capabilities": [
-            {"id": "cap_a", "status": "in_progress", "pytest_commands": ["pytest tests/test_alpha.py"]}
+            {
+                "id": "cap_a",
+                "status": "in_progress",
+                "pytest_commands": ["pytest tests/test_alpha.py"],
+            }
         ]
     }
     head_manifest = {
-        "capabilities": [{"id": "cap_a", "status": "done", "pytest_commands": ["pytest tests/test_alpha.py"]}]
+        "capabilities": [
+            {"id": "cap_a", "status": "done", "pytest_commands": ["pytest tests/test_alpha.py"]}
+        ]
     }
 
     try:
@@ -86,11 +93,17 @@ def test_transition_to_done_requires_non_manifest_docs_update() -> None:
 def test_transition_to_done_includes_done_commands_when_docs_present() -> None:
     base_manifest = {
         "capabilities": [
-            {"id": "cap_a", "status": "in_progress", "pytest_commands": ["pytest tests/test_alpha.py"]}
+            {
+                "id": "cap_a",
+                "status": "in_progress",
+                "pytest_commands": ["pytest tests/test_alpha.py"],
+            }
         ]
     }
     head_manifest = {
-        "capabilities": [{"id": "cap_a", "status": "done", "pytest_commands": ["pytest tests/test_alpha.py"]}]
+        "capabilities": [
+            {"id": "cap_a", "status": "done", "pytest_commands": ["pytest tests/test_alpha.py"]}
+        ]
     }
 
     selected = MODULE.select_governance_commands(

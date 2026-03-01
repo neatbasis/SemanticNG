@@ -4,9 +4,21 @@ from collections.abc import Callable
 from pathlib import Path
 
 from state_renormalization.adapters.persistence import append_jsonl, read_jsonl
-from state_renormalization.contracts import AskResult, AskStatus, BeliefState, Episode, HaltRecord, PredictionRecord, ProjectionState
-from state_renormalization.engine import evaluate_invariant_gates, replay_projection_analytics, run_mission_loop, to_jsonable_episode
-
+from state_renormalization.contracts import (
+    AskResult,
+    AskStatus,
+    BeliefState,
+    Episode,
+    HaltRecord,
+    PredictionRecord,
+    ProjectionState,
+)
+from state_renormalization.engine import (
+    evaluate_invariant_gates,
+    replay_projection_analytics,
+    run_mission_loop,
+    to_jsonable_episode,
+)
 
 FIXED_PENDING_PREDICTION = {
     "prediction_id": "pred:base",
@@ -49,7 +61,10 @@ def test_projection_state_rebuilds_identically_from_append_only_log_on_repeated_
     replay_twice = replay_projection_analytics(prediction_log)
 
     assert replay_once.model_dump(mode="json") == replay_twice.model_dump(mode="json")
-    assert replay_once.projection_state.current_predictions.keys() == online_projection.current_predictions.keys()
+    assert (
+        replay_once.projection_state.current_predictions.keys()
+        == online_projection.current_predictions.keys()
+    )
     assert replay_once.projection_state.correction_metrics == online_projection.correction_metrics
     assert replay_once.records_processed == 3
 
@@ -104,9 +119,19 @@ def test_process_restart_replay_is_deterministic_for_identical_persisted_inputs(
         prediction_log_path=log_b,
     )
 
-    assert projection_after_first_turn.correction_metrics == replay_projection_a.correction_metrics == replay_projection_b.correction_metrics
-    assert restarted_after_second_turn_a.current_predictions.keys() == restarted_after_second_turn_b.current_predictions.keys()
-    assert restarted_after_second_turn_a.correction_metrics == restarted_after_second_turn_b.correction_metrics
+    assert (
+        projection_after_first_turn.correction_metrics
+        == replay_projection_a.correction_metrics
+        == replay_projection_b.correction_metrics
+    )
+    assert (
+        restarted_after_second_turn_a.current_predictions.keys()
+        == restarted_after_second_turn_b.current_predictions.keys()
+    )
+    assert (
+        restarted_after_second_turn_a.correction_metrics
+        == restarted_after_second_turn_b.correction_metrics
+    )
 
 
 def test_replay_does_not_mutate_halt_explainability_fields(
@@ -132,7 +157,7 @@ def test_replay_does_not_mutate_halt_explainability_fields(
 
     _ = replay_projection_analytics(prediction_log)
 
-    (_, persisted), = list(read_jsonl(episode_log))
+    ((_, persisted),) = list(read_jsonl(episode_log))
     halt_payloads = [
         artifact
         for artifact in persisted["artifacts"]
@@ -146,7 +171,9 @@ def test_replay_does_not_mutate_halt_explainability_fields(
         assert required.issubset(canonical)
 
 
-def test_restart_branch_replay_remains_deterministic_with_mixed_lineage_noise(tmp_path: Path) -> None:
+def test_restart_branch_replay_remains_deterministic_with_mixed_lineage_noise(
+    tmp_path: Path,
+) -> None:
     seed_log = tmp_path / "seed.jsonl"
     seed_log.write_text(
         "\n".join(
@@ -154,7 +181,7 @@ def test_restart_branch_replay_remains_deterministic_with_mixed_lineage_noise(tm
                 '{"event_kind":"prediction_record","prediction_id":"pred:1","scope_key":"turn:1","filtration_id":"conversation:c1","target_variable":"user_response_present","target_horizon_iso":"2026-02-13T00:00:00+00:00","issued_at_iso":"2026-02-13T00:00:00+00:00"}',
                 '{"halt_id":"halt:1","stage":"pre-decision","invariant_id":"prediction_availability.v1","reason":"missing","details":{"scope":"turn:1"},"evidence":[{"kind":"jsonl","ref":"predictions.jsonl@1"}],"retryability":true,"timestamp":"2026-02-13T00:00:01+00:00"}',
                 '{"event_kind":"prediction_record",',
-                '[]',
+                "[]",
             ]
         )
         + "\n",
@@ -175,7 +202,9 @@ def test_restart_branch_replay_remains_deterministic_with_mixed_lineage_noise(tm
     assert replay_a.analytics_snapshot.halt_count == 1
 
 
-def test_restart_contract_replay_keeps_request_views_deterministic_for_identical_logs(tmp_path: Path) -> None:
+def test_restart_contract_replay_keeps_request_views_deterministic_for_identical_logs(
+    tmp_path: Path,
+) -> None:
     seed_log = tmp_path / "seed-ask.jsonl"
     append_jsonl(
         seed_log,

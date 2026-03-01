@@ -5,7 +5,7 @@ Feature: Resource envelope
 
   Background: Resource store
     Given a Resource store that is append-only
-    
+
   Scenario: Create a minimal Resource
     When I create a Resource with dc:type "Event"
     And with dc:created "2026-02-14T10:00:00Z"

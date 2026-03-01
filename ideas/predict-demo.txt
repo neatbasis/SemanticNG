@@ -228,18 +228,18 @@ Prediction record represents conditional expectation:
 
 class PredictionRecord(BaseModel):
     prediction_id: str
-    
+
     filtration_id: str  # identity state reference
-    
+
     variable: str
     horizon: datetime
-    
+
     conditional_expectation: float
     conditional_variance: float
-    
+
     issued_at: datetime
     valid_until: datetime
-    
+
     stopping_time: datetime | None
 
 This directly corresponds to E[X|𝔽_t].

@@ -204,6 +204,10 @@ make test-cov
 pytest --cov --cov-report=term-missing --cov-report=xml
 ```
 
+Coverage threshold governance policy (cadence, evidence requirements, waiver format,
+and threshold change log) is documented in
+[`docs/release_checklist.md`](docs/release_checklist.md#coverage-threshold-governance-policy).
+
 ### mypy (optional)
 
 `mypy` performs static type checking for `src/` and `tests/`.

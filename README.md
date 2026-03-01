@@ -1,5 +1,34 @@
 # SemanticNG
 
+## Refactoring focus (active)
+
+The current project-wide focus is the refactor program defined in `src/core/REFACTORING_METAPLAN.md`.
+
+Contributors should treat this as the active delivery objective:
+
+- move deterministic domain logic into `src/core/`,
+- keep infrastructure and I/O in adapters/shell layers,
+- migrate capability-by-capability using seams, parity checks, and incremental cutovers.
+
+### Boundary rules (repository-level)
+
+When changing code anywhere in this repository:
+
+- keep dependency direction pointed inward toward core logic,
+- do not introduce hidden I/O into core modules,
+- make contracts explicit at boundaries (inputs, outputs, errors, states),
+- inject non-deterministic sources (time, ids, randomness) through ports,
+- prefer slice migrations over broad rewrites.
+
+### Contributor quick-start for refactor work
+
+1. Pick one capability slice with clear inputs/outputs.
+2. Define or tighten seam contracts first.
+3. Add/route via a facade entrypoint.
+4. Add parity and invariant tests for the slice.
+5. Implement deterministic core logic in `src/core/`.
+6. Switch routing to core once parity passes, then retire legacy path.
+
 ## Document status legend
 
 - **Canonical**: normative for contributors.

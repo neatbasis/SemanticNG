@@ -14,6 +14,19 @@ This README is a **projection artifact**. Normative constraints live in:
 
 ---
 
+## Active implementation directive
+
+`src/core/REFACTORING_METAPLAN.md` is the active implementation directive for this module.
+
+All work in `src/core/` must satisfy:
+
+- deterministic domain logic only,
+- explicit contracts and ports,
+- zero direct infrastructure coupling or I/O,
+- inward dependency flow.
+
+If a proposed change needs framework, persistence, network, filesystem, or runtime-environment coupling, place it in an adapter layer and keep only the contract in core.
+
 ## What Core *Is*
 
 Core is the minimal, deterministic boundary contract for foundational package identity:

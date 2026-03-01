@@ -27,6 +27,17 @@ DMAIC change-type routing (required files, validators, evidence locations, and m
 - [ ] **Documentation freshness SLO met:** `docs/doc_freshness_slo.json` governs the freshness metadata policy and `python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json` passes.
 - [ ] **Sprint handoff minimum artifacts attached:** Sprint-close report includes exit table, open-risk register, and next-sprint preload list.
 - [ ] **Python version-contract drift blocked:** `pyproject.toml` `[project].requires-python`, README requirements text, and CI workflow `setup-python` versions must match in the same PR; any drift is a merge blocker for infra/docs changes.
+- [ ] **Tooling/config PR parity evidence attached:** For any tooling or CI/configuration change, include a checked PR checklist entry for **"pre-commit parity verified"** and paste command evidence from `python .github/scripts/check_precommit_parity.py` and `pre-commit run --all-files -v`.
+
+## Toolchain parity KPI tracking (release governance)
+
+Track these KPIs for each release window and summarize trend direction in release notes or governance review artifacts:
+
+- [ ] **Pre-commit missing-dependency failure rate:** `%` of local pre-commit failures attributable to missing dependencies in isolated hook environments.
+- [ ] **Median time-to-green after first CI failure:** median elapsed time from first failing CI run in a PR to first succeeding run.
+- [ ] **Local-pass/CI-fail incident ratio:** count and ratio of incidents where local quality gates passed but CI failed for parity-related reasons.
+
+Attach links to source evidence (CI dashboards, parity audit logs, or issue tracker rollups) whenever KPI values are updated.
 
 ### Documentation freshness metadata (contributor requirement)
 
@@ -228,4 +239,4 @@ Use this template:
 
 If conflict reconciliation drops or defers any behavior, do not merge immediately: open follow-up patch PR(s) in the same integration cycle and link them under the affected checklist entry.
 
-_Last regenerated from manifest: 2026-03-01T18:00:00Z (UTC)._
+_Last regenerated from manifest: 2026-03-01T19:10:00Z (UTC)._

@@ -55,6 +55,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
 
@@ -74,10 +77,13 @@ jobs:
       contents: read
       issues: write
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
-        with:
-          fetch-depth: '0'
 
       - name: Compute diff SHAs
         id: shas
@@ -153,94 +159,17 @@ jobs:
         run: |
           python .github/scripts/validate_sprint_handoff.py
 
-      - name: Run milestone pytest commands for relevant changes
+      - name: Select and run milestone pytest commands for relevant changes
         run: |
-          python - <<'PY'
-          import json
-          import os
-          import subprocess
-          import sys
-          from pathlib import Path
+          set -euo pipefail
+          python .github/scripts/select_milestone_test_commands.py \
+            --base "$BASE_SHA" \
+            --head "$HEAD_SHA" \
+            --run
 
-          def _matches_code_path(changed_file: str, code_path: str) -> bool:
-              normalized = code_path.rstrip("/")
-              return changed_file == normalized or changed_file.startswith(f"{normalized}/")
-
-          manifest_path = Path("docs/dod_manifest.json")
-          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-          capabilities = manifest.get("capabilities", [])
-
-          base_sha = os.environ.get("BASE_SHA")
-          head_sha = os.environ.get("HEAD_SHA")
-          if not base_sha or not head_sha:
-              print("Missing base/head SHA context; failing gate.")
-              sys.exit(1)
-
-          changed_files_cmd = ["git", "diff", "--name-only", base_sha, head_sha]
-          changed_files_out = subprocess.check_output(changed_files_cmd, text=True)
-          changed_files = [line.strip() for line in changed_files_out.splitlines() if line.strip()]
-          touches_state_renorm = any(path.startswith("src/state_renormalization/") for path in changed_files)
-
-          print("Changed files:")
-          for path in changed_files:
-              print(f"  - {path}")
-
-          commands = []
-
-          manifest_changed = "docs/dod_manifest.json" in changed_files
-          for capability in capabilities:
-              if capability.get("status") != "in_progress":
-                  continue
-
-              capability_paths = capability.get("code_paths", [])
-              capability_changed = touches_state_renorm or manifest_changed or any(
-                  _matches_code_path(changed, code_path)
-                  for changed in changed_files
-                  for code_path in capability_paths
-              )
-
-              if capability_changed:
-                  commands.extend(capability.get("pytest_commands", []))
-
-          base_manifest_raw = subprocess.check_output(
-              ["git", "show", f"{base_sha}:docs/dod_manifest.json"],
-              text=True,
-          )
-          base_manifest = json.loads(base_manifest_raw)
-          base_by_id = {cap["id"]: cap for cap in base_manifest.get("capabilities", [])}
-          head_by_id = {cap["id"]: cap for cap in capabilities}
-
-          transitioned_to_done = []
-          for capability_id, head_capability in head_by_id.items():
-              base_capability = base_by_id.get(capability_id)
-              if not base_capability:
-                  continue
-              if base_capability.get("status") == "in_progress" and head_capability.get("status") == "done":
-                  transitioned_to_done.append(head_capability)
-
-          if transitioned_to_done:
-              print("Capabilities transitioned in_progress -> done:")
-              for capability in transitioned_to_done:
-                  print(f"  - {capability['id']}")
-                  commands.extend(capability.get("pytest_commands", []))
-
-          deduped_commands = []
-          seen = set()
-          for command in commands:
-              if command in seen:
-                  continue
-              seen.add(command)
-              deduped_commands.append(command)
-
-          if not deduped_commands:
-              print("No relevant milestone pytest commands for this change set.")
-              sys.exit(0)
-
-          for command in deduped_commands:
-              print(f"\n>>> Running: {command}")
-              completed = subprocess.run(command, shell=True)
-              if completed.returncode != 0:
-                  sys.exit(completed.returncode)
-
-          print("\nAll relevant milestone pytest commands passed.")
-          PY
+      - name: Publish milestone command selection summary
+        if: ${{ always() }}
+        run: |
+          if [[ -f artifacts/milestone_test_selection_summary.md ]]; then
+            cat artifacts/milestone_test_selection_summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi

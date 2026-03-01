@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from enum import StrEnum
+from datetime import datetime
 from typing import Any, Protocol
 
+from state_renormalization._compat import UTC, StrEnum
 from state_renormalization.contracts import EvidenceRef
 
 

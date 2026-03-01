@@ -7,8 +7,7 @@ from collections.abc import Iterable, Mapping
 # during stabilization of integration/pr-conflict-resolution, merge changes to this
 # module only via the ordered integration stack documented in docs/integration_notes.md.
 from dataclasses import dataclass, field
-from enum import StrEnum
-from typing import Any, ClassVar, Literal, Protocol, Self
+from typing import Any, ClassVar, Literal, Protocol
 
 from pydantic import (
     AliasChoices,
@@ -20,6 +19,8 @@ from pydantic import (
     model_validator,
 )
 from pydantic_core import ErrorDetails
+
+from state_renormalization._compat import Self, StrEnum
 
 
 class HaltPayloadValidationError(ValueError):

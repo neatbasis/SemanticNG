@@ -9,13 +9,14 @@ import importlib
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Protocol, cast
 
 from pydantic import BaseModel
 
+from state_renormalization._compat import UTC
 from state_renormalization.adapters.ask_outbox import AskOutboxAdapter
 from state_renormalization.adapters.observation_freshness import ObservationFreshnessPolicyAdapter
 from state_renormalization.adapters.persistence import (

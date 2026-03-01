@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,6 +12,7 @@ _spec = importlib.util.spec_from_file_location("validate_doc_freshness_slo", SCR
 assert _spec and _spec.loader
 validate_doc_freshness_slo = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(validate_doc_freshness_slo)
+UTC = timezone.utc
 
 
 def _base_config() -> dict:

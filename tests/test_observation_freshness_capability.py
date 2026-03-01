@@ -73,7 +73,9 @@ def test_no_observation_emits_request(
         projection_state=_projection_state(),
         policy_adapter=_FreshnessPolicyAdapter(
             contract=ObservationFreshnessPolicyContract(
-                scope=ObservationType.USER_UTTERANCE.value, observed_at_iso=None, stale_after_seconds=30
+                scope=ObservationType.USER_UTTERANCE.value,
+                observed_at_iso=None,
+                stale_after_seconds=30,
             ),
         ),
         ask_outbox_adapter=outbox,

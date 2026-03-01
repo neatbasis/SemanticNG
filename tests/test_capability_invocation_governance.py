@@ -3,7 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from state_renormalization.adapters.persistence import read_jsonl
-from state_renormalization.contracts import EvidenceRef, HaltRecord, PredictionRecord, ProjectionState
+from state_renormalization.contracts import (
+    EvidenceRef,
+    HaltRecord,
+    PredictionRecord,
+    ProjectionState,
+)
 from state_renormalization.engine import append_prediction_record
 
 

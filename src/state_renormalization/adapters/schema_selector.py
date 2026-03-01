@@ -5,9 +5,9 @@ import re
 from collections import defaultdict
 from collections.abc import Mapping, Set
 from dataclasses import dataclass, field
-from enum import StrEnum
 from typing import Any, Protocol
 
+from state_renormalization._compat import StrEnum
 from state_renormalization.contracts import (
     AboutKind,
     Ambiguity,

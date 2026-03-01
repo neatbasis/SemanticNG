@@ -10,7 +10,6 @@ from state_renormalization.adapters.schema_selector import (
     RULE_REGISTRY,
     BaseRule,
     SelectorCheckContext,
-    SelectorContext,
     SelectorDecisionStatus,
     _decide_selection_policy,
     _legacy_naive_schema_selector,

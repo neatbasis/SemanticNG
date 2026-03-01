@@ -8,7 +8,13 @@ from typing import Any, cast
 import pytest
 
 from state_renormalization.adapters.persistence import read_jsonl
-from state_renormalization.contracts import Episode, EvidenceRef, HaltRecord, PredictionRecord, ProjectionState
+from state_renormalization.contracts import (
+    Episode,
+    EvidenceRef,
+    HaltRecord,
+    PredictionRecord,
+    ProjectionState,
+)
 from state_renormalization.engine import (
     GateDecision,
     Success,

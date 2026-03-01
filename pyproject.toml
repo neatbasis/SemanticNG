@@ -5,9 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "semanticng"
 dynamic = ["version"]
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
   "pydantic>=2.6,<3",
+  "typing-extensions>=4.7,<5",
 ]
 
 [project.optional-dependencies]
@@ -18,7 +19,7 @@ test = [
   "pytest-cov>=5,<6",
   "pre-commit>=4,<5",
   "gherkin-official>=30,<31",
-  "typing-extensions>=4.8,<5",
+  "typing-extensions>=4.7,<5",
 ]
 bdd = [
   "behave>=1.2.6,<2",
@@ -49,7 +50,7 @@ addopts = [
 ]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py310"
 line-length = 100
 src = ["src", "tests"]
 
@@ -69,9 +70,10 @@ ignore = [
 "tests/**/*.py" = [
   "S101",
 ]
+"src/state_renormalization/_compat.py" = ["UP035"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.10"
 strict = true
 warn_unused_ignores = true
 warn_redundant_casts = true

@@ -54,7 +54,7 @@ Guardrail classification guidance for contributors (invariants vs policies vs he
 
 ## Requirements
 
-- Python **3.11+**
+- Python **3.10+**
 - `pip` (latest recommended)
 
 ## Local development setup

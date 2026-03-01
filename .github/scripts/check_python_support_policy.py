@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail CI when README Python requirement drifts from pyproject policy."""
+"""Fail CI when Python version policy drifts across pyproject, README, and CI setup."""
 
 from __future__ import annotations
 
@@ -25,9 +25,23 @@ def expected_readme_requirement(requires_python: str) -> str:
     return f"- Python **{match.group(1)}+**"
 
 
+def read_ci_default_python_version(action_path: Path) -> str:
+    action_text = action_path.read_text(encoding="utf-8")
+    match = re.search(
+        r"inputs:\n(?:.|\n)*?python-version:\n(?:.|\n)*?default:\s*['\"]([0-9]+\.[0-9]+)['\"]",
+        action_text,
+    )
+    if not match:
+        raise ValueError(
+            "Could not find a default Python version in .github/actions/python-test-setup/action.yml."
+        )
+    return match.group(1)
+
+
 def main() -> int:
     requires_python = read_requires_python(Path("pyproject.toml"))
     expected_line = expected_readme_requirement(requires_python)
+    expected_ci_version = expected_line.removeprefix("- Python **").removesuffix("+**")
 
     readme_lines = Path("README.md").read_text(encoding="utf-8").splitlines()
     python_requirement_lines = [
@@ -46,7 +60,18 @@ def main() -> int:
             print("  found README line(s): <none>")
         return 1
 
-    print(f"Python support policy in sync: {requires_python}")
+    ci_default_python = read_ci_default_python_version(Path(".github/actions/python-test-setup/action.yml"))
+    if ci_default_python != expected_ci_version:
+        print("CI default Python version is out of sync with pyproject policy.")
+        print(f"  pyproject.toml requires-python: {requires_python}")
+        print(f"  expected CI default python-version: {expected_ci_version}")
+        print(f"  found CI default python-version: {ci_default_python}")
+        return 1
+
+    print(
+        "Python support policy in sync: "
+        f"requires-python={requires_python}, readme={expected_line}, ci_default={ci_default_python}"
+    )
     return 0
 
 

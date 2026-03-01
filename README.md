@@ -72,10 +72,16 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[test]"
 ```
 
-Validate your local bootstrap state at any time with:
+After installation, validate your local bootstrap state (including `python --version` and `import pydantic`) with:
 
 ```bash
 make bootstrap
+```
+
+Enforce Python version policy parity between `pyproject.toml`, README requirements text, and CI defaults with:
+
+```bash
+python .github/scripts/check_python_support_policy.py
 ```
 
 ## Definition-of-done manifest

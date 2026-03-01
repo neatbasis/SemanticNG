@@ -371,6 +371,24 @@ def test_release_checklist_has_no_duplicate_headers_or_checklist_labels() -> Non
     )
 
 
+def test_readme_does_not_duplicate_full_coverage_policy_block() -> None:
+    readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    duplicated_policy_markers = [
+        "Coverage failure triage (blocking vs. advisory)",
+        "Threshold source of truth",
+        "Allowed change cadence",
+        "Waiver format and expiration",
+    ]
+    duplicates = [marker for marker in duplicated_policy_markers if marker in readme_text]
+
+    assert not duplicates, (
+        "README policy duplication detected: full coverage governance markers must remain canonical in "
+        "docs/release_checklist.md only. "
+        f"duplicate_markers_in_readme={duplicates}"
+    )
+
+
 def test_planned_or_in_progress_capabilities_are_present_in_sprint_plan() -> None:
     manifest_status = _load_manifest_status_map()
     sprint_plan_text = SPRINT_PLAN_PATH.read_text(encoding="utf-8")

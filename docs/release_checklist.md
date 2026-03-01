@@ -6,6 +6,8 @@ Use this checklist before tagging a release.
 
 This document is the canonical source for active release/integration workflow expectations.
 
+DMAIC change-type routing (required files, validators, evidence locations, and merge-blocking criteria) is defined in [`docs/documentation_change_control.md`](documentation_change_control.md).
+
 - Default to standard PR flow with branch protection and required checks enabled.
 - Use milestone gate + manifest evidence as merge prerequisites for milestone/maturity changes.
 - Treat `docs/integration_notes.md` as historical context only unless its explicit activation criteria are met.

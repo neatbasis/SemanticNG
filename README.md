@@ -110,6 +110,8 @@ PRs that change capability status in `docs/dod_manifest.json` or contract maturi
 
 CI enforces these milestone rules for PRs and merge queues that touch `src/state_renormalization/`, `docs/dod_manifest.json`, or the milestone gate workflow. Other docs can be generated from the manifest as needed.
 
+Canonical DMAIC documentation update paths (Define/Measure/Analyze/Improve/Control) and merge-blocking evidence expectations are defined in [`docs/documentation_change_control.md`](docs/documentation_change_control.md).
+
 
 ### Promotion workflow checklist
 

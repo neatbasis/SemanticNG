@@ -427,3 +427,41 @@ def test_live_dependency_statements_match_between_roadmap_and_sprint_plan() -> N
         "conflicting dependency statements across docs for capability IDs: "
         f"{mismatches}"
     )
+
+
+def test_documentation_change_control_mismatches_passes_with_current_docs() -> None:
+    assert validate_milestone_docs._documentation_change_control_mismatches() == []
+
+
+def test_documentation_change_control_mismatches_reports_missing_references(tmp_path, monkeypatch) -> None:
+    repo_root = tmp_path
+    docs_dir = repo_root / "docs"
+    docs_dir.mkdir(parents=True)
+
+    (docs_dir / "documentation_change_control.md").write_text(
+        "\n".join(
+            [
+                "## DMAIC change-control matrix",
+                "| DMAIC phase (change type) | Required files to update | Required commands / validators | Required evidence locations (PR body + handoff docs) | Merge-blocking criteria |",
+                "| --- | --- | --- | --- | --- |",
+                "| **Define** | a | b | c | d |",
+                "| **Measure** | a | b | c | d |",
+                "| **Analyze** | a | b | c | d |",
+                "| **Improve** | a | b | c | d |",
+                "| **Control** | a | b | c | d |",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (repo_root / "README.md").write_text("# Placeholder\n", encoding="utf-8")
+    (docs_dir / "release_checklist.md").write_text("# Release Checklist\n", encoding="utf-8")
+
+    monkeypatch.chdir(repo_root)
+
+    mismatches = validate_milestone_docs._documentation_change_control_mismatches()
+
+    assert "README.md must reference docs/documentation_change_control.md for canonical DMAIC change-control policy." in mismatches
+    assert (
+        "docs/release_checklist.md must reference docs/documentation_change_control.md for release governance routing."
+        in mismatches
+    )

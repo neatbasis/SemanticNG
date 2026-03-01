@@ -6,9 +6,10 @@ import re
 import subprocess
 import sys
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
+UTC = timezone.utc
 _GLOB_META_CHARS = set("*?[]")
 _HEX_COMMIT_PATTERN = re.compile(r"^[0-9a-f]{7,40}$")
 

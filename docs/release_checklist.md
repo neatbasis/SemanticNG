@@ -180,6 +180,51 @@ Record every accepted threshold update in reverse chronological order.
 | --- | --- | --- | --- |
 | 2026-03-01 | `85 -> 85` | Baseline governance log entry added to document current enforced threshold and establish audit trail format. | https://github.com/example/semanticng/actions/runs/REPLACE_WITH_RUN_ID |
 
+
+## Workflow quality KPIs (publish each sprint-close + monthly rollup)
+
+Track and publish these KPI definitions in sprint handoff evidence and (optionally) in CI job summaries.
+
+| KPI | Definition | Calculation window | Target/guardrail |
+| --- | --- | --- | --- |
+| Median PR CI duration | Median wall-clock minutes from workflow start to completion for PR-triggered required workflows. | Previous 30 days | Stable or improving trend; flag >10% regression month-over-month. |
+| Duplicate-test execution rate | Share of executed test commands that duplicate coverage already run in another required job. | Previous 30 days | <= 5%; any sustained increase requires consolidation plan. |
+| Flaky-check incidence | Percent of required checks that fail and pass on rerun without code changes. | Previous 30 days | <= 2%; above threshold requires flake triage owner. |
+| Bootstrap failure rate | Percent of CI runs failing before test execution (setup/dependency/bootstrap stages). | Previous 30 days | <= 1%; above threshold is release-risk. |
+
+Publication requirements:
+- Include latest KPI values and trend deltas in `docs/sprint_handoffs/sprint-<n>-handoff.md`.
+- Optional: append the KPI table to `$GITHUB_STEP_SUMMARY` for visibility in CI runs.
+
+## Monthly workflow health review checklist
+
+Complete this checklist once per month (or per release train, whichever is sooner).
+
+- [ ] **Top slow jobs identified:** list the top 3 slowest required jobs by median duration and time spent.
+- [ ] **Top failure causes identified:** list recurring failure signatures (flake, infra, deterministic regression, bootstrap).
+- [ ] **Remediation actions assigned:** every action has an owner, due date, and success metric.
+- [ ] **Follow-through status captured:** prior month remediation actions are marked done/carry/blocked with rationale.
+
+## Quality debt budget tracking (CI/workflow complexity)
+
+Use this budget when adding or expanding CI checks/jobs/workflow steps that increase runtime or operational complexity.
+
+| Change ID | Added quality debt cost (min/run or complexity points) | Rationale | Owner | Planned paydown sprint/date | Rollback plan if cost exceeds budget | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| <id> | <cost> | <why added> | <owner> | <YYYY-MM-DD or sprint> | <exact rollback trigger + command/PR path> | planned/in_progress/done |
+
+Policy:
+- Any positive debt-cost change must include a rollback plan before merge.
+- If observed KPI regressions exceed guardrails for two consecutive weeks, execute rollback or approved mitigation by owner.
+
+## Workflow command-policy drift governance
+
+Canonical command policy source: `docs/workflow_command_policy.json`.
+
+- [ ] Run `python .github/scripts/workflow_policy_drift_report.py --summary` in CI and fail when drift is detected.
+- [ ] Update policy + source docs in the same PR whenever required workflow commands are added, removed, or relocated.
+- [ ] Include drift-report output in sprint-close evidence when workflow commands changed during the sprint.
+
 ## Copy/paste evidence block (validator-compatible)
 
 Generate the PR-template block from `docs/dod_manifest.json` instead of maintaining command examples here:
@@ -228,4 +273,4 @@ Use this template:
 
 If conflict reconciliation drops or defers any behavior, do not merge immediately: open follow-up patch PR(s) in the same integration cycle and link them under the affected checklist entry.
 
-_Last regenerated from manifest: 2026-03-01T18:00:00Z (UTC)._
+_Last regenerated from manifest: 2026-03-01T22:30:00Z (UTC)._

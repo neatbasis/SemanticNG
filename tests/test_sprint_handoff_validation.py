@@ -60,6 +60,19 @@ def test_detects_unknown_preload_capability_id(tmp_path: Path) -> None:
                 "| Capability ID | Preload objective | Dependency notes |",
                 "| --- | --- | --- |",
                 "| `not_in_manifest` | Objective | Notes |",
+                "",
+                "## Workflow quality KPI trend deltas",
+                "| KPI | Previous window | Current window | Delta | Evidence |",
+                "| --- | --- | --- | --- | --- |",
+                "| Median PR CI duration | 10 | 9 | -1 | evidence |",
+                "| Duplicate-test execution rate | 8% | 7% | -1% | evidence |",
+                "| Flaky-check incidence | 3% | 2% | -1% | evidence |",
+                "| Bootstrap failure rate | 1.5% | 1.0% | -0.5% | evidence |",
+                "",
+                "## Completed workflow-quality actions",
+                "| Action | Source (monthly review / incident / debt budget) | Owner | Status (`done` required at sprint close) | Evidence |",
+                "| --- | --- | --- | --- | --- |",
+                "| Example action | monthly review | owner | done | evidence |",
             ]
         ),
         encoding="utf-8",
@@ -69,3 +82,47 @@ def test_detects_unknown_preload_capability_id(tmp_path: Path) -> None:
 
     assert len(mismatches) == 1
     assert "not found in docs/dod_manifest.json" in mismatches[0]
+
+
+def test_detects_non_done_workflow_quality_action(tmp_path: Path) -> None:
+    bad_handoff = tmp_path / "sprint-100-handoff.md"
+    bad_handoff.write_text(
+        "\n".join(
+            [
+                "# Sprint 100 handoff",
+                "",
+                "## Exit criteria pass/fail matrix",
+                "| Exit criterion | Status (`pass`/`fail`) | Evidence |",
+                "| --- | --- | --- |",
+                "| Ready | pass | evidence |",
+                "",
+                "## Open risk register with owners/dates",
+                "| Risk | Owner | Target resolution date (YYYY-MM-DD) | Mitigation/next step |",
+                "| --- | --- | --- | --- |",
+                "| Drift | Owner | 2026-01-30 | Mitigate |",
+                "",
+                "## Next-sprint preload mapped to capability IDs",
+                "| Capability ID | Preload objective | Dependency notes |",
+                "| --- | --- | --- |",
+                "| `known_capability` | Objective | Notes |",
+                "",
+                "## Workflow quality KPI trend deltas",
+                "| KPI | Previous window | Current window | Delta | Evidence |",
+                "| --- | --- | --- | --- | --- |",
+                "| Median PR CI duration | 10 | 9 | -1 | evidence |",
+                "| Duplicate-test execution rate | 8% | 7% | -1% | evidence |",
+                "| Flaky-check incidence | 3% | 2% | -1% | evidence |",
+                "| Bootstrap failure rate | 1.5% | 1.0% | -0.5% | evidence |",
+                "",
+                "## Completed workflow-quality actions",
+                "| Action | Source (monthly review / incident / debt budget) | Owner | Status (`done` required at sprint close) | Evidence |",
+                "| --- | --- | --- | --- | --- |",
+                "| Example action | monthly review | owner | in_progress | evidence |",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    mismatches = validate_sprint_handoff._validate_handoff_file(bad_handoff, {"known_capability"})
+
+    assert any("must have status 'done'" in mismatch for mismatch in mismatches)

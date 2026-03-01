@@ -18,6 +18,8 @@ on:
       - '.github/scripts/validate_doc_freshness_slo.py'
       - '.github/scripts/capability_parity_report.py'
       - '.github/scripts/render_transition_evidence.py'
+      - '.github/scripts/workflow_policy_drift_report.py'
+      - 'docs/workflow_command_policy.json'
       - '.github/workflows/state-renorm-milestone-gate.yml'
       - '.github/workflows/quality-guardrails.yml'
       - '.github/actions/python-test-setup/action.yml'
@@ -38,6 +40,8 @@ on:
       - '.github/scripts/validate_doc_freshness_slo.py'
       - '.github/scripts/capability_parity_report.py'
       - '.github/scripts/render_transition_evidence.py'
+      - '.github/scripts/workflow_policy_drift_report.py'
+      - 'docs/workflow_command_policy.json'
       - '.github/workflows/state-renorm-milestone-gate.yml'
       - '.github/workflows/quality-guardrails.yml'
       - '.github/actions/python-test-setup/action.yml'
@@ -57,6 +61,8 @@ on:
       - '.github/scripts/validate_doc_freshness_slo.py'
       - '.github/scripts/capability_parity_report.py'
       - '.github/scripts/render_transition_evidence.py'
+      - '.github/scripts/workflow_policy_drift_report.py'
+      - 'docs/workflow_command_policy.json'
       - '.github/workflows/state-renorm-milestone-gate.yml'
       - '.github/workflows/quality-guardrails.yml'
       - '.github/actions/python-test-setup/action.yml'
@@ -75,6 +81,9 @@ jobs:
 
       - name: Verify Python support policy sync
         run: python .github/scripts/check_python_support_policy.py
+
+      - name: Check workflow command policy drift
+        run: python .github/scripts/workflow_policy_drift_report.py --summary
 
       - name: Run baseline lint/type checks
         run: pre-commit run --all-files

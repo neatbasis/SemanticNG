@@ -76,11 +76,11 @@ jobs:
       - name: Verify Python support policy sync
         run: python .github/scripts/check_python_support_policy.py
 
-      - name: Verify pre-commit parity
-        run: python .github/scripts/check_precommit_parity.py
+      - name: Print environment provenance
+        run: python .github/scripts/print_env_provenance.py
 
       - name: Run baseline lint/type checks
-        run: pre-commit run --all-files
+        run: make qa-hook-parity
 
       - name: Run baseline tests with coverage gate
         run: pytest --cov --cov-report=term-missing --cov-report=xml

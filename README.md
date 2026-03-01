@@ -72,10 +72,16 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[test]"
 ```
 
-After installation, validate your local bootstrap state (including `python --version` and `import pydantic`) with:
+After installation, validate your local bootstrap state (Python/pip, editable import path, and key tool versions) with:
 
 ```bash
 make bootstrap
+```
+
+If CI and local behavior diverge, print provenance details explicitly:
+
+```bash
+python .github/scripts/print_env_provenance.py
 ```
 
 Enforce Python version policy parity between `pyproject.toml`, README requirements text, and CI defaults with:
@@ -168,10 +174,16 @@ pre-commit install
 pre-commit install --hook-type pre-push
 ```
 
-Run all guardrails on demand:
+Run guardrail parity checks (Python policy + pre-commit parity + all hooks):
 
 ```bash
-pre-commit run --all-files
+make qa-hook-parity
+```
+
+Run the local full QA pass aligned to CI (bootstrap + pre-commit + coverage + full mypy):
+
+```bash
+make qa-local
 ```
 
 The repository hook set is defined in `.pre-commit-config.yaml` and includes:
@@ -180,6 +192,31 @@ The repository hook set is defined in `.pre-commit-config.yaml` and includes:
 - `ruff` lint + format
 - `mypy` Tier 1 strict checks for core/application paths (`src/state_renormalization` + `src/core`)
 - a fast `pytest` smoke hook on `pre-push`
+
+### First-failure triage (pre-commit)
+
+If `make qa-hook-parity` or `pre-commit` fails, use this quick map:
+
+- **`import-not-found` from mypy hook**
+  ```bash
+  python -m pip install -e ".[test]"
+  pre-commit run mypy --all-files
+  ```
+
+- **File-modified loop (ruff/format keeps changing files)**
+  ```bash
+  pre-commit run ruff-format --all-files
+  pre-commit run ruff --all-files
+  git add -A
+  pre-commit run --all-files
+  ```
+
+- **Config mismatch/parity drift (Python version or hook metadata mismatch)**
+  ```bash
+  python .github/scripts/check_python_support_policy.py
+  python .github/scripts/check_precommit_parity.py
+  python .github/scripts/print_env_provenance.py
+  ```
 
 ## Running tests
 

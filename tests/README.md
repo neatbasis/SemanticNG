@@ -3,11 +3,15 @@
 Type-checking is split into two tiers so local hooks stay fast while CI keeps broad coverage:
 
 - **Tier 1 (pre-commit):** strict checks for `src/state_renormalization` and `src/core`.
-- **Tier 2 (CI full surface):** `mypy --config-file=pyproject.toml src tests`.
+- **Tier 2a (contract-sensitive tests):**
+  `mypy --config-file=pyproject.toml tests/test_engine_*.py tests/test_contracts_*.py tests/test_capability_adapter_*.py tests/test_ask_outbox_contracts.py tests/test_predictions_contracts_and_gates.py`.
+- **Tier 2b (CI full surface):** `mypy --config-file=pyproject.toml src tests`.
 
-When changing tests or BDD-related code, run the Tier 2 command locally before pushing so your local checks match CI scope.
+When changing contract boundaries (engine/contracts/adapters), run Tier 2a locally before pushing.
+Run Tier 2b for CI-parity confidence.
 
 ```bash
+mypy --config-file=pyproject.toml tests/test_engine_*.py tests/test_contracts_*.py tests/test_capability_adapter_*.py tests/test_ask_outbox_contracts.py tests/test_predictions_contracts_and_gates.py
 mypy --config-file=pyproject.toml src tests
 ```
 
@@ -50,3 +54,17 @@ When adding a new invariant checker in `src/state_renormalization/invariants.py`
 4. Keep the expected ordered tuple in `test_invariant_identifiers_are_enumerated_and_registered` updated with the new invariant ID string and ensure `REGISTERED_INVARIANT_IDS` in `src/state_renormalization/invariants.py` remains the source of truth.
 5. Keep matrix scenario names explicit as `pass` and `stop`; `test_invariant_matrix_has_explicit_pass_stop_scenarios_per_invariant` is the guard that enforces this contract.
 6. Run the invariant contract tests; the guard test `test_invariant_matrix_guard_fails_when_registry_gains_uncovered_invariant` should fail if matrix coverage is incomplete.
+
+## Test classification
+
+`tests/conftest.py` auto-applies markers during collection:
+
+- `@pytest.mark.contract_sensitive`: engine/contracts/adapters boundary tests and canonical contract matrices.
+- `@pytest.mark.general_behavior`: all other tests.
+
+Use selectors when you want targeted feedback:
+
+```bash
+pytest -m contract_sensitive
+pytest -m general_behavior
+```

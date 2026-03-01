@@ -1,6 +1,10 @@
-# Architecture & Planning Axioms
+# Repository Governance Axioms
 
-This document defines the compact, normative axiom set used to constrain architecture and planning decisions.
+This document defines **repository governance axioms**: project-level, cross-module constraints used to steer architecture, planning, and verification decisions.
+
+> Scope note: this file intentionally avoids restating module-local semantic axioms.
+> - Core irreducible/domain-agnostic axioms live in [`src/core/AXIOMS.md`](../src/core/AXIOMS.md).
+> - SemanticNG application-layer axioms for `PredictionRecord`/state transitions live in [`src/semanticng/AXIOMS.md`](../src/semanticng/AXIOMS.md).
 
 ## Axiom list
 
@@ -15,7 +19,7 @@ This document defines the compact, normative axiom set used to constrain archite
 - **A9 — Evidence-carrying claims.** Assertions in durable records must include evidence references or explicit unknown/pending markers.
 - **A10 — Executable-governance supremacy.** Mission/governance claims are binding only when encoded in contracts/invariants and enforced by automated tests.
 
-## Mapping: axiom → mission principle → invariants → contract map → enforcing tests
+## Mapping: governance axiom → mission principle → invariants → contract map → enforcing tests
 
 | axiom_id | Mission principle(s) | Invariant IDs | Contract-map row(s) | Enforcing tests |
 |---|---|---|---|---|
@@ -30,20 +34,9 @@ This document defines the compact, normative axiom set used to constrain archite
 | A9 | Evidence anchors every claim | `evidence_link_completeness.v1` | Prediction append contract; Projection view contract | `tests/test_invariants.py`, `tests/test_predictions_contracts_and_gates.py` |
 | A10 | Behavior defined by executable specification | _all registered invariants_ | _all active contract rows with milestone coverage_ | `pytest` baseline + milestone manifest commands (`tests/test_dod_manifest.py`) |
 
-## Candidate axioms aligned to current code
+## Design boundary decisions (governance scope)
 
-The following candidate set is now adopted as normative and maps directly to current contracts/tests:
-
-1. **Determinism of projection/replay over append-only lineage** → **A1**, **A7**, **A8**.
-2. **Prediction-before-action for consequential effects** → **A2**.
-3. **Explainable halt completeness (`invariant_id`, `details`, `evidence`) for every stop path** → **A3**.
-4. **Authorization-scoped invariant evaluation** → **A4**.
-5. **Contract-shape validity as precondition to interpretation** → **A5**.
-6. **No silent state mutation in repair flows** → **A6**.
-
-## Design boundary decisions (explicitly out of bounds)
-
-Until an axiom in this document is revised in the same PR, the following are out of bounds:
+Until a governance axiom in this document is revised in the same PR, the following are out of bounds:
 
 - Introducing non-deterministic projection/replay behavior for identical lineage input (violates A1/A8).
 - Executing consequential effects without durable pre-effect prediction artifacts (violates A2).

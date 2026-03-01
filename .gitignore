@@ -3,6 +3,11 @@ artifacts/
 *.jsonl
 halts.jsonl
 
+# Root scratch / CI artifacts hygiene
+precommit.log
+scratch/
+tmp/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

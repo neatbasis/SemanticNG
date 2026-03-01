@@ -1,4 +1,4 @@
-.PHONY: bootstrap qa-hook-parity qa-local promotion-checks test test-cov
+.PHONY: bootstrap qa-hook-parity qa-local promotion-checks scratch-hygiene test test-cov
 
 bootstrap:
 	@python --version
@@ -15,6 +15,9 @@ qa-hook-parity:
 qa-local: bootstrap qa-hook-parity
 	pytest --cov --cov-report=term-missing --cov-report=xml
 	mypy --config-file=pyproject.toml src tests
+
+scratch-hygiene:
+	python .github/scripts/check_root_scratch_files.py
 
 promotion-checks:
 	.github/scripts/run_promotion_checks.sh

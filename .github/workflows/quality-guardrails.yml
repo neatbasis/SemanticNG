@@ -31,8 +31,31 @@ jobs:
       - name: Print environment provenance
         run: python .github/scripts/print_env_provenance.py
 
-      - name: Run hook parity QA target
-        run: make qa-hook-parity
+      - name: Verify pre-commit parity wiring
+        run: python .github/scripts/check_precommit_parity.py
+
+      - name: Run pre-commit (verbose, capture log)
+        id: precommit
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pre-commit run --all-files -v 2>&1 | tee precommit.log
+
+      - name: Classify pre-commit output
+        if: always()
+        run: python .github/scripts/classify_precommit_failures.py --log precommit.log >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload pre-commit log artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: precommit-log
+          path: precommit.log
+          if-no-files-found: warn
+
+      - name: Fail job on pre-commit errors
+        if: steps.precommit.outcome == 'failure'
+        run: exit 1
 
   baseline-test-cov:
     runs-on: ubuntu-latest

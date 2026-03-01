@@ -127,3 +127,5 @@ No big-bang mutation of core semantics.
 - Keep the module-scope boundary narrow.
 - Update local canonical docs before changing behavior.
 - Preserve compatibility with the architecture mapping in [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+_Last regenerated from manifest: 2026-03-01T16:17:40Z (UTC)._

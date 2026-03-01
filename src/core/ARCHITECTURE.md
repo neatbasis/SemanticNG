@@ -8,3 +8,5 @@ Constraint-to-code map for `src/core`:
   - Serves as the concrete boundary state in `S = (X, ~, C, ∂, Ω)`.
 
 No other module in `src/core` may introduce higher-level orchestration (**I3**).
+
+_Last regenerated from manifest: 2026-03-01T16:17:40Z (UTC)._

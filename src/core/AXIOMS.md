@@ -39,3 +39,5 @@ Given equivalent canonicalized lineage input, replay/projection outcomes are det
 
 - Re-executing the same admissible lineage yields the same canonical state and same invariant verdicts.
 - Non-determinism must be represented as explicit lineage data to remain replay-safe.
+
+_Last regenerated from manifest: 2026-03-01T16:17:40Z (UTC)._

@@ -6,3 +6,5 @@ Staged maturity guarantees for `src/semanticng`:
 - **L1 (Stable boundary):** version export and bridge role are consistently enforced.
 - **L2 (Controlled evolution):** boundary edits validated for invariant preservation and canonical commutation.
 - **L3 (Auditable semantics):** failures are classifiable and block incompatible releases.
+
+_Last regenerated from manifest: 2026-03-01T16:17:40Z (UTC)._

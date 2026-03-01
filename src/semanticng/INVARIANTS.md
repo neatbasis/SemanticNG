@@ -11,3 +11,5 @@ Let `M_sem` be the `src/semanticng` boundary.
 - Violation of **I1** is a **release integrity failure**.
 - Violation of **I2** is a **semantic drift failure**.
 - Violation of **I3** is a **boundary contract failure**.
+
+_Last regenerated from manifest: 2026-03-01T16:17:40Z (UTC)._

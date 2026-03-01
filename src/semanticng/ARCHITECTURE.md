@@ -8,3 +8,5 @@ Constraint-to-code map for `src/semanticng`:
   - Defines observable boundary state for `S = (X, ~, C, ∂, Ω)`.
 
 Related module `_version.py` supplies canonical version source used by **I1**.
+
+_Last regenerated from manifest: 2026-03-01T16:17:40Z (UTC)._

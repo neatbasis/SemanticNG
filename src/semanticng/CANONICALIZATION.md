@@ -7,3 +7,5 @@ Let `κ` canonicalize semantic boundary state.
 - **Commutation requirement:** for admissible `τ`, `κ(τ(x)) = τ(κ(x))`.
 
 Failure implies non-canonical boundary semantics.
+
+_Last regenerated from manifest: 2026-03-01T16:17:40Z (UTC)._

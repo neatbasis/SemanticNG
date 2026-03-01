@@ -15,3 +15,5 @@ Admissible subspace:
 `A = { x ∈ X | x ⊨ C }`.
 
 Only transitions `x -> x'` with `x, x' ∈ A` are admissible.
+
+_Last regenerated from manifest: 2026-03-01T16:17:40Z (UTC)._

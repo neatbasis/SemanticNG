@@ -14,6 +14,48 @@ MISSING_ROLLBACK_PLAN_MARKER = "MILESTONE_VALIDATION_ERROR=MISSING_ROLLBACK_PLAN
 MISSING_GOVERNANCE_HANDOFF_MARKER = "MILESTONE_VALIDATION_ERROR=MISSING_GOVERNANCE_HANDOFF_FIELDS"
 
 
+
+
+def _documentation_change_control_mismatches() -> list[str]:
+    mismatches: list[str] = []
+    matrix_path = Path("docs/documentation_change_control.md")
+    if not matrix_path.exists():
+        return ["Missing required canonical DMAIC matrix: docs/documentation_change_control.md."]
+
+    matrix_text = matrix_path.read_text(encoding="utf-8")
+    required_markers = [
+        "## DMAIC change-control matrix",
+        "**Define**",
+        "**Measure**",
+        "**Analyze**",
+        "**Improve**",
+        "**Control**",
+        "Required files to update",
+        "Required commands / validators",
+        "Required evidence locations (PR body + handoff docs)",
+        "Merge-blocking criteria",
+    ]
+    for marker in required_markers:
+        if marker not in matrix_text:
+            mismatches.append(
+                "docs/documentation_change_control.md is missing required matrix marker: "
+                f"'{marker}'."
+            )
+
+    readme_text = Path("README.md").read_text(encoding="utf-8")
+    if "docs/documentation_change_control.md" not in readme_text:
+        mismatches.append(
+            "README.md must reference docs/documentation_change_control.md for canonical DMAIC change-control policy."
+        )
+
+    release_text = Path("docs/release_checklist.md").read_text(encoding="utf-8")
+    if "docs/documentation_change_control.md" not in release_text and "documentation_change_control.md" not in release_text:
+        mismatches.append(
+            "docs/release_checklist.md must reference docs/documentation_change_control.md for release governance routing."
+        )
+
+    return mismatches
+
 def _load_manifest(rev: str) -> dict:
     raw = subprocess.check_output(["git", "show", f"{rev}:docs/dod_manifest.json"], text=True)
     return json.loads(raw)
@@ -689,6 +731,13 @@ def main() -> int:
 
     if not base_sha or not head_sha:
         print("Unable to determine BASE_SHA or HEAD_SHA.")
+        return 1
+
+    doc_control_mismatches = _documentation_change_control_mismatches()
+    if doc_control_mismatches:
+        print("DMAIC documentation change-control parity checks failed.")
+        for mismatch in doc_control_mismatches:
+            print(f"  - {mismatch}")
         return 1
 
     changed_files = _changed_files(base_sha, head_sha)

@@ -29,5 +29,16 @@ It defines:
 
 - `.github/scripts/check_precommit_parity.py` enforces known parity invariants:
   - `mypy` includes all required third-party dependency declarations for its scan scope.
+  - `mypy` additional dependency constraints stay aligned with `pyproject.toml` dependency constraints.
   - `mypy`, `ruff`, and `ruff-format` pin `language_version` to `python3.11`.
+  - Workflow Python versions used for parity-sensitive quality jobs stay aligned with the project Python baseline.
 - CI runs this parity check before `pre-commit run --all-files`.
+
+## Ownership and review cadence
+
+- **Owner:** `@semanticng/toolchain-parity-maintainers` owns toolchain parity policy, break/fix response, and exception approvals.
+- **Cadence:** run a monthly parity hygiene review to:
+  - prune stale mypy override allowances,
+  - remove obsolete hook `additional_dependencies` exceptions,
+  - retire temporary dependency waivers once upstream constraints are stable,
+  - confirm scheduled cold-start parity workflow results remain green.

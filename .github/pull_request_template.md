@@ -26,6 +26,7 @@
 - Quality gate changed? (`yes`/`no`):
 - If `yes`, list updated files/sections (for example `pyproject.toml:[tool.pytest.ini_options]`, workflow step names):
 - Evidence link (CI run/artifact proving before+after behavior):
+- [ ] If this PR changes tooling/config/workflows, **pre-commit parity verified** with command evidence (`python .github/scripts/check_precommit_parity.py` and `pre-commit run --all-files -v`)
 
 ## Testing
 

@@ -14,6 +14,16 @@ This README is a **projection artifact**. Normative constraints live in:
 
 ---
 
+## Active implementation directive
+
+This package must remain a stable namespace boundary while the refactor moves domain logic into `src/core/` per `src/core/REFACTORING_METAPLAN.md`.
+
+Contributors should:
+
+- keep this layer focused on package identity and governed surface exposure,
+- avoid embedding domain/infrastructure behavior in boundary glue,
+- ensure exports remain consistent with local invariants and architecture mapping.
+
 ## What `semanticng` *Is*
 
 `src/semanticng` is the canonical namespace boundary for consumers:

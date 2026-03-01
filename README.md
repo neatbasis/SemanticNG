@@ -54,31 +54,28 @@ Guardrail classification guidance for contributors (invariants vs policies vs he
 
 ## Requirements
 
-- Python **3.10+**
+- Python **3.11+**
 - `pip` (latest recommended)
 
-## Installation (runtime)
+## Local development setup
 
-Install the project and its core runtime dependencies:
-
-```bash
-python -m pip install --upgrade pip
-python -m pip install .
-```
-
-## Installation for editing / development
-
-For local development, install in editable mode with test dependencies:
+Create and activate a virtual environment, then install the project in editable mode with test dependencies:
 
 ```bash
+python -m venv .venv
+# Linux/macOS:
+source .venv/bin/activate
+# Windows (PowerShell):
+# .venv\Scripts\Activate.ps1
+
 python -m pip install --upgrade pip
 python -m pip install -e ".[test]"
 ```
 
-If you also want the BDD / Gherkin tooling used by the `features/` step definitions:
+Validate your local bootstrap state at any time with:
 
 ```bash
-python -m pip install -e ".[test,bdd]"
+make bootstrap
 ```
 
 ## Definition-of-done manifest

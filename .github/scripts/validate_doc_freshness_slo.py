@@ -293,6 +293,10 @@ def main(argv: list[str] | None = None) -> int:
         print("Documentation freshness SLO validation failed:", file=sys.stderr)
         for issue in issues:
             print(f" - {issue['file_path']}: {issue['message']}", file=sys.stderr)
+        print(
+            "Remediation instructions: docs/release_checklist.md#freshness-validator-remediation-playbook",
+            file=sys.stderr,
+        )
         return 1
 
     print(f"Documentation freshness SLO validation passed for {len(config.get('governed_files', []))} governed file(s).")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -254,3 +255,49 @@ def test_doc_freshness_slo_rejects_missing_source_commit_metadata(tmp_path: Path
 
     assert len(issues) == 1
     assert "missing source commit metadata" in issues[0]["message"]
+
+
+
+def test_doc_freshness_slo_config_error_invalid_max_commit_lag(tmp_path: Path) -> None:
+    governed = tmp_path / "docs" / "governed.md"
+    governed.parent.mkdir(parents=True)
+    governed.write_text(
+        "# Governed Doc\n\n_Last regenerated from manifest: 2026-02-28T15:48:35Z (UTC)._\n",
+        encoding="utf-8",
+    )
+
+    config = _base_config()
+    config["file_classes"]["governance_doc"]["max_commit_lag"] = "bad"
+
+    issues = validate_doc_freshness_slo._validate_doc_freshness(
+        config,
+        tmp_path,
+        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        git_runner=_git_runner,
+    )
+
+    assert len(issues) == 1
+    assert "invalid max_commit_lag" in issues[0]["message"]
+
+
+def test_doc_freshness_slo_main_prints_release_checklist_remediation_on_failure(tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "doc_freshness_slo.json"
+    config_path.write_text(json.dumps(_base_config()), encoding="utf-8")
+
+    governed = tmp_path / "docs" / "governed.md"
+    governed.parent.mkdir(parents=True)
+    governed.write_text("# Governed Doc\n\nNo timestamp here.\n", encoding="utf-8")
+
+    previous_cwd = Path.cwd()
+    try:
+        import os
+
+        os.chdir(tmp_path)
+        exit_code = validate_doc_freshness_slo.main(["--config", str(config_path)])
+    finally:
+        os.chdir(previous_cwd)
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "missing freshness metadata" in captured.err
+    assert "docs/release_checklist.md#freshness-validator-remediation-playbook" in captured.err

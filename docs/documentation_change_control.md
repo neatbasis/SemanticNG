@@ -19,6 +19,7 @@ This canonical matrix defines mandatory documentation update paths and merge-blo
 - `state-renorm-milestone-gate.yml` owns the **milestone governance layer** (manifest/doc parity validation plus milestone-targeted suites) and now declares a `needs` dependency so governance checks run only after its baseline-quality job succeeds.
 - Both workflows share `.github/actions/python-test-setup/action.yml` for checkout, Python setup, pip caching, and editable test-extra installation to keep CI environment semantics aligned.
 - Trigger boundary intent: baseline quality runs broadly on pull requests/pushes, while milestone governance remains path-scoped to state-renormalization and governance artifacts to avoid unnecessary governance gate runs on unrelated changes.
+- Branch protection requirement: when governance-scoped docs/scripts are touched (for example `docs/doc_freshness_slo.json`, `docs/release_checklist.md`, or `.github/scripts/validate_doc_freshness_slo.py`), require the `State Renormalization Milestone Gate / milestone-governance` status check so documentation freshness validation is merge-blocking.
 
 ## Contributor usage notes
 
@@ -26,4 +27,4 @@ This canonical matrix defines mandatory documentation update paths and merge-blo
 - If a single PR spans multiple DMAIC phases, satisfy the union of all required file updates, validators, evidence locations, and merge-blocking checks.
 - Reference this document in PR descriptions when proposing governance or milestone policy adjustments.
 
-_Last regenerated from manifest: 2026-03-01T00:00:00Z (UTC)._
+_Last regenerated from manifest: 2026-03-01T18:00:00Z (UTC)._

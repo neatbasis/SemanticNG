@@ -2,8 +2,9 @@
 
 import os
 
-from behave import given, then
-from deeponto.onto import Ontology
+from semanticng.bdd_compat import given, then
+from semanticng.deeponto_compat import OntologyLike, create_ontology
+from semanticng.step_state import get_ontology_step_state
 
 RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
 
@@ -12,10 +13,11 @@ RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
 def step_load_ontology(context, path):
     basename = os.path.basename(path)
     print(basename)
-    context.onto = Ontology(path)
+    state = get_ontology_step_state(context)
+    state.onto = create_ontology(path)
 
 
-def _resolve_class_iri(onto: Ontology, cls: str) -> str | None:
+def _resolve_class_iri(onto: OntologyLike, cls: str) -> str | None:
     # 1) Full IRI given
     if cls.startswith("http://") or cls.startswith("https://"):
         return cls if cls in onto.owl_classes else None
@@ -37,5 +39,7 @@ def _resolve_class_iri(onto: Ontology, cls: str) -> str | None:
 
 @then('class "{cls}" should exist')
 def step_check_class(context, cls):
-    iri = _resolve_class_iri(context.onto, cls)
+    state = get_ontology_step_state(context)
+    assert state.onto is not None, "Ontology must be loaded before lookup"
+    iri = _resolve_class_iri(state.onto, cls)
     assert iri is not None, f'Class "{cls}" not found (tried: full IRI, localname, rdfs:label)'

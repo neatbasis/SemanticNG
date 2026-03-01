@@ -9,9 +9,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from behave import given, then, when
-from gherkin.parser import Parser
-from gherkin.token_scanner import TokenScanner
+from gherkin.parser import Parser  # type: ignore[import-not-found]
+from gherkin.token_scanner import TokenScanner  # type: ignore[import-not-found]
+
+from semanticng.bdd_compat import given, then, when
+from semanticng.step_state import get_index_step_state
 
 from state_renormalization.gherkin_document import GherkinDocument
 from state_renormalization.stable_ids import derive_stable_ids
@@ -108,7 +110,7 @@ class SparseIndex:
     """
 
     def __init__(self) -> None:
-        self.inverted: dict[str, set] = {}
+        self.inverted: dict[str, set[str]] = {}
         self.docs: dict[str, str] = {}  # resource_id -> searchable text
 
     def add(self, doc_id: str, text: str) -> None:
@@ -227,9 +229,10 @@ def _derive_context_stable_ids(context) -> dict[str, str]:
 
 
 def _initialize_pipeline_context(context) -> None:
-    context._last_persisted_resource = None
-    context._last_ingested_resource = None
-    context._last_artifact_resource = None
+    state = get_index_step_state(context)
+    state.last_persisted_resource = None
+    state.last_ingested_resource = None
+    state.last_artifact_resource = None
 
 
 def _build_ingested_resource(context, dc: dict[str, Any], payload_text: str) -> Resource:
@@ -318,13 +321,13 @@ def step_given_sparse_index(context):
 
 @given("an ontology registry")
 def step_given_ontology_registry(context):
-    context.ontology_registry: dict[str, Any] = {}
+    context.ontology_registry = {}
 
 
 @given("a schema registry with versioning")
 def step_given_schema_registry(context):
     # schema_id -> dict(definition)
-    context.schema_registry: dict[str, dict[str, Any]] = {}
+    context.schema_registry = {}
 
 
 @given("a dense interpreter configured for schema proposals")
@@ -362,13 +365,15 @@ def step_given_dc_resource_table(context):
         val = row.cells[1].strip()
         dc[key] = val
 
-    context._pending_dc = dc
-    context._pending_payload_text = None
+    state = get_index_step_state(context)
+    state.pending_dc = dc
+    state.pending_payload_text = None
 
 
 @given("with payload text:")
 def step_given_payload_text(context):
-    context._pending_payload_text = context.text.strip("\n")
+    state = get_index_step_state(context)
+    state.pending_payload_text = context.text.strip("\n")
 
 
 # -------------------------
@@ -378,21 +383,23 @@ def step_given_payload_text(context):
 
 @when("I ingest the Resource")
 def step_when_ingest_resource(context):
-    dc = getattr(context, "_pending_dc", None) or {}
-    payload_text = getattr(context, "_pending_payload_text", None)
+    state = get_index_step_state(context)
+    dc = state.pending_dc
+    payload_text = state.pending_payload_text
     if payload_text is None:
         raise AssertionError("No payload text provided for ingestion.")
 
     resource = _build_ingested_resource(context, dc=dc, payload_text=payload_text)
 
     context.resource_store.append(resource)
-    context._last_persisted_resource = resource
-    context._last_ingested_resource = resource
+    state.last_persisted_resource = resource
+    state.last_ingested_resource = resource
 
 
 @when('I request a schema proposal from the dense interpreter using ontology "core"')
 def step_when_request_schema_proposal(context):
-    res: Resource = context._last_ingested_resource
+    state = get_index_step_state(context)
+    res = state.last_ingested_resource
     if not res:
         raise AssertionError("No ingested Resource to propose schema for.")
 
@@ -403,12 +410,13 @@ def step_when_request_schema_proposal(context):
         schema_id=schema_id,
         dc_created=res.meta.get("dc", {}).get("dc:created", "2026-02-14T10:00:00Z"),
     )
-    context._last_proposal = proposal
+    state.last_proposal = proposal
 
 
 @when('I validate the proposal against the ontology "core" and schema "Event.v1"')
 def step_when_validate_proposal(context):
-    proposal = getattr(context, "_last_proposal", None)
+    state = get_index_step_state(context)
+    proposal = state.last_proposal
     if not proposal:
         raise AssertionError("No proposal to validate.")
 
@@ -416,16 +424,17 @@ def step_when_validate_proposal(context):
     if not schema:
         raise AssertionError('Schema "Event.v1" not found in registry.')
 
-    context._last_validation = _validate_event_v1_proposal(proposal=proposal, schema=schema)
+    state.last_validation = _validate_event_v1_proposal(proposal=proposal, schema=schema)
 
 
 @when("I materialize a structured Artifact from the validated extraction")
 def step_when_materialize_artifact(context):
-    validation = getattr(context, "_last_validation", None)
+    state = get_index_step_state(context)
+    validation = state.last_validation
     if not validation or not validation.get("ok"):
         raise AssertionError("Validation missing or failed; cannot materialize artifact.")
 
-    source_res: Resource = context._last_ingested_resource
+    source_res = state.last_ingested_resource
     schema_id = validation["schema_id"]
     extraction = validation["extraction"]
     evidence = validation["evidence_spans"]
@@ -467,8 +476,8 @@ def step_when_materialize_artifact(context):
     )
 
     context.resource_store.append(artifact)
-    context._last_persisted_resource = artifact
-    context._last_artifact_resource = artifact
+    state.last_persisted_resource = artifact
+    state.last_artifact_resource = artifact
 
     _update_schema_usage_metrics(
         context=context,
@@ -479,7 +488,8 @@ def step_when_materialize_artifact(context):
 
 @when("I update the sparse index from the persisted Artifact")
 def step_when_update_sparse_index(context):
-    art: Resource = context._last_artifact_resource
+    state = get_index_step_state(context)
+    art = state.last_artifact_resource
     if not art:
         raise AssertionError("No artifact resource to index.")
 
@@ -507,7 +517,8 @@ def step_when_update_sparse_index(context):
 
 @then("the Resource MUST be persisted immutably with an integrity content_hash")
 def step_then_resource_persisted_with_hash(context):
-    res: Resource = context._last_persisted_resource
+    state = get_index_step_state(context)
+    res = state.last_persisted_resource
     assert res is not None, "No persisted resource found."
     assert isinstance(res.integrity, dict), "integrity must be a dict."
     assert "content_hash" in res.integrity, "integrity.content_hash missing."
@@ -517,7 +528,7 @@ def step_then_resource_persisted_with_hash(context):
 
 @then("the proposal MUST include a schema_id and a structured extraction")
 def step_then_proposal_has_schema_and_extraction(context):
-    proposal = getattr(context, "_last_proposal", None)
+    proposal = get_index_step_state(context).last_proposal
     assert proposal is not None, "No proposal found."
     assert "schema_id" in proposal, "proposal.schema_id missing."
     assert "extraction" in proposal and isinstance(proposal["extraction"], dict), (
@@ -527,7 +538,7 @@ def step_then_proposal_has_schema_and_extraction(context):
 
 @then("the proposal MUST cite evidence spans from the payload text")
 def step_then_proposal_has_evidence_spans(context):
-    proposal = getattr(context, "_last_proposal", None)
+    proposal = get_index_step_state(context).last_proposal
     assert proposal is not None, "No proposal found."
     spans = proposal.get("evidence_spans")
     assert isinstance(spans, dict) and spans, "proposal.evidence_spans missing/empty."
@@ -542,7 +553,7 @@ def step_then_proposal_has_evidence_spans(context):
 
 @then('the proposed schema_id MUST be "Event.v1"')
 def step_then_proposed_schema_is_event_v1(context):
-    proposal = getattr(context, "_last_proposal", None)
+    proposal = get_index_step_state(context).last_proposal
     assert proposal is not None, "No proposal found."
     assert proposal.get("schema_id") == "Event.v1", (
         f"Expected Event.v1, got {proposal.get('schema_id')}"
@@ -551,13 +562,13 @@ def step_then_proposed_schema_is_event_v1(context):
 
 @then("validation MUST succeed")
 def step_then_validation_succeeds(context):
-    val = getattr(context, "_last_validation", None)
+    val = get_index_step_state(context).last_validation
     assert val is not None and val.get("ok") is True, "Validation did not succeed."
 
 
 @then('the extracted fields MUST satisfy required fields for "Event.v1"')
 def step_then_required_fields_present(context):
-    val = getattr(context, "_last_validation", None)
+    val = get_index_step_state(context).last_validation
     assert val and val.get("ok"), "No successful validation."
     schema = context.schema_registry["Event.v1"]
     required = schema.get("required", [])
@@ -568,7 +579,7 @@ def step_then_required_fields_present(context):
 
 @then("the Artifact MUST be persisted as a new immutable Resource")
 def step_then_artifact_persisted(context):
-    art: Resource = context._last_artifact_resource
+    art = get_index_step_state(context).last_artifact_resource
     assert art is not None, "Artifact not persisted."
     assert art.integrity.get("content_hash"), "Artifact content_hash missing."
     assert art.identifier.startswith("art:"), (
@@ -578,24 +589,26 @@ def step_then_artifact_persisted(context):
 
 @then('the Artifact dc:type MUST be "Event"')
 def step_then_artifact_dc_type_event(context):
-    art: Resource = context._last_artifact_resource
+    art = get_index_step_state(context).last_artifact_resource
     dc = (art.meta or {}).get("dc", {})
     assert dc.get("dc:type") == "Event", f"Expected dc:type Event, got {dc.get('dc:type')}"
 
 
 @then("the Artifact MUST include a link to the source Resource identifier")
 def step_then_artifact_links_source(context):
-    art: Resource = context._last_artifact_resource
+    state = get_index_step_state(context)
+    art = state.last_artifact_resource
     source_id = ((art.meta or {}).get("semanticng", {}) or {}).get("source_identifier")
     assert source_id, "Artifact missing semanticng.source_identifier"
-    assert source_id == context._last_ingested_resource.identifier, (
+    assert state.last_ingested_resource is not None
+    assert source_id == state.last_ingested_resource.identifier, (
         "Artifact source_identifier does not match ingested resource."
     )
 
 
 @then("the Artifact MUST include evidence spans for each extracted field")
 def step_then_artifact_has_evidence_per_field(context):
-    art: Resource = context._last_artifact_resource
+    art = get_index_step_state(context).last_artifact_resource
     extraction = (art.payload or {}).get("extraction", {})
     evidence = (art.payload or {}).get("evidence_spans", {})
     assert isinstance(evidence, dict) and evidence, "Artifact evidence_spans missing/empty."
@@ -605,13 +618,13 @@ def step_then_artifact_has_evidence_per_field(context):
 
 @then("the sparse index MUST contain the Artifact identifier")
 def step_then_sparse_index_contains_artifact(context):
-    art: Resource = context._last_artifact_resource
+    art = get_index_step_state(context).last_artifact_resource
     assert art.identifier in context.sparse_index.docs, "Artifact not present in sparse index docs."
 
 
 @then('searching for "hack night" MUST return the Artifact in the top results')
 def step_then_search_hack_night_returns_artifact(context):
-    art: Resource = context._last_artifact_resource
+    art = get_index_step_state(context).last_artifact_resource
     results = context.sparse_index.search("hack night", top_k=5)
     assert art.identifier in results, (
         f"Artifact not found in top results for 'hack night'. Got: {results}"
@@ -620,7 +633,7 @@ def step_then_search_hack_night_returns_artifact(context):
 
 @then('searching for "Maria 01" MUST return the Artifact in the top results')
 def step_then_search_maria01_returns_artifact(context):
-    art: Resource = context._last_artifact_resource
+    art = get_index_step_state(context).last_artifact_resource
     results = context.sparse_index.search("Maria 01", top_k=5)
     assert art.identifier in results, (
         f"Artifact not found in top results for 'Maria 01'. Got: {results}"

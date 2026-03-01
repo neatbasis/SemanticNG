@@ -79,7 +79,9 @@ no_implicit_optional = true
 disallow_any_generics = true
 disallow_subclassing_any = true
 check_untyped_defs = true
-files = ["src/state_renormalization", "tests"]
+# Tier 1 (strict, pre-commit): core/application modules only.
+# Keep this set intentionally narrow so local hooks stay fast and deterministic.
+files = ["src/state_renormalization", "src/core"]
 pretty = true
 show_error_codes = true
 
@@ -87,30 +89,41 @@ show_error_codes = true
 ignore_missing_imports = false
 
 [[tool.mypy.overrides]]
+module = ["behave", "deeponto", "deeponto.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = [
+  "src.features.steps.*",
   "steps",
   "index_steps",
   "ontology_steps",
 ]
-# Legacy BDD glue code with optional deps (behave/deeponto) and dynamic context objects.
-# Keep strict checks in core modules while deferring this suite.
-ignore_missing_imports = true
+# BDD step glue is legacy/dynamic integration code (behave context + optional deps).
+# Keep relaxations tightly bounded to this namespace so strict typing remains the
+# default for production modules.
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 disallow_untyped_decorators = false
 warn_return_any = false
-disable_error_code = ["arg-type", "misc", "type-arg", "typeddict-unknown-key", "import-not-found"]
-
-# Tests often use duck-typing/fakes:
+disable_error_code = [
+  "arg-type",
+  "misc",
+  "type-arg",
+  "typeddict-unknown-key",
+  "import-not-found",
+]
 
 [[tool.mypy.overrides]]
-module = ["behave", "deeponto", "deeponto.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = "tests.*"
+module = ["tests", "tests.*"]
+# Tests prioritize readability and controlled fakes over full annotation coverage.
+# Relax only the noisiest strict rules needed for this tier while preserving basic
+# signal (e.g. import/type checking for annotated code).
+strict = false
 disallow_any_generics = false
 check_untyped_defs = false
-strict = false
+disallow_untyped_defs = false
+warn_return_any = false
 
 [tool.coverage.run]
 branch = true

@@ -13,7 +13,7 @@ REQUIRED_MYPY_PACKAGES = (
     "gherkin-official",
     "typing-extensions",
 )
-REQUIRED_HOOK_LANGUAGE_VERSION = "python3.11"
+REQUIRED_HOOK_LANGUAGE_VERSION = "python3.10"
 PARITY_SENSITIVE_WORKFLOWS = (
     ".github/workflows/quality-guardrails.yml",
     ".github/workflows/state-renorm-milestone-gate.yml",

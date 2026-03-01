@@ -8,6 +8,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+_GLOB_META_CHARS = set("*?[]")
+
+
 def _load_config(config_path: Path) -> dict:
     with config_path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
@@ -31,6 +34,25 @@ def _extract_timestamp(content: str, pattern: str) -> str | None:
     return None
 
 
+def _contains_glob(path_value: str) -> bool:
+    return any(char in path_value for char in _GLOB_META_CHARS)
+
+
+def _resolve_governed_paths(base_dir: Path, configured_path: str) -> list[str]:
+    candidate = configured_path.strip()
+    if not candidate:
+        return []
+
+    candidate_path = Path(candidate)
+    if candidate_path.is_absolute() or ".." in candidate_path.parts:
+        return []
+
+    if _contains_glob(candidate):
+        return sorted(str(path.relative_to(base_dir)) for path in base_dir.glob(candidate) if path.is_file())
+
+    return [candidate]
+
+
 def _validate_doc_freshness(config: dict, base_dir: Path, now_utc: datetime) -> list[dict[str, str]]:
     issues: list[dict[str, str]] = []
 
@@ -42,38 +64,47 @@ def _validate_doc_freshness(config: dict, base_dir: Path, now_utc: datetime) -> 
     governed_files = config.get("governed_files", [])
 
     for entry in governed_files:
-        file_path = str(entry.get("path", "")).strip()
+        configured_path = str(entry.get("path", "")).strip()
         file_class = str(entry.get("class", "")).strip()
 
         if file_class not in file_classes:
-            issues.append({"file_path": file_path, "message": f"references unknown class '{file_class}'."})
+            issues.append({"file_path": configured_path, "message": f"references unknown class '{file_class}'."})
             continue
 
         max_age_days = file_classes[file_class].get("max_age_days")
         if not isinstance(max_age_days, int) or max_age_days < 0:
-            issues.append({"file_path": file_path, "message": "has invalid max_age_days in configured class."})
+            issues.append({"file_path": configured_path, "message": "has invalid max_age_days in configured class."})
             continue
 
-        absolute_path = base_dir / file_path
-        if not absolute_path.exists():
-            issues.append({"file_path": file_path, "message": "governed file does not exist."})
+        resolved_paths = _resolve_governed_paths(base_dir, configured_path)
+        if not resolved_paths:
+            if _contains_glob(configured_path):
+                issues.append({"file_path": configured_path, "message": "glob pattern did not match any files."})
+            else:
+                issues.append({"file_path": configured_path, "message": "governed file does not exist."})
             continue
 
-        content = absolute_path.read_text(encoding="utf-8")
-        extracted = _extract_timestamp(content, timestamp_pattern)
-        if extracted is None:
-            issues.append({"file_path": file_path, "message": "missing freshness metadata line matching configured timestamp policy."})
-            continue
+        for file_path in resolved_paths:
+            absolute_path = base_dir / file_path
+            if not absolute_path.exists():
+                issues.append({"file_path": file_path, "message": "governed file does not exist."})
+                continue
 
-        try:
-            timestamp = datetime.strptime(extracted, timestamp_format).replace(tzinfo=timezone.utc)
-        except ValueError:
-            issues.append({"file_path": file_path, "message": f"metadata timestamp '{extracted}' does not match format '{timestamp_format}'."})
-            continue
+            content = absolute_path.read_text(encoding="utf-8")
+            extracted = _extract_timestamp(content, timestamp_pattern)
+            if extracted is None:
+                issues.append({"file_path": file_path, "message": "missing freshness metadata line matching configured timestamp policy."})
+                continue
 
-        age_days = (now_utc - timestamp).total_seconds() / 86400
-        if age_days > max_age_days:
-            issues.append({"file_path": file_path, "message": f"stale freshness metadata: age={age_days:.1f} days exceeds max_age_days={max_age_days} for class '{file_class}'."})
+            try:
+                timestamp = datetime.strptime(extracted, timestamp_format).replace(tzinfo=timezone.utc)
+            except ValueError:
+                issues.append({"file_path": file_path, "message": f"metadata timestamp '{extracted}' does not match format '{timestamp_format}'."})
+                continue
+
+            age_days = (now_utc - timestamp).total_seconds() / 86400
+            if age_days > max_age_days:
+                issues.append({"file_path": file_path, "message": f"stale freshness metadata: age={age_days:.1f} days exceeds max_age_days={max_age_days} for class '{file_class}'."})
 
     return issues
 

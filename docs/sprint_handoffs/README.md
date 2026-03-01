@@ -24,3 +24,5 @@ Coverage artifact summaries must include, at minimum:
 - Changed-module coverage percentage (`changed-module %`)
 - Threshold delta (`actual % - fail_under threshold`)
 - Evidence reference (CI artifact link or attached report excerpt)
+
+_Last regenerated from manifest: 2026-03-01T00:00:00Z (UTC)._

@@ -19,3 +19,5 @@
 | --- | --- | --- |
 | `capability_invocation_governance` | Reconfirm no-regression command packs and evidence links remain current after handoff gating rollout. | Depends on milestone governance workflow and no-regression policy checks. |
 | `repair_aware_projection_evolution` | Prepare implementation sequencing and test scaffolding before moving status. | Depends on replay/invariant suites and policy guard stability. |
+
+_Last regenerated from manifest: 2026-03-01T00:00:00Z (UTC)._

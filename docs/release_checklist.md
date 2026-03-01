@@ -25,6 +25,18 @@ This document is the canonical source for active release/integration workflow ex
 - [ ] **Documentation freshness SLO met:** `docs/doc_freshness_slo.json` governs the freshness metadata policy and `python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json` passes.
 - [ ] **Sprint handoff minimum artifacts attached:** Sprint-close report includes exit table, open-risk register, and next-sprint preload list.
 
+### Documentation freshness metadata (contributor requirement)
+
+For every Markdown file governed by `docs/doc_freshness_slo.json`, include this exact metadata line near the end of the file and refresh it whenever governance-significant content changes:
+
+`_Last regenerated from manifest: YYYY-MM-DDTHH:MM:SSZ (UTC)._`
+
+Use UTC only, keep the trailing `Z`, and do not alter punctuation/format. The validator enforces this pattern and freshness age SLO:
+
+```bash
+python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json
+```
+
 ## `pyproject.toml` quality-tooling change controls
 
 Apply this section whenever a PR modifies `pyproject.toml` entries that affect `pytest`, `mypy`, or `coverage` behavior.
@@ -175,3 +187,5 @@ Use this template:
 ```
 
 If conflict reconciliation drops or defers any behavior, do not merge immediately: open follow-up patch PR(s) in the same integration cycle and link them under the affected checklist entry.
+
+_Last regenerated from manifest: 2026-03-01T00:00:00Z (UTC)._

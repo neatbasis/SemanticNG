@@ -188,3 +188,5 @@ Use this short table at each planning checkpoint to pick exactly one next PR sco
 - Keep JSONL append-only persistence as the reference storage contract until gate/halt unification and invariant matrix completion are green in CI.
 - Defer production ML ranking complexity for schema selection until selector contract tests are expanded and stable.
 - Avoid broad UX/CLI expansion outside invariant-critical paths until the Next section is complete.
+
+_Last regenerated from manifest: 2026-03-01T00:00:00Z (UTC)._

@@ -24,6 +24,7 @@ def _base_config() -> dict:
         },
         "file_classes": {
             "governance_doc": {"max_age_days": 30},
+            "sprint_doc": {"max_age_days": 7},
         },
         "governed_files": [
             {"path": "docs/governed.md", "class": "governance_doc"},
@@ -79,3 +80,91 @@ def test_doc_freshness_slo_rejects_stale_document(tmp_path: Path) -> None:
 
     assert len(issues) == 1
     assert "stale freshness metadata" in issues[0]["message"]
+
+
+def test_doc_freshness_slo_validates_multiple_governed_files(tmp_path: Path) -> None:
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir(parents=True)
+    (docs_dir / "governed.md").write_text(
+        "# Governance\n\n_Last regenerated from manifest: 2026-02-25T00:00:00Z (UTC)._\n",
+        encoding="utf-8",
+    )
+    (docs_dir / "release_checklist.md").write_text(
+        "# Checklist\n\n_Last regenerated from manifest: 2026-02-24T00:00:00Z (UTC)._\n",
+        encoding="utf-8",
+    )
+
+    config = _base_config()
+    config["governed_files"] = [
+        {"path": "docs/governed.md", "class": "governance_doc"},
+        {"path": "docs/release_checklist.md", "class": "governance_doc"},
+    ]
+
+    issues = validate_doc_freshness_slo._validate_doc_freshness(
+        config,
+        tmp_path,
+        datetime(2026, 3, 1, tzinfo=timezone.utc),
+    )
+
+    assert issues == []
+
+
+def test_doc_freshness_slo_reports_stale_metadata_across_classes_and_files(tmp_path: Path) -> None:
+    docs_dir = tmp_path / "docs"
+    handoff_dir = docs_dir / "sprint_handoffs"
+    handoff_dir.mkdir(parents=True)
+    (docs_dir / "governed.md").write_text(
+        "# Governance\n\n_Last regenerated from manifest: 2025-12-15T00:00:00Z (UTC)._\n",
+        encoding="utf-8",
+    )
+    (handoff_dir / "sprint-1-handoff.md").write_text(
+        "# Handoff\n\n_Last regenerated from manifest: 2026-02-01T00:00:00Z (UTC)._\n",
+        encoding="utf-8",
+    )
+
+    config = _base_config()
+    config["governed_files"] = [
+        {"path": "docs/governed.md", "class": "governance_doc"},
+        {"path": "docs/sprint_handoffs/*.md", "class": "sprint_doc"},
+    ]
+
+    issues = validate_doc_freshness_slo._validate_doc_freshness(
+        config,
+        tmp_path,
+        datetime(2026, 3, 1, tzinfo=timezone.utc),
+    )
+
+    assert len(issues) == 2
+    issue_paths = {issue["file_path"] for issue in issues}
+    assert issue_paths == {"docs/governed.md", "docs/sprint_handoffs/sprint-1-handoff.md"}
+    assert all("stale freshness metadata" in issue["message"] for issue in issues)
+
+
+def test_doc_freshness_slo_reports_missing_timestamp_for_newly_governed_docs(tmp_path: Path) -> None:
+    docs_dir = tmp_path / "docs"
+    handoff_dir = docs_dir / "sprint_handoffs"
+    handoff_dir.mkdir(parents=True)
+    (docs_dir / "governed.md").write_text(
+        "# Governance\n\n_Last regenerated from manifest: 2026-02-27T00:00:00Z (UTC)._\n",
+        encoding="utf-8",
+    )
+    (handoff_dir / "sprint-2-handoff.md").write_text(
+        "# Newly Governed Handoff\n\nNo metadata line yet.\n",
+        encoding="utf-8",
+    )
+
+    config = _base_config()
+    config["governed_files"] = [
+        {"path": "docs/governed.md", "class": "governance_doc"},
+        {"path": "docs/sprint_handoffs/*.md", "class": "sprint_doc"},
+    ]
+
+    issues = validate_doc_freshness_slo._validate_doc_freshness(
+        config,
+        tmp_path,
+        datetime(2026, 3, 1, tzinfo=timezone.utc),
+    )
+
+    assert len(issues) == 1
+    assert issues[0]["file_path"] == "docs/sprint_handoffs/sprint-2-handoff.md"
+    assert "missing freshness metadata" in issues[0]["message"]

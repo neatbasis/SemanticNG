@@ -1,3 +1,18 @@
+# Type-checking expectations for contributors
+
+Type-checking is split into two tiers so local hooks stay fast while CI keeps broad coverage:
+
+- **Tier 1 (pre-commit):** strict checks for `src/state_renormalization` and `src/core`.
+- **Tier 2 (CI full surface):** `mypy --config-file=pyproject.toml src tests`.
+
+When changing tests or BDD-related code, run the Tier 2 command locally before pushing so your local checks match CI scope.
+
+```bash
+mypy --config-file=pyproject.toml src tests
+```
+
+---
+
 # Test setup conventions
 
 Use shared fixtures from `tests/conftest.py` for recurring contract objects:

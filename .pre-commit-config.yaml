@@ -24,7 +24,8 @@ repos:
     hooks:
       - id: mypy
         language_version: python3.11
-        args: ["--config-file=pyproject.toml"]
+        args: ["--config-file=pyproject.toml", "src/state_renormalization", "src/core"]
+        pass_filenames: false
         additional_dependencies:
           - pydantic>=2.6,<3
           - pytest>=8,<9

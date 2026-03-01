@@ -6,7 +6,8 @@ name: Quality Guardrails
 # | --- | --- | --- |
 # | [tool.pytest.ini_options] | pytest --cov --cov-report=term-missing --cov-report=xml | Test discovery/runtime flags and marker/filter behavior apply to the test-cov job. |
 # | [tool.coverage.run], [tool.coverage.report] | pytest --cov --cov-report=term-missing --cov-report=xml | Coverage configuration (including fail_under) is enforced by pytest-cov in test-cov. |
-# | [tool.mypy] | pre-commit run --all-files | mypy policy is enforced when mypy hooks are enabled in pre-commit. |
+# | [tool.mypy] (Tier 1 strict scope) | pre-commit run --all-files | mypy hook is scoped to strict core/application paths for fast local feedback. |
+# | [tool.mypy] (full surface) | mypy --config-file=pyproject.toml src tests | Separate CI gate for tests + legacy/BDD namespaces under bounded relaxations. |
 # | [tool.ruff], [tool.black], [tool.isort], other lint tooling sections | pre-commit run --all-files | Lint/format policy is enforced through configured pre-commit hooks. |
 
 on:
@@ -47,3 +48,18 @@ jobs:
 
       - name: Run tests with coverage gate
         run: pytest --cov --cov-report=term-missing --cov-report=xml
+
+  full-type-surface:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Shared Python setup
+        uses: ./.github/actions/python-test-setup
+
+      - name: Verify Python support policy sync
+        run: python .github/scripts/check_python_support_policy.py
+
+      - name: Run mypy (full type surface)
+        run: mypy --config-file=pyproject.toml src tests

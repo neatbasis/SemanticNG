@@ -178,7 +178,7 @@ The repository hook set is defined in `.pre-commit-config.yaml` and includes:
 
 - hygiene checks (`pre-commit-hooks`)
 - `ruff` lint + format
-- `mypy` type checks (configured from `pyproject.toml`)
+- `mypy` Tier 1 strict checks for core/application paths (`src/state_renormalization` + `src/core`)
 - a fast `pytest` smoke hook on `pre-push`
 
 ## Running tests
@@ -220,10 +220,21 @@ Coverage XML governance details are defined only in the release checklist policy
 
 ### mypy (optional)
 
-`mypy` performs static type checking for `src/` and `tests/`.
+Type checking is intentionally split into tiers:
+
+- **Tier 1 (strict, fast, pre-commit scope):** `src/state_renormalization` and `src/core`
+- **Tier 2 (full CI surface):** `src` + `tests` (including bounded relaxations for tests and BDD glue modules configured in `pyproject.toml`)
+
+Run the same command used by pre-commit (Tier 1):
 
 ```bash
-mypy src tests
+mypy --config-file=pyproject.toml src/state_renormalization src/core
+```
+
+Run the full CI type gate locally (Tier 2):
+
+```bash
+mypy --config-file=pyproject.toml src tests
 ```
 
 ### ruff (optional)

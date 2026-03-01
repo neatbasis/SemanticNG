@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail CI when toolchain parity drifts across hook, pyproject, and workflow policy."""
+"""Fail CI when toolchain parity drifts across hook, pyproject, workflow, and docs policy."""
 
 from __future__ import annotations
 
@@ -18,6 +18,10 @@ PARITY_SENSITIVE_WORKFLOWS = (
     ".github/workflows/quality-guardrails.yml",
     ".github/workflows/state-renorm-milestone-gate.yml",
     ".github/workflows/toolchain-parity-weekly.yml",
+)
+MYPY_SCOPE_DOCS = (
+    Path("docs/dev_toolchain_parity.md"),
+    Path("docs/DEVELOPMENT.md"),
 )
 
 
@@ -64,6 +68,14 @@ def _extract_hook_language_version(hook_block: list[str], hook_id: str) -> str:
     raise ParityError(f"Hook '{hook_id}' is missing 'language_version'.")
 
 
+def _extract_hook_args(hook_block: list[str], hook_id: str) -> list[str]:
+    for line in hook_block:
+        stripped = line.strip()
+        if stripped.startswith("args:"):
+            return re.findall(r'"([^"]+)"', stripped)
+    raise ParityError(f"Hook '{hook_id}' is missing 'args'.")
+
+
 def _extract_additional_dependencies(hook_block: list[str]) -> list[str]:
     deps: list[str] = []
     in_dep_list = False
@@ -106,6 +118,13 @@ def _read_constraint_map_from_pyproject(pyproject_path: Path) -> dict[str, str]:
     return constraints
 
 
+def _extract_toml_array(pyproject_text: str, key: str) -> list[str]:
+    match = re.search(rf"^{re.escape(key)}\s*=\s*\[(.*?)\]\s*$", pyproject_text, re.MULTILINE)
+    if not match:
+        raise ParityError(f"Could not parse '{key}' list from pyproject.toml.")
+    return re.findall(r'"([^"]+)"', match.group(1))
+
+
 def _read_action_default_python_version(action_path: Path) -> str:
     action_text = action_path.read_text(encoding="utf-8")
     match = re.search(
@@ -124,11 +143,61 @@ def _read_python_versions_from_workflow(workflow_path: Path) -> list[str]:
     return re.findall(r"python-version:\s*['\"]?([0-9]+\.[0-9]+)['\"]?", text)
 
 
+def _as_scope_expr(values: list[str]) -> str:
+    return "[" + ", ".join(f'\"{value}\"' for value in values) + "]"
+
+
+def _ensure_docs_match_mypy_scope(mypy_files: list[str], mypy_hook_args: list[str]) -> None:
+    expected_files = f"[tool.mypy].files = {_as_scope_expr(mypy_files)}"
+    expected_args = f"args: {_as_scope_expr(mypy_hook_args)}"
+
+    for doc in MYPY_SCOPE_DOCS:
+        text = doc.read_text(encoding="utf-8")
+        missing: list[str] = []
+        if expected_files not in text:
+            missing.append(expected_files)
+        if expected_args not in text:
+            missing.append(expected_args)
+        if missing:
+            print("Pre-commit parity failure: documented mypy scope drift.")
+            print(f"  file: {doc}")
+            print("  missing exact string(s):")
+            for entry in missing:
+                print(f"    - {entry}")
+            raise ParityError("Documented mypy scope strings are out of sync.")
+
+
 def main() -> int:
     config_lines = Path(".pre-commit-config.yaml").read_text(encoding="utf-8").splitlines()
     pyproject_path = Path("pyproject.toml")
+    pyproject_text = pyproject_path.read_text(encoding="utf-8")
+
+    tier1 = _extract_toml_array(pyproject_text, "tier1_strict")
+    tier2 = _extract_toml_array(pyproject_text, "tier2_extended")
+    if tier2 != ["src", "tests"]:
+        print("Pre-commit parity failure: unexpected Tier 2 canonical scope.")
+        print("  expected: ['src', 'tests']")
+        print(f"  found: {tier2}")
+        return 1
+
+    mypy_files = _extract_toml_array(pyproject_text, "files")
+    if mypy_files != tier1:
+        print("Pre-commit parity failure: [tool.mypy].files must match tier1_strict.")
+        print(f"  tier1_strict: {tier1}")
+        print(f"  [tool.mypy].files: {mypy_files}")
+        return 1
 
     mypy_block = _extract_hook_block(config_lines, "mypy")
+    mypy_hook_args = _extract_hook_args(mypy_block, "mypy")
+    expected_mypy_hook_args = ["--config-file=pyproject.toml", *tier1]
+    if mypy_hook_args != expected_mypy_hook_args:
+        print("Pre-commit parity failure: mypy hook args must match tier1_strict scope.")
+        print(f"  expected: {expected_mypy_hook_args}")
+        print(f"  found: {mypy_hook_args}")
+        return 1
+
+    _ensure_docs_match_mypy_scope(mypy_files, expected_mypy_hook_args)
+
     mypy_dep_specs = _extract_additional_dependencies(mypy_block)
     mypy_constraints = {
         _split_requirement(dep)[0]: _split_requirement(dep)[1] for dep in mypy_dep_specs
@@ -197,6 +266,8 @@ def main() -> int:
 
     print(
         "Pre-commit parity in sync: "
+        f"tier1={tier1}; "
+        f"tier2={tier2}; "
         f"mypy deps={', '.join(REQUIRED_MYPY_PACKAGES)}; "
         f"language_version={expected_hook_language_version}; "
         f"python_baseline={py_minor}; "

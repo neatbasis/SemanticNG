@@ -13,15 +13,20 @@ python -m pip install -e ".[test]"
 pre-commit install
 ```
 
-## Local CI-parity preflight
+## Local quality scopes
 
-Run these commands in order before every commit/push:
+### Required pre-commit scope (Tier 1 strict)
+
+Run this before every commit/push:
 
 ```bash
 pre-commit run --all-files
-pytest
-mypy --config-file=pyproject.toml src tests
 ```
+
+Tier 1 mypy scope is intentionally narrow and enforced by the hook:
+
+- `[tool.mypy].files = ["src/state_renormalization", "src/core"]`
+- Hook args: `args: ["--config-file=pyproject.toml", "src/state_renormalization", "src/core"]`
 
 If `pre-commit` reformats files, stage and rerun until clean:
 
@@ -30,9 +35,16 @@ git add -A
 pre-commit run --all-files
 ```
 
-## One-command option
+### Full-surface optional / CI scope (Tier 2 extended)
 
-`make qa-local` is the repository CI-parity command. It runs hook parity checks, tests, and full-surface mypy.
+Use this for full local confidence and CI parity coverage:
+
+```bash
+pytest
+mypy --config-file=pyproject.toml src tests
+```
+
+`make qa-local` remains the one-command CI-parity option (parity checks + tests + Tier 2 mypy):
 
 ```bash
 make qa-local

@@ -72,6 +72,12 @@ ignore = [
 ]
 "src/state_renormalization/_compat.py" = ["UP035"]
 
+[tool.semanticng.mypy_tiers]
+# Canonical mypy scope tiers. Keep [tool.mypy].files, pre-commit hook args,
+# and developer docs aligned to these lists.
+tier1_strict = ["src/state_renormalization", "src/core"]
+tier2_extended = ["src", "tests"]
+
 [tool.mypy]
 python_version = "3.10"
 strict = true

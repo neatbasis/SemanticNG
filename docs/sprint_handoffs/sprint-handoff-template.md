@@ -23,3 +23,5 @@
 | Artifact | Overall % | Changed-module % | Threshold delta | Evidence |
 | --- | --- | --- | --- | --- |
 | `coverage.xml` | <overall_coverage_percent> | <changed_module_coverage_percent> | <actual_minus_fail_under> | <CI artifact link or attached report summary> |
+
+_Last regenerated from manifest: 2026-03-01T00:00:00Z (UTC)._

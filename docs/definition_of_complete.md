@@ -113,3 +113,5 @@ Minimum evidence baseline:
 - `docs/dod_manifest.json` remains the machine-readable source of capability status and test commands.
 - This document defines when those capabilities are considered complete at capability, integration, and system layers.
 - `docs/system_contract_map.md` remains the source of truth for contract maturity and changelog evidence.
+
+_Last regenerated from manifest: 2026-03-01T00:00:00Z (UTC)._

@@ -123,7 +123,7 @@ When promoting a capability status (for example `planned` -> `in_progress` or `i
 - [ ] Paste a transition evidence block with real CI URLs (no placeholders), including command/evidence pairs for transitioned capabilities.
 - [ ] Include a PR dependency impact statement (upstream dependencies, downstream unlocks, and cross-capability regression risk).
 - [ ] Declare no-regression budget impact for all affected `done` capabilities; if waived, include owner and rollback-by date.
-- [ ] For governance/maturity PRs, update documentation freshness metadata and sprint handoff artifacts.
+- [ ] For governance/maturity PRs, follow the documentation freshness metadata requirement in [`docs/release_checklist.md`](docs/release_checklist.md#documentation-freshness-metadata-contributor-requirement) and update sprint handoff artifacts.
 
 ### Local one-step promotion checks
 

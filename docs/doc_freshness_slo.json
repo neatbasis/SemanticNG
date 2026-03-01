@@ -12,6 +12,26 @@
   },
   "governed_files": [
     {
+      "path": "ROADMAP.md",
+      "class": "governance_doc"
+    },
+    {
+      "path": "docs/release_checklist.md",
+      "class": "governance_doc"
+    },
+    {
+      "path": "docs/definition_of_complete.md",
+      "class": "governance_doc"
+    },
+    {
+      "path": "docs/system_contract_map.md",
+      "class": "governance_doc"
+    },
+    {
+      "path": "docs/sprint_handoffs/*.md",
+      "class": "governance_doc"
+    },
+    {
       "path": "docs/project_maturity_evaluation.md",
       "class": "governance_doc"
     }

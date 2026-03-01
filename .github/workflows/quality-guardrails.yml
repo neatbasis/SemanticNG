@@ -42,13 +42,6 @@ jobs:
           pre-commit run --all-files -v 2>&1 | tee precommit.log
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload pre-commit log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: precommit-log
-          path: precommit.log
-
       - name: Show pre-commit log
         if: always()
         run: |

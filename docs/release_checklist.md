@@ -112,6 +112,15 @@ Evidence expectations:
 2. Include exit status and key summary lines (test counts, mypy error totals, coverage percent/fail-under check).
 3. Link to the exact CI run URL or uploaded artifact for reproducibility.
 
+### Mypy suppression debt delta review (required when overrides change)
+
+If a PR changes `[[tool.mypy.overrides]]` in `pyproject.toml`, include a debt delta review in release evidence:
+
+- [ ] Attach suppression inventory output from `python .github/scripts/mypy_override_inventory.py --format markdown` for both **before** and **after** states.
+- [ ] Document net delta (`added`, `removed`, and `unchanged`) for suppressions and disabled rules.
+- [ ] Link updated `docs/mypy_debt.md` entries (owner, target removal sprint, blocker) for each new or modified suppression.
+- [ ] Confirm reviewer acknowledgement that debt delta is acceptable for the release.
+
 ### CI workflow compatibility checks
 
 Before merge, confirm `.github/workflows/quality-guardrails.yml` remains aligned with updated `pyproject.toml` gates:

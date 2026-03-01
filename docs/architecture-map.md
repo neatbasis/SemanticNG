@@ -8,3 +8,12 @@
 | Prediction persistence + projection (append-only prediction log and current view) | `src/state_renormalization/adapters/persistence.py`<br>`src/state_renormalization/engine.py` (`append_prediction_record`, `project_current`)<br>`src/state_renormalization/contracts.py` (`PredictionRecord`, `ProjectionState`) | `tests/test_persistence_jsonl.py`<br>`tests/test_predictions_contracts_and_gates.py` | _None currently tied to this path_ |
 | Channel-agnostic contract surface (avoid HA/satellite-specific core field names) | `src/state_renormalization/contracts.py`<br>`src/state_renormalization/engine.py` | `tests/test_contracts_belief_state.py`<br>`tests/test_contracts_decision_effect_shape.py`<br>`tests/test_engine_calls_selector_with_generic_error.py` | _None currently tied to this path_ |
 | Resource/ontology/indexing path (ingest → validate → materialize → index) | `src/features/steps/index_steps.py`<br>`src/features/steps/ontology_steps.py`<br>`src/features/steps/steps.py` | (BDD-driven; no dedicated pytest module in `tests/`) | `src/features/index/evidence_grounded_adaptive_indexing.feature` (both scenarios)<br>`src/features/core/resource.feature` (Create a minimal Resource)<br>`src/features/ontology/ontology_contains_class.feature` (Ontology contains class) |
+
+## Scope staging rationale
+
+Coverage scope is intentionally staged with `src/state_renormalization` as the active baseline before expanding into `src/core`.
+
+- `src/state_renormalization` contains the contract-bearing execution paths (selection, pending-obligation handling, invariant gates, projection persistence) that define observable behavior and maturity evidence in current sprint controls.
+- Staging reduces simultaneous churn risk by separating contract-hardening work from broader structural refactors in adjacent layers.
+- Scope expansion to `src/core` is deferred until three readiness signals are sustained: stable contract surfaces, deterministic replay/gate test outcomes, and fail-closed parity validation across roadmap/manifest/contract map.
+- This sequence keeps refactor milestones auditable: first prove no-drift behavior in the current slice, then admit `src/core` under a gated rollout with rollback criteria.

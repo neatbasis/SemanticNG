@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 from state_renormalization.adapters.persistence import iter_projection_lineage_records, read_jsonl
@@ -235,7 +235,7 @@ class _RecordingAskOutboxAdapter:
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
 
-    def create_request(self, title: str, question: str, context: dict[str, object]) -> str:
+    def create_request(self, title: str, question: str, context: Mapping[str, object]) -> str:
         request_id = f"ask:{len(self.calls) + 1}"
         self.calls.append(
             {

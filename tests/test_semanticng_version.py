@@ -6,11 +6,15 @@ import sys
 import types
 from pathlib import Path
 
+from _pytest.monkeypatch import MonkeyPatch
+
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "src" / "semanticng" / "__init__.py"
 
 
-def test_semanticng_version_falls_back_when_version_module_is_absent(monkeypatch) -> None:
+def test_semanticng_version_falls_back_when_version_module_is_absent(
+    monkeypatch: MonkeyPatch,
+) -> None:
     spec = importlib.util.spec_from_file_location("semanticng_init_under_test", MODULE_PATH)
     assert spec and spec.loader
 

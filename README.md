@@ -186,6 +186,25 @@ Run the local full QA pass aligned to CI (bootstrap + pre-commit + coverage + fu
 make qa-local
 ```
 
+### Local preflight checklist (CI parity)
+
+Use this sequence before committing so CI behavior matches local validation:
+
+```bash
+pre-commit run --all-files
+pytest
+mypy --config-file=pyproject.toml src tests
+```
+
+If hooks rewrite files, stage and rerun until clean:
+
+```bash
+git add -A
+pre-commit run --all-files
+```
+
+For fresh-clone setup and troubleshooting guidance, see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+
 The repository hook set is defined in `.pre-commit-config.yaml` and includes:
 
 - hygiene checks (`pre-commit-hooks`)

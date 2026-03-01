@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from state_renormalization.adapters.persistence import read_jsonl
-from state_renormalization.contracts import HaltRecord, PredictionRecord, ProjectionState
+from state_renormalization.contracts import EvidenceRef, HaltRecord, PredictionRecord, ProjectionState
 from state_renormalization.engine import append_prediction_record
 
 
@@ -12,12 +12,12 @@ def _prediction(prediction_id: str, scope_key: str) -> PredictionRecord:
         prediction_id=prediction_id,
         prediction_key=scope_key,
         scope_key=scope_key,
-        filtration_ref="filt:test",
-        variable="user_response_present",
-        horizon_iso="2026-02-13T00:00:00+00:00",
+        filtration_id="filt:test",
+        target_variable="user_response_present",
+        target_horizon_iso="2026-02-13T00:00:00+00:00",
         issued_at_iso="2026-02-13T00:00:00+00:00",
-        invariants_assumed=["prediction_availability.v1"],
-        evidence_links=[{"kind": "jsonl", "ref": "predictions.jsonl@1"}],
+        assumptions=["prediction_availability.v1"],
+        evidence_refs=[EvidenceRef(kind="jsonl", ref="predictions.jsonl@1")],
     )
 
 

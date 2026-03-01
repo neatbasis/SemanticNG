@@ -1,6 +1,12 @@
-# Core Invariants
+# INVARIANTS
 
-This document captures runtime and structural invariants for `src/core`.
+Let `M_core` be the `src/core` module boundary.
 
-- Invariants must be testable or checkable by review.
-- Behavior-changing edits must update this file first.
+## Symbolic constraints
+- **I1 (Surface minimality):** `Exports(M_core) = {__version__}`.
+- **I2 (Version provenance):** `__version__` in `core` must be imported from `semanticng._version`.
+- **I3 (No orchestration):** `core` defines no feature workflow semantics; only foundational boundary contract.
+
+## Failure semantics
+- Violation of **I1** or **I2** is a **contract break** (reject release/build).
+- Violation of **I3** is a **layering breach** (must be refactored before merge).

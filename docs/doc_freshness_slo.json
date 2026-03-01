@@ -7,14 +7,24 @@
   },
   "file_classes": {
     "governance_doc": {
-      "max_age_days": 30
+      "max_age_days": 30,
+      "max_commit_lag": 10
     }
   },
   "source_commit_policy": {
     "source_files": {
-      "dod_manifest": "docs/dod_manifest.json",
-      "roadmap": "ROADMAP.md",
-      "system_contract_map": "docs/system_contract_map.md"
+      "dod_manifest": {
+        "path": "docs/dod_manifest.json",
+        "lag_reference": "source_tip"
+      },
+      "roadmap": {
+        "path": "ROADMAP.md",
+        "lag_reference": "source_tip"
+      },
+      "system_contract_map": {
+        "path": "docs/system_contract_map.md",
+        "lag_reference": "source_tip"
+      }
     },
     "governed_source_commits": {
       "*": {
@@ -22,6 +32,50 @@
         "roadmap": "a1dd61d005d20bc3e15aa477e731d57c0a34ed45",
         "system_contract_map": "a1dd61d005d20bc3e15aa477e731d57c0a34ed45"
       }
+    },
+    "governed_source_map": {
+      "ROADMAP.md": [
+        "dod_manifest",
+        "system_contract_map"
+      ],
+      "docs/release_checklist.md": [
+        "dod_manifest",
+        "roadmap",
+        "system_contract_map"
+      ],
+      "docs/definition_of_complete.md": [
+        "dod_manifest",
+        "roadmap",
+        "system_contract_map"
+      ],
+      "docs/system_contract_map.md": [
+        "dod_manifest",
+        "roadmap"
+      ],
+      "docs/sprint_handoffs/*.md": [
+        "dod_manifest",
+        "roadmap"
+      ],
+      "docs/project_maturity_evaluation.md": [
+        "dod_manifest",
+        "roadmap",
+        "system_contract_map"
+      ],
+      "src/core/*.md": [
+        "dod_manifest",
+        "roadmap",
+        "system_contract_map"
+      ],
+      "src/semanticng/*.md": [
+        "dod_manifest",
+        "roadmap",
+        "system_contract_map"
+      ],
+      "src/state_renormalization/*.md": [
+        "dod_manifest",
+        "roadmap",
+        "system_contract_map"
+      ]
     }
   },
   "governed_files": [

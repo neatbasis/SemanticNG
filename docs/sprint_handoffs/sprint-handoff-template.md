@@ -17,3 +17,9 @@
 | Capability ID | Preload objective | Dependency notes |
 | --- | --- | --- |
 | `capability_id_from_docs/dod_manifest.json` | <objective> | <dependency notes> |
+
+## Coverage artifact summary
+
+| Artifact | Overall % | Changed-module % | Threshold delta | Evidence |
+| --- | --- | --- | --- | --- |
+| `coverage.xml` | <overall_coverage_percent> | <changed_module_coverage_percent> | <actual_minus_fail_under> | <CI artifact link or attached report summary> |

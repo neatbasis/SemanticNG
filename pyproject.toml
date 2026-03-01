@@ -48,6 +48,10 @@ addopts = [
   "--disable-warnings",
   "--maxfail=1",
 ]
+markers = [
+  "contract_sensitive: engine/contracts/adapters tests that assert canonical runtime contracts",
+  "general_behavior: broader behavior/regression tests that are not contract-boundary focused",
+]
 
 [tool.ruff]
 target-version = "py310"
@@ -77,6 +81,13 @@ ignore = [
 # and developer docs aligned to these lists.
 tier1_strict = ["src/state_renormalization", "src/core"]
 tier2_extended = ["src", "tests"]
+tier2_tests_contract_sensitive = [
+  "tests/test_engine_*.py",
+  "tests/test_contracts_*.py",
+  "tests/test_capability_adapter_*.py",
+  "tests/test_ask_outbox_contracts.py",
+  "tests/test_predictions_contracts_and_gates.py",
+]
 
 [tool.mypy]
 python_version = "3.10"

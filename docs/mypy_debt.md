@@ -3,7 +3,8 @@
 Policy boundary:
 
 - **Tier 1 (strict, required pre-commit):** `src/state_renormalization`, `src/core`.
-- **Tier 2 (extended, optional local / CI):** `src`, `tests`.
+- **Tier 2a (focused contract-sensitive tests):** `tests/test_engine_*.py`, `tests/test_contracts_*.py`, `tests/test_capability_adapter_*.py`, `tests/test_ask_outbox_contracts.py`, `tests/test_predictions_contracts_and_gates.py`.
+- **Tier 2b (extended, optional local / CI):** `src`, `tests`.
 
 Canonical tier source is `[tool.semanticng.mypy_tiers]` in `pyproject.toml`.
 
@@ -54,3 +55,15 @@ Remaining `Any` hotspots (next module boundary: adapters):
   - `JsonObj = dict[str, Any]`
   - `_to_jsonable`, `append_jsonl`, `append_prediction*`, `append_ask_outbox_*`, `_canonicalize_halt_payload`, `append_halt`
   - follow-up plan: replace `Any` entrypoints with typed JSON aliases + validated event payload wrappers.
+
+
+## 2026-03 Graduated test typing rollout
+
+Status updates for the contract-sensitive tranche:
+
+- ✅ Added automatic pytest classification (`contract_sensitive` vs `general_behavior`) in `tests/conftest.py`.
+- ✅ Introduced focused Tier 2a mypy command/profile for contract-sensitive tests.
+- ✅ Removed targeted `type: ignore` call-arg suppressions in adapter policy-guard tests by annotating callable fakes.
+- ✅ Replaced cast-based episode fakes in invariant contract tests with typed `Episode` factory helpers.
+- ✅ Replaced malformed-outcome `type: ignore[arg-type]` usage with explicit `InvariantOutcome.model_construct(...)` fixtures where invalid payloads are intentional.
+- ⏳ Remaining work: extend fixture/fake annotations to additional high-noise modules outside current contract-sensitive tranche before tightening Tier 2b defaults.

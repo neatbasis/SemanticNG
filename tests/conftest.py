@@ -25,6 +25,29 @@ from state_renormalization.contracts import (
     default_observer_frame,
 )
 
+CONTRACT_SENSITIVE_PREFIXES = (
+    "tests/test_engine_",
+    "tests/test_contracts_",
+    "tests/test_capability_adapter_",
+)
+CONTRACT_SENSITIVE_EXACT = {
+    "tests/test_ask_outbox_contracts.py",
+    "tests/test_predictions_contracts_and_gates.py",
+}
+
+
+def _is_contract_sensitive(nodeid: str) -> bool:
+    path = nodeid.split("::", 1)[0]
+    return path.startswith(CONTRACT_SENSITIVE_PREFIXES) or path in CONTRACT_SENSITIVE_EXACT
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    for item in items:
+        if _is_contract_sensitive(item.nodeid):
+            item.add_marker("contract_sensitive")
+        else:
+            item.add_marker("general_behavior")
+
 
 @pytest.fixture
 def belief() -> BeliefState:

@@ -44,6 +44,20 @@ pytest
 mypy --config-file=pyproject.toml src tests
 ```
 
+### Contract-sensitive test typing profile (Tier 2a focused)
+
+Before full strictness on all tests, use the focused profile for engine/contracts/adapters tests:
+
+```bash
+mypy --config-file=pyproject.toml tests/test_engine_*.py tests/test_contracts_*.py tests/test_capability_adapter_*.py tests/test_ask_outbox_contracts.py tests/test_predictions_contracts_and_gates.py
+```
+
+Pytest markers are auto-assigned in collection, so you can also run:
+
+```bash
+pytest -m contract_sensitive
+```
+
 `make qa-local` remains the one-command CI-parity option (parity checks + tests + Tier 2 mypy):
 
 ```bash
@@ -63,6 +77,12 @@ git add -A
 
 ```bash
 mypy --config-file=pyproject.toml src tests
+```
+
+If the failure is isolated to contract boundaries, start with Tier 2a to iterate faster:
+
+```bash
+mypy --config-file=pyproject.toml tests/test_engine_*.py tests/test_contracts_*.py tests/test_capability_adapter_*.py tests/test_ask_outbox_contracts.py tests/test_predictions_contracts_and_gates.py
 ```
 
 Most failures here are typed-test drift (missing annotations, protocol signature mismatch, or stale contract field names).

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -15,8 +17,9 @@ from state_renormalization.contracts import CapabilityAdapterGate, HaltRecord
 
 def test_append_prediction_requires_policy_gate(tmp_path: Path) -> None:
     path = tmp_path / "prediction.jsonl"
+    append_without_gate: Callable[..., Any] = append_prediction
     with pytest.raises(TypeError):
-        append_prediction(path=path, record={"prediction_id": "pred:1"})  # type: ignore[call-arg]
+        append_without_gate(path=path, record={"prediction_id": "pred:1"})
 
 
 def test_append_prediction_event_rejects_denied_policy_gate(tmp_path: Path) -> None:

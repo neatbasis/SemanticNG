@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -11,8 +13,9 @@ from state_renormalization.contracts import CapabilityAdapterGate
 def test_adapter_guard_requires_policy_gate(tmp_path: Path) -> None:
     path = tmp_path / "prediction-records.jsonl"
 
+    append_without_gate: Callable[..., Any] = append_prediction_record_event
     with pytest.raises(TypeError):
-        append_prediction_record_event({"prediction_id": "pred:1"}, path=path)  # type: ignore[call-arg]
+        append_without_gate({"prediction_id": "pred:1"}, path=path)
 
     assert not path.exists()
 

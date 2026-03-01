@@ -25,6 +25,58 @@ This document is the canonical source for active release/integration workflow ex
 - [ ] **Documentation freshness SLO met:** `docs/doc_freshness_slo.json` governs the freshness metadata policy and `python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json` passes.
 - [ ] **Sprint handoff minimum artifacts attached:** Sprint-close report includes exit table, open-risk register, and next-sprint preload list.
 
+## Coverage threshold governance policy
+
+This section is the canonical policy for coverage threshold governance.
+
+### Threshold source of truth
+
+- Coverage threshold authority is `pyproject.toml` under `[tool.coverage.report].fail_under`.
+- Current configured threshold: **85**.
+- Any PR discussion, checklist, or sprint note that references a different threshold is non-authoritative until `pyproject.toml` is updated.
+
+### Allowed change cadence
+
+- Threshold changes are allowed only at declared sprint boundaries (sprint planning kickoff or sprint close).
+- Out-of-band changes require an explicit waiver (see waiver format below) and approval from the designated release/governance owner.
+
+### Required evidence for threshold changes
+
+For both threshold increases and decreases, the PR must include:
+
+1. Link to a successful CI run showing `pytest --cov` output and resulting percentage.
+2. A short rationale describing the motivating code/test delta.
+3. Impact statement covering expected effect on near-term delivery risk.
+
+Additional requirement for decreases:
+
+4. Recovery plan with target sprint/date for restoring or exceeding the prior threshold.
+
+### Waiver format and expiration
+
+If cadence or evidence requirements cannot be fully met, include a timeboxed waiver using this structure:
+
+```markdown
+Coverage governance waiver:
+- Owner: <name/github-handle>
+- Requested on: <YYYY-MM-DD>
+- Scope: <cadence exception and/or missing evidence>
+- Rationale: <why waiver is needed>
+- Mitigations: <temporary controls while waiver is active>
+- Expires on: <YYYY-MM-DD>
+- Follow-up issue/PR: <link>
+```
+
+Waivers expire automatically at the stated date and must be removed or renewed with fresh approval before further threshold changes.
+
+### Threshold change log
+
+Record every accepted threshold update in reverse chronological order.
+
+| Date (UTC) | Change (`from -> to`) | Rationale | CI evidence URL |
+| --- | --- | --- | --- |
+| 2026-03-01 | `85 -> 85` | Baseline governance log entry added to document current enforced threshold and establish audit trail format. | https://github.com/example/semanticng/actions/runs/REPLACE_WITH_RUN_ID |
+
 ## Copy/paste evidence block (validator-compatible)
 
 Generate the PR-template block from `docs/dod_manifest.json` instead of maintaining command examples here:

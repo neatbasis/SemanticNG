@@ -10,6 +10,7 @@ Canonical references:
 - Capability status and pytest command packs: `docs/dod_manifest.json`.
 - Contract maturity transitions: `docs/system_contract_map.md`.
 - Completion-layer criteria: `docs/definition_of_complete.md`.
+- Coverage threshold governance policy: `docs/release_checklist.md` (Coverage threshold governance policy section).
 
 ## Source-of-truth matrix
 

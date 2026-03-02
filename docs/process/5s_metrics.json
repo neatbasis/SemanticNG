@@ -1,0 +1,75 @@
+{
+  "spec_version": "1.0.0",
+  "generated_for": "quality-guardrails",
+  "stabilization_window": {
+    "non_blocking_until": "2026-04-15",
+    "promotion_rule": "Switch all measure-only metrics to blocking after non_blocking_until if sanity checks pass for 14 consecutive days."
+  },
+  "metrics": [
+    {
+      "s": "stability",
+      "metric_id": "required-check-pass-rate",
+      "definition": "Share of required Quality Guardrails checks that pass on main over a rolling 14-day window.",
+      "source_of_truth": ".github/workflows/quality-guardrails.yml job outcomes + branch protection required-check logs",
+      "target_threshold": {
+        "operator": ">=",
+        "value": 98,
+        "unit": "%"
+      },
+      "breach_severity": "critical",
+      "enforcement_mode": "measure-only"
+    },
+    {
+      "s": "signal-health",
+      "metric_id": "flaky-test-count",
+      "definition": "Number of test cases classified as flaky in CI reruns over the rolling 7-day window.",
+      "source_of_truth": "CI rerun diagnostics and failure classification artifacts",
+      "target_threshold": {
+        "operator": "<=",
+        "value": 2,
+        "unit": "count"
+      },
+      "breach_severity": "high",
+      "enforcement_mode": "measure-only"
+    },
+    {
+      "s": "staleness",
+      "metric_id": "stale-doc-freshness-days",
+      "definition": "Maximum allowed age in days for governance/process docs without a freshness review stamp.",
+      "source_of_truth": "docs/process review timestamps and freshness checklist updates",
+      "target_threshold": {
+        "operator": "<=",
+        "value": 30,
+        "unit": "days"
+      },
+      "breach_severity": "medium",
+      "enforcement_mode": "measure-only"
+    },
+    {
+      "s": "supply-chain",
+      "metric_id": "dependency-drift-count",
+      "definition": "Count of dependencies drifting beyond allowed parity between lockfiles/toolchain declarations and CI pins.",
+      "source_of_truth": "scripts/ci/check_toolchain_parity.py output and lockfile drift reports",
+      "target_threshold": {
+        "operator": "<=",
+        "value": 0,
+        "unit": "count"
+      },
+      "breach_severity": "high",
+      "enforcement_mode": "measure-only"
+    },
+    {
+      "s": "specification",
+      "metric_id": "contract-maturity-movement",
+      "definition": "Net movement toward higher contract maturity states per release cycle (no regressions in accepted contracts).",
+      "source_of_truth": "Contract maturity ledger and release readiness checklist deltas",
+      "target_threshold": {
+        "operator": ">=",
+        "value": 0,
+        "unit": "net-level"
+      },
+      "breach_severity": "high",
+      "enforcement_mode": "measure-only"
+    }
+  ]
+}

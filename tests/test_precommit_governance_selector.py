@@ -124,6 +124,10 @@ def test_pre_push_hooks_include_required_quality_gates() -> None:
     assert "entry: python scripts/ci/run_stage_checks.py qa-commit" in config_text
     assert "stages: [pre-commit]" in config_text
 
+    assert "- id: precommit-governance-selector" in config_text
+    assert "entry: .github/scripts/run_precommit_governance_checks.py" in config_text
+    assert "stages: [pre-commit]" in config_text
+
     assert "- id: qa-push-stage" in config_text
     assert "entry: python scripts/ci/run_stage_checks.py qa-push" in config_text
     assert "stages: [pre-push]" in config_text

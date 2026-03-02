@@ -43,6 +43,16 @@ make qa-full-type
 mypy --config-file=pyproject.toml src tests
 ```
 
+## 4) Pre-commit governance selector (targeted capability checks)
+
+The governance selector runs during the local `pre-commit` stage (hook id `precommit-governance-selector`) and computes capability-linked pytest commands for changed paths.
+
+To reproduce it directly, run:
+
+```bash
+.github/scripts/run_precommit_governance_checks.py
+```
+
 ## CI artifacts: where to find them and how to apply them
 
 When `baseline-lint-type` fails in CI, open the run summary and download these artifacts from that job:

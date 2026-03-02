@@ -18,5 +18,5 @@ def create_ontology(path: str) -> OntologyLike:
     if not _HAS_DEEPONTO:
         raise ModuleNotFoundError("deeponto is required for ontology BDD steps")
     onto_mod = importlib.import_module("deeponto.onto")
-    ontology_cls = getattr(onto_mod, "Ontology")
+    ontology_cls = onto_mod.Ontology
     return cast(OntologyLike, ontology_cls(path))

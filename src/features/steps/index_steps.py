@@ -9,12 +9,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from gherkin.parser import Parser  # type: ignore[import-not-found]
-from gherkin.token_scanner import TokenScanner  # type: ignore[import-not-found]
+from gherkin.parser import Parser
+from gherkin.token_scanner import TokenScanner
 
+from features.steps._typing import BehaveContext
 from semanticng.bdd_compat import given, then, when
 from semanticng.step_state import get_index_step_state
-
 from state_renormalization.gherkin_document import GherkinDocument
 from state_renormalization.stable_ids import derive_stable_ids
 
@@ -179,7 +179,7 @@ class DenseInterpreterStub:
         }
 
 
-def _derive_context_stable_ids(context) -> dict[str, str]:
+def _derive_context_stable_ids(context: BehaveContext) -> dict[str, str]:
     feature_path = getattr(getattr(context, "feature", None), "filename", None)
     scenario = getattr(context, "scenario", None)
     step = getattr(context, "step", None)
@@ -228,14 +228,14 @@ def _derive_context_stable_ids(context) -> dict[str, str]:
     return out
 
 
-def _initialize_pipeline_context(context) -> None:
+def _initialize_pipeline_context(context: BehaveContext) -> None:
     state = get_index_step_state(context)
     state.last_persisted_resource = None
     state.last_ingested_resource = None
     state.last_artifact_resource = None
 
 
-def _build_ingested_resource(context, dc: dict[str, Any], payload_text: str) -> Resource:
+def _build_ingested_resource(context: BehaveContext, dc: dict[str, Any], payload_text: str) -> Resource:
     stable_ids = _derive_context_stable_ids(context)
     meta = {"dc": dict(dc)}
     payload = {"text": payload_text}
@@ -281,7 +281,7 @@ def _validate_event_v1_proposal(proposal: dict[str, Any], schema: dict[str, Any]
     }
 
 
-def _update_schema_usage_metrics(context, schema_id: str, confidence: float) -> None:
+def _update_schema_usage_metrics(context: BehaveContext, schema_id: str, confidence: float) -> None:
     schema_usage = getattr(context, "schema_usage", None)
     if schema_usage is None:
         context.schema_usage = {}
@@ -309,29 +309,29 @@ def _update_schema_usage_metrics(context, schema_id: str, confidence: float) -> 
 
 
 @given("an append-only Resource store")
-def step_given_append_only_store(context):
+def step_given_append_only_store(context: BehaveContext) -> None:
     context.resource_store = AppendOnlyResourceStore()
     _initialize_pipeline_context(context)
 
 
 @given("a sparse index")
-def step_given_sparse_index(context):
+def step_given_sparse_index(context: BehaveContext) -> None:
     context.sparse_index = SparseIndex()
 
 
 @given("an ontology registry")
-def step_given_ontology_registry(context):
+def step_given_ontology_registry(context: BehaveContext) -> None:
     context.ontology_registry = {}
 
 
 @given("a schema registry with versioning")
-def step_given_schema_registry(context):
+def step_given_schema_registry(context: BehaveContext) -> None:
     # schema_id -> dict(definition)
     context.schema_registry = {}
 
 
 @given("a dense interpreter configured for schema proposals")
-def step_given_dense_interpreter(context):
+def step_given_dense_interpreter(context: BehaveContext) -> None:
     context.dense_interpreter = DenseInterpreterStub()
 
 
@@ -341,20 +341,20 @@ def step_given_dense_interpreter(context):
 
 
 @given('an ontology "core" with concepts:')
-def step_given_ontology_core(context):
+def step_given_ontology_core(context: BehaveContext) -> None:
     # context.text holds the triple-quoted block
     context.ontology_registry["core"] = json.loads(context.text)
 
 
 @given('a schema "Event.v1" mapped to ontology "core" with required fields:')
-def step_given_schema_event_v1(context):
+def step_given_schema_event_v1(context: BehaveContext) -> None:
     schema_def = json.loads(context.text)
     schema_def["ontology"] = "core"
     context.schema_registry["Event.v1"] = schema_def
 
 
 @given("a Dublin Core Resource with:")
-def step_given_dc_resource_table(context):
+def step_given_dc_resource_table(context: BehaveContext) -> None:
     # Table has keys like dc:type, dc:created, dc:source, dc:format
     dc = {}
     for row in context.table:
@@ -371,7 +371,7 @@ def step_given_dc_resource_table(context):
 
 
 @given("with payload text:")
-def step_given_payload_text(context):
+def step_given_payload_text(context: BehaveContext) -> None:
     state = get_index_step_state(context)
     state.pending_payload_text = context.text.strip("\n")
 
@@ -382,7 +382,7 @@ def step_given_payload_text(context):
 
 
 @when("I ingest the Resource")
-def step_when_ingest_resource(context):
+def step_when_ingest_resource(context: BehaveContext) -> None:
     state = get_index_step_state(context)
     dc = state.pending_dc
     payload_text = state.pending_payload_text
@@ -397,7 +397,7 @@ def step_when_ingest_resource(context):
 
 
 @when('I request a schema proposal from the dense interpreter using ontology "core"')
-def step_when_request_schema_proposal(context):
+def step_when_request_schema_proposal(context: BehaveContext) -> None:
     state = get_index_step_state(context)
     res = state.last_ingested_resource
     if not res:
@@ -414,7 +414,7 @@ def step_when_request_schema_proposal(context):
 
 
 @when('I validate the proposal against the ontology "core" and schema "Event.v1"')
-def step_when_validate_proposal(context):
+def step_when_validate_proposal(context: BehaveContext) -> None:
     state = get_index_step_state(context)
     proposal = state.last_proposal
     if not proposal:
@@ -428,7 +428,7 @@ def step_when_validate_proposal(context):
 
 
 @when("I materialize a structured Artifact from the validated extraction")
-def step_when_materialize_artifact(context):
+def step_when_materialize_artifact(context: BehaveContext) -> None:
     state = get_index_step_state(context)
     validation = state.last_validation
     if not validation or not validation.get("ok"):
@@ -487,7 +487,7 @@ def step_when_materialize_artifact(context):
 
 
 @when("I update the sparse index from the persisted Artifact")
-def step_when_update_sparse_index(context):
+def step_when_update_sparse_index(context: BehaveContext) -> None:
     state = get_index_step_state(context)
     art = state.last_artifact_resource
     if not art:
@@ -516,7 +516,7 @@ def step_when_update_sparse_index(context):
 
 
 @then("the Resource MUST be persisted immutably with an integrity content_hash")
-def step_then_resource_persisted_with_hash(context):
+def step_then_resource_persisted_with_hash(context: BehaveContext) -> None:
     state = get_index_step_state(context)
     res = state.last_persisted_resource
     assert res is not None, "No persisted resource found."
@@ -527,7 +527,7 @@ def step_then_resource_persisted_with_hash(context):
 
 
 @then("the proposal MUST include a schema_id and a structured extraction")
-def step_then_proposal_has_schema_and_extraction(context):
+def step_then_proposal_has_schema_and_extraction(context: BehaveContext) -> None:
     proposal = get_index_step_state(context).last_proposal
     assert proposal is not None, "No proposal found."
     assert "schema_id" in proposal, "proposal.schema_id missing."
@@ -537,7 +537,7 @@ def step_then_proposal_has_schema_and_extraction(context):
 
 
 @then("the proposal MUST cite evidence spans from the payload text")
-def step_then_proposal_has_evidence_spans(context):
+def step_then_proposal_has_evidence_spans(context: BehaveContext) -> None:
     proposal = get_index_step_state(context).last_proposal
     assert proposal is not None, "No proposal found."
     spans = proposal.get("evidence_spans")
@@ -552,7 +552,7 @@ def step_then_proposal_has_evidence_spans(context):
 
 
 @then('the proposed schema_id MUST be "Event.v1"')
-def step_then_proposed_schema_is_event_v1(context):
+def step_then_proposed_schema_is_event_v1(context: BehaveContext) -> None:
     proposal = get_index_step_state(context).last_proposal
     assert proposal is not None, "No proposal found."
     assert proposal.get("schema_id") == "Event.v1", (
@@ -561,13 +561,13 @@ def step_then_proposed_schema_is_event_v1(context):
 
 
 @then("validation MUST succeed")
-def step_then_validation_succeeds(context):
+def step_then_validation_succeeds(context: BehaveContext) -> None:
     val = get_index_step_state(context).last_validation
     assert val is not None and val.get("ok") is True, "Validation did not succeed."
 
 
 @then('the extracted fields MUST satisfy required fields for "Event.v1"')
-def step_then_required_fields_present(context):
+def step_then_required_fields_present(context: BehaveContext) -> None:
     val = get_index_step_state(context).last_validation
     assert val and val.get("ok"), "No successful validation."
     schema = context.schema_registry["Event.v1"]
@@ -578,7 +578,7 @@ def step_then_required_fields_present(context):
 
 
 @then("the Artifact MUST be persisted as a new immutable Resource")
-def step_then_artifact_persisted(context):
+def step_then_artifact_persisted(context: BehaveContext) -> None:
     art = get_index_step_state(context).last_artifact_resource
     assert art is not None, "Artifact not persisted."
     assert art.integrity.get("content_hash"), "Artifact content_hash missing."
@@ -588,14 +588,14 @@ def step_then_artifact_persisted(context):
 
 
 @then('the Artifact dc:type MUST be "Event"')
-def step_then_artifact_dc_type_event(context):
+def step_then_artifact_dc_type_event(context: BehaveContext) -> None:
     art = get_index_step_state(context).last_artifact_resource
     dc = (art.meta or {}).get("dc", {})
     assert dc.get("dc:type") == "Event", f"Expected dc:type Event, got {dc.get('dc:type')}"
 
 
 @then("the Artifact MUST include a link to the source Resource identifier")
-def step_then_artifact_links_source(context):
+def step_then_artifact_links_source(context: BehaveContext) -> None:
     state = get_index_step_state(context)
     art = state.last_artifact_resource
     source_id = ((art.meta or {}).get("semanticng", {}) or {}).get("source_identifier")
@@ -607,7 +607,7 @@ def step_then_artifact_links_source(context):
 
 
 @then("the Artifact MUST include evidence spans for each extracted field")
-def step_then_artifact_has_evidence_per_field(context):
+def step_then_artifact_has_evidence_per_field(context: BehaveContext) -> None:
     art = get_index_step_state(context).last_artifact_resource
     extraction = (art.payload or {}).get("extraction", {})
     evidence = (art.payload or {}).get("evidence_spans", {})
@@ -617,13 +617,13 @@ def step_then_artifact_has_evidence_per_field(context):
 
 
 @then("the sparse index MUST contain the Artifact identifier")
-def step_then_sparse_index_contains_artifact(context):
+def step_then_sparse_index_contains_artifact(context: BehaveContext) -> None:
     art = get_index_step_state(context).last_artifact_resource
     assert art.identifier in context.sparse_index.docs, "Artifact not present in sparse index docs."
 
 
 @then('searching for "hack night" MUST return the Artifact in the top results')
-def step_then_search_hack_night_returns_artifact(context):
+def step_then_search_hack_night_returns_artifact(context: BehaveContext) -> None:
     art = get_index_step_state(context).last_artifact_resource
     results = context.sparse_index.search("hack night", top_k=5)
     assert art.identifier in results, (
@@ -632,7 +632,7 @@ def step_then_search_hack_night_returns_artifact(context):
 
 
 @then('searching for "Maria 01" MUST return the Artifact in the top results')
-def step_then_search_maria01_returns_artifact(context):
+def step_then_search_maria01_returns_artifact(context: BehaveContext) -> None:
     art = get_index_step_state(context).last_artifact_resource
     results = context.sparse_index.search("Maria 01", top_k=5)
     assert art.identifier in results, (
@@ -641,7 +641,7 @@ def step_then_search_maria01_returns_artifact(context):
 
 
 @then('schema usage metrics MUST be updated for "Event.v1"')
-def step_then_schema_usage_updated(context):
+def step_then_schema_usage_updated(context: BehaveContext) -> None:
     usage = getattr(context, "schema_usage", {})
     assert "Event.v1" in usage, "No schema usage record for Event.v1"
     assert usage["Event.v1"]["successful_validations"] >= 1, (
@@ -650,7 +650,7 @@ def step_then_schema_usage_updated(context):
 
 
 @then("the schema usage record MUST include:")
-def step_then_schema_usage_record_includes_metrics(context):
+def step_then_schema_usage_record_includes_metrics(context: BehaveContext) -> None:
     usage = getattr(context, "schema_usage", {})
     rec = usage.get("Event.v1")
     assert rec, "No schema usage record for Event.v1"

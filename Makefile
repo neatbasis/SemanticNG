@@ -1,11 +1,17 @@
-.PHONY: bootstrap qa-baseline qa-hook-parity qa-hook-parity-diagnostics qa-local-fast qa-full-type qa-full-type-surface qa-test-cov qa-ci-equivalent qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
+.PHONY: bootstrap verify-precommit-installed qa-baseline qa-hook-parity qa-hook-parity-diagnostics qa-local-fast qa-full-type qa-full-type-surface qa-test-cov qa-ci-equivalent qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
 
 bootstrap:
+	pre-commit install --hook-type pre-commit --hook-type pre-push
+	pre-commit install-hooks
+	$(MAKE) verify-precommit-installed
 	@python --version
 	@python -m pip --version
 	@python -c "import importlib.util, pathlib, semanticng; assert importlib.util.find_spec('semanticng') is not None; package_path = pathlib.Path(semanticng.__file__).resolve(); print(f'semanticng import path: {package_path}')"
 	@python -c "import pydantic; print(f'pydantic {pydantic.__version__}')"
 	@python .github/scripts/print_env_provenance.py
+
+verify-precommit-installed:
+	python scripts/dev/verify_precommit_installed.py
 
 qa-baseline:
 	$(MAKE) qa-hook-parity

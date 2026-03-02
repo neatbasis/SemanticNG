@@ -65,5 +65,15 @@
     "expiration_rule": "waiver is invalid once rollback_by is earlier than current UTC date",
     "timezone": "UTC"
   },
-  "waivers": []
+  "waivers": [],
+  "baseline_update_governance": {
+    "policy_doc": "docs/no_regression_budget_update_policy.md",
+    "metadata_file": "docs/no_regression_budget_update_request.json",
+    "default_allowed_regression": 0,
+    "nonzero_allowed_regression_requires": [
+      "timeboxed_exception",
+      "approval_reference",
+      "rollback_issue_or_pr"
+    ]
+  }
 }

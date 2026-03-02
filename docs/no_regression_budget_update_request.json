@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "status": "not_applicable",
+  "policy_doc": "docs/no_regression_budget_update_policy.md",
+  "change_summary": "Populate this file only when docs/no_regression_budget.json baseline or allowed_regression values change.",
+  "checklist": {
+    "before_counts": {},
+    "after_counts": {},
+    "justification": "",
+    "remediation_issue_or_pr": "not_applicable"
+  },
+  "timeboxed_exception": {
+    "enabled": false,
+    "approved_by": "",
+    "approval_expires_on": "",
+    "approval_reference": "",
+    "rollback_issue_or_pr": ""
+  }
+}

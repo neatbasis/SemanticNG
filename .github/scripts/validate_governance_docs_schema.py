@@ -55,6 +55,46 @@ def _validate_no_regression_budget(data: dict) -> list[str]:
     if waivers is not None and not isinstance(waivers, list):
         errors.append("docs/no_regression_budget.json: `waivers` must be a list when present.")
 
+    baseline_governance = data.get("baseline_update_governance")
+    if not isinstance(baseline_governance, dict):
+        errors.append(
+            "docs/no_regression_budget.json: `baseline_update_governance` must be an object."
+        )
+    else:
+        policy_doc = baseline_governance.get("policy_doc")
+        metadata_file = baseline_governance.get("metadata_file")
+        default_allowed = baseline_governance.get("default_allowed_regression")
+        if not isinstance(policy_doc, str) or not policy_doc.strip():
+            errors.append(
+                "docs/no_regression_budget.json: baseline_update_governance.policy_doc must be a non-empty string."
+            )
+        if not isinstance(metadata_file, str) or not metadata_file.strip():
+            errors.append(
+                "docs/no_regression_budget.json: baseline_update_governance.metadata_file must be a non-empty string."
+            )
+        if default_allowed != 0:
+            errors.append(
+                "docs/no_regression_budget.json: baseline_update_governance.default_allowed_regression must be 0."
+            )
+
+    return errors
+
+
+def _validate_no_regression_update_request(data: dict) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(data.get("status"), str):
+        errors.append("docs/no_regression_budget_update_request.json: `status` must be a string.")
+
+    checklist = data.get("checklist")
+    if not isinstance(checklist, dict):
+        errors.append("docs/no_regression_budget_update_request.json: `checklist` must be an object.")
+
+    timeboxed = data.get("timeboxed_exception")
+    if not isinstance(timeboxed, dict):
+        errors.append(
+            "docs/no_regression_budget_update_request.json: `timeboxed_exception` must be an object."
+        )
+
     return errors
 
 
@@ -62,6 +102,11 @@ def main() -> int:
     errors: list[str] = []
     errors.extend(_validate_dod_manifest(_load_json("docs/dod_manifest.json")))
     errors.extend(_validate_no_regression_budget(_load_json("docs/no_regression_budget.json")))
+    errors.extend(
+        _validate_no_regression_update_request(
+            _load_json("docs/no_regression_budget_update_request.json")
+        )
+    )
 
     if errors:
         print("Governance docs schema validation failed:")

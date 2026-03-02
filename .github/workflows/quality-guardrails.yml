@@ -27,6 +27,9 @@ jobs:
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
 
+      - name: Validate baseline-update governance metadata
+        run: python .github/scripts/validate_no_regression_budget_update.py
+
       - name: Enforce no-regression budget policy
         run: python .github/scripts/check_no_regression_budget.py
 

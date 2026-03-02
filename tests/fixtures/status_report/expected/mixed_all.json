@@ -28,7 +28,12 @@
       ]
     },
     "status_show": "all",
-    "unknown_policy": "Print unknown with reason when data is missing or unresolved."
+    "unknown_policy": "Print unknown with reason when data is missing or unresolved.",
+    "generated_from": {
+      "manifest": "unknown",
+      "manifest_commit": "unknown",
+      "generated_at": "unknown"
+    }
   },
   "milestones": [
     {

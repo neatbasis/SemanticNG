@@ -111,3 +111,63 @@ def test_check_mode_exit_codes_follow_issue_presence(tmp_path: Path) -> None:
     assert json.loads(valid_result.stdout) == {"issues": []}
     assert invalid_result.returncode == 1
     assert json.loads(invalid_result.stdout)["issues"]
+
+
+def test_status_report_json_surfaces_generated_from_provenance() -> None:
+    result = _run_status("json", ROOT)
+
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    generated_from = payload["meta"]["generated_from"]
+    assert generated_from["manifest"] == "docs/dod_manifest.json"
+    assert isinstance(generated_from["manifest_commit"], str) and len(generated_from["manifest_commit"]) == 40
+    assert generated_from["generated_at"].endswith("Z")
+
+
+def test_generated_status_files_are_manifest_synchronized() -> None:
+    manifest = _load_json(ROOT / "docs" / "dod_manifest.json")
+    objectives = _load_json(ROOT / "docs" / "status" / "objectives.json")
+    milestones = _load_json(ROOT / "docs" / "status" / "milestones.json")
+    sprints = _load_json(ROOT / "docs" / "status" / "sprints.json")
+
+    capability_status = {item["id"]: item["status"] for item in manifest["capabilities"]}
+
+    expected_objective_ids = {group["id"] for group in manifest["capability_groups"]}
+    observed_objective_ids = {item["id"] for item in objectives["items"]}
+    assert observed_objective_ids == expected_objective_ids
+
+    for group in manifest["capability_groups"]:
+        member_statuses = [capability_status[cap_id] for cap_id in group["capability_ids"]]
+        expected_status = (
+            "in_progress"
+            if "in_progress" in member_statuses
+            else "planned"
+            if "planned" in member_statuses
+            else "done"
+        )
+        objective = next(item for item in objectives["items"] if item["id"] == group["id"])
+        assert objective["status"] == expected_status
+
+    for manifest_key, status_doc in (("milestone_groups", milestones), ("sprint_groups", sprints)):
+        expected = {group["id"]: group["status"] for group in manifest[manifest_key]}
+        observed = {item["id"]: item["status"] for item in status_doc["items"]}
+        assert observed == expected
+
+
+def test_generated_status_files_validate_against_status_schema() -> None:
+    from scripts.dev.status_schema import validate_item_collection_document, validate_project_document
+
+    objectives_path = ROOT / "docs" / "status" / "objectives.json"
+    milestones_path = ROOT / "docs" / "status" / "milestones.json"
+    sprints_path = ROOT / "docs" / "status" / "sprints.json"
+    project_path = ROOT / "docs" / "status" / "project.json"
+
+    _, objective_issues = validate_item_collection_document(objectives_path, _load_json(objectives_path))
+    _, milestone_issues = validate_item_collection_document(milestones_path, _load_json(milestones_path))
+    _, sprint_issues = validate_item_collection_document(sprints_path, _load_json(sprints_path))
+    project_issues = validate_project_document(project_path, _load_json(project_path))
+
+    assert objective_issues == []
+    assert milestone_issues == []
+    assert sprint_issues == []
+    assert project_issues == []

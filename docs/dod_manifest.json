@@ -261,7 +261,95 @@
     }
   ],
   "canonical_source_of_truth": {
+    "manifest_path": "docs/dod_manifest.json",
     "capability_status_field": "status",
-    "required_pytest_commands_field": "pytest_commands"
+    "required_pytest_commands_field": "pytest_commands",
+    "status_artifacts_generated_by": "scripts/dev/render_status_from_manifest.py"
+  },
+  "capability_groups": [
+    {
+      "id": "capability_invocation_governance",
+      "name": "Capability invocation governance",
+      "capability_ids": [
+        "capability_invocation_governance"
+      ],
+      "summary": "Boundary gating and edge-case hardening remain the active objective.",
+      "reason": "Sprint plan keeps this capability on a promotion path with explicit evidence requirements."
+    },
+    {
+      "id": "repair_aware_projection_evolution",
+      "name": "Repair-aware projection evolution",
+      "capability_ids": [
+        "repair_aware_projection_evolution"
+      ],
+      "summary": "Objective remains queued behind governance boundary completion.",
+      "reason": "Sequenced in sprint planning docs as a subsequent objective."
+    }
+  ],
+  "milestone_groups": [
+    {
+      "id": "state-renorm-milestone",
+      "name": "State Renormalization milestone gate",
+      "status": "in_progress",
+      "active": true,
+      "summary": "Milestone governance remains active and enforced through docs/test parity controls.",
+      "reason": "Execution evidence in this report is static; latest CI run evidence is not resolved offline."
+    },
+    {
+      "id": "core-rollout-readiness",
+      "name": "src/core rollout readiness",
+      "status": "planned",
+      "active": false,
+      "summary": "Deferred until current state-renormalization scope shows sustained no-drift evidence.",
+      "reason": "Roadmap and architecture docs mark future, gated expansion."
+    }
+  ],
+  "sprint_groups": [
+    {
+      "id": "sprint-5",
+      "name": "Sprint 5",
+      "status": "done",
+      "active": false,
+      "summary": "Sprint 5 handoff is documented with exit checks and carry-over risks.",
+      "reason": "See docs/sprint_handoffs/sprint-5-handoff.md for closure evidence."
+    },
+    {
+      "id": "sprint-next",
+      "name": "Next sprint planning",
+      "status": "in_progress",
+      "active": true,
+      "summary": "Planning and preload sequencing are active for the next objective slice.",
+      "reason": "Current planning artifacts track pending objective transitions."
+    }
+  ],
+  "project_status": {
+    "id": "semanticng",
+    "name": "SemanticNG",
+    "summary": "Repository delivery remains active with ongoing governance and capability hardening work.",
+    "reason": "Canonical source maintained in-repo for deterministic offline status reporting.",
+    "analytics": [
+      {
+        "id": "5s_metrics",
+        "name": "5S mission metrics",
+        "entrypoint": "python scripts/ci/validate_5s_metrics.py",
+        "source": "docs/process/5s_metrics.json",
+        "status": "ready"
+      },
+      {
+        "id": "milestone_doc_parity",
+        "name": "Milestone documentation parity",
+        "entrypoint": "python .github/scripts/validate_milestone_docs.py",
+        "source": "docs/dod_manifest.json",
+        "status": "ready"
+      },
+      {
+        "id": "no_regression_budget",
+        "name": "No-regression budget guard",
+        "entrypoint": "python .github/scripts/validate_no_regression_budget.py",
+        "source": "docs/no_regression_budget.json",
+        "status": "unknown",
+        "reason": "Entrypoint expected by policy docs; confirm script availability before execution."
+      }
+    ]
   }
 }

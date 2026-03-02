@@ -147,6 +147,34 @@ def _build_stop_context_for_evidence_link_completeness() -> Any:
     )
 
 
+def _build_allow_context_for_authorization_scope() -> Any:
+    return default_check_context(
+        scope="scope:test",
+        prediction_key="scope:test",
+        current_predictions={"scope:test": "pred:test"},
+        prediction_log_available=True,
+        authorization_allowed=True,
+        authorization_context={
+            "action": "evaluate_invariant_gates",
+            "required_capability": "baseline.invariant_evaluation",
+        },
+    )
+
+
+def _build_stop_context_for_authorization_scope() -> Any:
+    return default_check_context(
+        scope="scope:test",
+        prediction_key="scope:test",
+        current_predictions={"scope:test": "pred:test"},
+        prediction_log_available=True,
+        authorization_allowed=False,
+        authorization_context={
+            "action": "evaluate_invariant_gates",
+            "required_capability": "baseline.invariant_evaluation",
+        },
+    )
+
+
 def _build_allow_context_for_prediction_outcome_binding() -> Any:
     return default_check_context(
         scope="scope:test",
@@ -216,6 +244,30 @@ def _build_stop_context_for_explainable_halt_payload() -> Any:
 
 
 INVARIANT_RELEASE_GATE_MATRIX: dict[InvariantId, InvariantCoverage] = {
+    InvariantId.AUTHORIZATION_SCOPE: InvariantCoverage(
+        supports_stop=True,
+        scenarios=(
+            InvariantScenario(
+                name="pass",
+                build_context=_build_allow_context_for_authorization_scope,
+                expected_passed=True,
+                expected_flow=Flow.CONTINUE,
+                expected_code="authorization_scope_allowed",
+                rationale="Observer has capability required for invariant gate evaluation.",
+            ),
+            InvariantScenario(
+                name="stop",
+                build_context=_build_stop_context_for_authorization_scope,
+                expected_passed=False,
+                expected_flow=Flow.STOP,
+                expected_code="authorization_scope_denied",
+                rationale="Observer without required capability must halt invariant gate evaluation.",
+            ),
+        ),
+        gate_non_applicable=NonApplicableGateCoverage(
+            rationale="Authorization scope is evaluated only when an Episode observer context is present.",
+        ),
+    ),
     InvariantId.PREDICTION_AVAILABILITY: InvariantCoverage(
         supports_stop=True,
         scenarios=(
@@ -643,8 +695,12 @@ def test_gate_decisions_and_artifacts_are_deterministic_by_invariant(
     _assert_result_contract(first)
     _assert_result_contract(second)
 
-    first_artifact = first_ep.artifacts[0]
-    second_artifact = second_ep.artifacts[0]
+    first_artifact = next(
+        artifact for artifact in first_ep.artifacts if artifact.get("artifact_kind") == "invariant_outcomes"
+    )
+    second_artifact = next(
+        artifact for artifact in second_ep.artifacts if artifact.get("artifact_kind") == "invariant_outcomes"
+    )
     assert first_artifact["artifact_kind"] == "invariant_outcomes"
     assert second_artifact["artifact_kind"] == "invariant_outcomes"
     assert first_artifact["invariant_checks"] == second_artifact["invariant_checks"]
@@ -652,11 +708,11 @@ def test_gate_decisions_and_artifacts_are_deterministic_by_invariant(
 
     flow_decisions = [check["passed"] for check in first_artifact["invariant_checks"]]
     if just_written_prediction is None:
-        assert flow_decisions == ([False, True] if expect_halt else [True])
+        assert flow_decisions == ([True, False, True] if expect_halt else [True, True])
     elif expect_halt:
-        assert flow_decisions == [True, False, True]
+        assert flow_decisions == [True, True, False, True]
     else:
-        assert flow_decisions == [True, True]
+        assert flow_decisions == [True, True, True]
 
     if expect_halt:
         assert isinstance(first, HaltRecord)
@@ -668,20 +724,24 @@ def test_gate_decisions_and_artifacts_are_deterministic_by_invariant(
         assert set(first_artifact["halt"]) == set(HaltRecord.required_payload_fields())
         if just_written_prediction is None:
             assert [check["passed"] for check in first_artifact["invariant_checks"]] == [
+                True,
                 False,
                 True,
             ]
             assert [check["invariant_id"] for check in first_artifact["invariant_checks"]] == [
+                InvariantId.AUTHORIZATION_SCOPE.value,
                 InvariantId.PREDICTION_AVAILABILITY.value,
                 InvariantId.EXPLAINABLE_HALT_PAYLOAD.value,
             ]
         else:
             assert [check["passed"] for check in first_artifact["invariant_checks"]] == [
                 True,
+                True,
                 False,
                 True,
             ]
             assert [check["invariant_id"] for check in first_artifact["invariant_checks"]] == [
+                InvariantId.AUTHORIZATION_SCOPE.value,
                 InvariantId.PREDICTION_AVAILABILITY.value,
                 InvariantId.EVIDENCE_LINK_COMPLETENESS.value,
                 InvariantId.EXPLAINABLE_HALT_PAYLOAD.value,
@@ -696,12 +756,18 @@ def test_gate_decisions_and_artifacts_are_deterministic_by_invariant(
         if just_written_prediction is None:
             assert [out.flow for out in first.artifact.combined] == [Flow.CONTINUE]
             assert [check["invariant_id"] for check in first_artifact["invariant_checks"]] == [
+                InvariantId.AUTHORIZATION_SCOPE.value,
                 InvariantId.PREDICTION_AVAILABILITY.value,
             ]
         else:
             assert [out.flow for out in first.artifact.combined] == [Flow.CONTINUE, Flow.CONTINUE]
-            assert [check["passed"] for check in first_artifact["invariant_checks"]] == [True, True]
+            assert [check["passed"] for check in first_artifact["invariant_checks"]] == [
+                True,
+                True,
+                True,
+            ]
             assert [check["invariant_id"] for check in first_artifact["invariant_checks"]] == [
+                InvariantId.AUTHORIZATION_SCOPE.value,
                 InvariantId.PREDICTION_AVAILABILITY.value,
                 InvariantId.EVIDENCE_LINK_COMPLETENESS.value,
             ]
@@ -959,8 +1025,8 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
     )
 
     assert isinstance(gate, HaltRecord)
-    assert len(ep.artifacts) == 2
-    artifact = ep.artifacts[0]
+    assert len(ep.artifacts) == 3
+    artifact = next(a for a in ep.artifacts if a.get("artifact_kind") == "invariant_outcomes")
     assert artifact["artifact_kind"] == "invariant_outcomes"
     assert artifact["kind"] == "halt"
     assert artifact["halt"]["halt_id"].startswith("halt:")
@@ -973,14 +1039,16 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
         "evidence_refs": [],
     }
     checks = artifact["invariant_checks"]
-    assert len(checks) == 3
+    assert len(checks) == 4
     assert [check["invariant_id"] for check in checks] == [
+        "authorization.scope.v1",
         "prediction_availability.v1",
         "evidence_link_completeness.v1",
         "explainable_halt_payload.v1",
     ]
-    assert [check["passed"] for check in checks] == [True, False, True]
+    assert [check["passed"] for check in checks] == [True, True, False, True]
     assert [check["gate_point"] for check in checks] == [
+        "pre-decision:authorization",
         "pre-decision:pre_consume",
         "pre-decision:post_write",
         "halt_validation",
@@ -988,9 +1056,9 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
     for check in checks:
         assert set(check.keys()) >= {"gate_point", "invariant_id", "passed", "evidence", "reason"}
 
-    assert checks[1]["evidence"] == [{"kind": "scope", "ref": pred.scope_key}]
+    assert checks[2]["evidence"] == [{"kind": "scope", "ref": pred.scope_key}]
 
-    halt_observation = ep.artifacts[1]
+    halt_observation = next(a for a in ep.artifacts if a.get("artifact_kind") == "halt_observation")
     assert halt_observation["artifact_kind"] == "halt_observation"
     assert halt_observation["observation_type"] == "halt"
     assert halt_observation["halt_id"].startswith("halt:")
@@ -1218,9 +1286,13 @@ def test_gate_flow_parity_continue_and_stop_payloads(tmp_path: Path) -> None:
         halt_log_path=tmp_path / "halts.jsonl",
     )
     assert isinstance(stop_gate, HaltRecord)
-    stop_checks = stop_ep.artifacts[0]["invariant_checks"]
-    assert [check["passed"] for check in stop_checks[:2]] == [True, False]
-    assert [check["invariant_id"] for check in stop_checks[:2]] == [
+    stop_artifact = next(
+        artifact for artifact in stop_ep.artifacts if artifact.get("artifact_kind") == "invariant_outcomes"
+    )
+    stop_checks = stop_artifact["invariant_checks"]
+    assert [check["passed"] for check in stop_checks[:3]] == [True, True, False]
+    assert [check["invariant_id"] for check in stop_checks[:3]] == [
+        InvariantId.AUTHORIZATION_SCOPE.value,
         InvariantId.PREDICTION_AVAILABILITY.value,
         InvariantId.EVIDENCE_LINK_COMPLETENESS.value,
     ]

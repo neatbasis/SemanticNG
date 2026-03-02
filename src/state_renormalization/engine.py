@@ -1164,40 +1164,53 @@ def evaluate_invariant_gates(
         action="evaluate_invariant_gates",
         required_capability="baseline.invariant_evaluation",
     )
-    if ep is not None and not is_authorized:
-        halt = _authorization_halt_record(
-            stage=gate_point,
-            reason="observer is not authorized to evaluate invariant gates",
-            context=auth_context,
-        )
-        halt_evidence_ref = append_halt_record(
-            halt, halt_log_path=halt_log_path, stable_ids=_episode_stable_ids(ep)
-        )
-        _append_authorization_issue(ep, halt=halt, context=auth_context)
-        _append_episode_artifact(
-            ep,
-            {
-                "artifact_kind": "halt_observation",
-                "observation_type": "halt",
-                **_halt_payload(halt),
-                "halt_evidence_ref": halt_evidence_ref,
-            },
-        )
-        return halt
 
     current_predictions = {
         key: pred.prediction_id for key, pred in projection_state.current_predictions.items()
     }
+    authorization_evaluation: GateInvariantEvaluation | None = None
+    if ep is not None:
+        auth_outcome = _run_invariant(
+            InvariantId.AUTHORIZATION_SCOPE,
+            ctx=default_check_context(
+                scope=scope,
+                prediction_key=prediction_key,
+                current_predictions=current_predictions,
+                prediction_log_available=prediction_log_available,
+                just_written_prediction=just_written_prediction,
+                authorization_allowed=is_authorized,
+                authorization_context=auth_context,
+            ),
+        )
+        authorization_evaluation = GateInvariantEvaluation(
+            phase="authorization",
+            outcome=auth_outcome,
+        )
+        if auth_outcome.flow == InvariantFlow.STOP:
+            evaluations = [authorization_evaluation]
+            result = _result_from_gate_evaluations(evaluations=evaluations, gate_point=gate_point)
+        else:
+            evaluations, result = _evaluate_invariant_gate_pipeline(
+                observer=observer,
+                scope=scope,
+                prediction_key=prediction_key,
+                current_predictions=current_predictions,
+                prediction_log_available=prediction_log_available,
+                just_written_prediction=just_written_prediction,
+                gate_point=gate_point,
+            )
+            evaluations = [authorization_evaluation, *evaluations]
+    else:
+        evaluations, result = _evaluate_invariant_gate_pipeline(
+            observer=observer,
+            scope=scope,
+            prediction_key=prediction_key,
+            current_predictions=current_predictions,
+            prediction_log_available=prediction_log_available,
+            just_written_prediction=just_written_prediction,
+            gate_point=gate_point,
+        )
 
-    evaluations, result = _evaluate_invariant_gate_pipeline(
-        observer=observer,
-        scope=scope,
-        prediction_key=prediction_key,
-        current_predictions=current_predictions,
-        prediction_log_available=prediction_log_available,
-        just_written_prediction=just_written_prediction,
-        gate_point=gate_point,
-    )
     gate_checks: list[GateInvariantCheck] = []
     invariant_audit: list[InvariantAuditResult] = []
 
@@ -1260,6 +1273,10 @@ def evaluate_invariant_gates(
             halt_log_path=halt_log_path,
             stable_ids=stable_ids,
         )
+        if authorization_evaluation is not None:
+            halt_outcome = authorization_evaluation.outcome
+            if halt_outcome.invariant_id == InvariantId.AUTHORIZATION_SCOPE:
+                _append_authorization_issue(ep, halt=result, context=auth_context)
 
     if ep is not None:
         _append_episode_artifact(

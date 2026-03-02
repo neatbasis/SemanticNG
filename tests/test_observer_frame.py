@@ -144,6 +144,32 @@ def test_observer_enforcement_hooks_limit_invariant_evaluation(make_episode, mak
     ]
 
 
+
+
+def test_authorization_invariant_is_enforced_even_when_gate_allowlist_excludes_other_checks(
+    make_episode, make_observer
+) -> None:
+    ep = make_episode(observer=make_observer(evaluation_invariants=["evidence_link_completeness.v1"]))
+
+    gate = evaluate_invariant_gates(
+        ep=ep,
+        scope="scope:test",
+        prediction_key="scope:test",
+        projection_state=ProjectionState(
+            current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"
+        ),
+        prediction_log_available=True,
+    )
+
+    assert isinstance(gate, GateSuccessOutcome)
+    invariant_artifact = next(
+        a for a in ep.artifacts if a.get("artifact_kind") == "invariant_outcomes"
+    )
+    assert [check["invariant_id"] for check in invariant_artifact["invariant_checks"]] == [
+        "authorization.scope.v1",
+    ]
+    assert invariant_artifact["invariant_checks"][0]["code"] == "authorization_scope_allowed"
+
 def test_build_episode_attaches_stable_ids_from_feature_doc(
     tmp_path: Path, make_policy_decision
 ) -> None:

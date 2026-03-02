@@ -5,6 +5,7 @@ from state_renormalization.invariants import (
     InvariantId,
     InvariantOutcome,
     Validity,
+    check_authorization_scope,
     check_evidence_link_completeness,
     check_explainable_halt_payload,
     check_prediction_availability,
@@ -13,6 +14,45 @@ from state_renormalization.invariants import (
     normalize_outcome,
 )
 
+
+
+
+def test_authorization_scope_invariant_pass_and_fail_have_deterministic_shape() -> None:
+    denied = check_authorization_scope(
+        default_check_context(
+            scope="scope:test",
+            prediction_key="scope:test",
+            current_predictions={"scope:test": "pred:1"},
+            prediction_log_available=True,
+            authorization_allowed=False,
+            authorization_context={
+                "action": "evaluate_invariant_gates",
+                "required_capability": "baseline.invariant_evaluation",
+            },
+        )
+    )
+    assert denied.invariant_id is InvariantId.AUTHORIZATION_SCOPE
+    assert denied.code == "authorization_scope_denied"
+    assert isinstance(denied.details, dict)
+    assert isinstance(denied.evidence, tuple)
+
+    allowed = check_authorization_scope(
+        default_check_context(
+            scope="scope:test",
+            prediction_key="scope:test",
+            current_predictions={"scope:test": "pred:1"},
+            prediction_log_available=True,
+            authorization_allowed=True,
+            authorization_context={
+                "action": "evaluate_invariant_gates",
+                "required_capability": "baseline.invariant_evaluation",
+            },
+        )
+    )
+    normalized = normalize_outcome(allowed)
+    assert normalized.invariant_id == "authorization.scope.v1"
+    assert normalized.code == "authorization_scope_allowed"
+    assert normalized.passed is True
 
 def test_prediction_availability_invariant_pass_and_fail() -> None:
     failing = check_prediction_availability(

@@ -23,11 +23,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
 
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
 
       - name: Validate baseline-update governance metadata
+        env:
+          HEAD_SHA: ${{ github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
         run: python .github/scripts/validate_no_regression_budget_update.py
 
       - name: Enforce no-regression budget policy

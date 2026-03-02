@@ -12,12 +12,34 @@ METADATA_PATH = Path("docs/no_regression_budget_update_request.json")
 METRICS = ("ruff_violations", "mypy_errors", "failing_tests")
 
 
+def _git_command_failure_message(command: list[str], error: subprocess.CalledProcessError) -> str:
+    command_rendered = " ".join(command)
+    stderr = (error.stderr or "").strip()
+    details = f" Command: `{command_rendered}` exited with status {error.returncode}."
+    if stderr:
+        details += f" stderr: {stderr}"
+    return (
+        "Unable to resolve Git revision context for no-regression budget validation."
+        f"{details}"
+        " This usually indicates a shallow checkout without the required parent commit history."
+        " Remediation: set checkout fetch-depth >= 2 (or 0 for full history)"
+        " and/or provide BASE_SHA explicitly."
+    )
+
+
+def _run_git(command: list[str]) -> str:
+    try:
+        return subprocess.check_output(command, text=True, stderr=subprocess.PIPE).strip()
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError(_git_command_failure_message(command, error)) from error
+
+
 def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _load_policy_at_rev(rev: str) -> dict:
-    raw = subprocess.check_output(["git", "show", f"{rev}:{POLICY_PATH.as_posix()}"], text=True)
+    raw = _run_git(["git", "show", f"{rev}:{POLICY_PATH.as_posix()}"])
     return json.loads(raw)
 
 
@@ -116,13 +138,25 @@ def _metadata_mismatches(metadata: dict, baseline_changes: dict, allowed_changes
 
 
 def main() -> int:
-    head_sha = os.environ.get("HEAD_SHA") or subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    base_sha = os.environ.get("BASE_SHA")
-    if not base_sha:
-        base_sha = subprocess.check_output(["git", "rev-parse", f"{head_sha}~1"], text=True).strip()
+    try:
+        head_sha = os.environ.get("HEAD_SHA") or _run_git(["git", "rev-parse", "HEAD"])
+        base_sha = os.environ.get("BASE_SHA")
+        if not base_sha:
+            base_sha = _run_git(["git", "rev-parse", f"{head_sha}~1"])
 
-    head_policy = _load_json(POLICY_PATH)
-    base_policy = _load_policy_at_rev(base_sha)
+        head_policy = _load_json(POLICY_PATH)
+        base_policy = _load_policy_at_rev(base_sha)
+    except RuntimeError as error:
+        print(error)
+        return 2
+
+    except FileNotFoundError as error:
+        print(
+            "Unable to execute git while validating no-regression budget updates."
+            " Ensure git is available in the runner environment and BASE_SHA is provided explicitly."
+            f" Details: {error}"
+        )
+        return 2
 
     baseline_changes = _changed_metrics(_extract_counts(base_policy, "baseline"), _extract_counts(head_policy, "baseline"))
     allowed_changes = _changed_metrics(_extract_counts(base_policy, "allowed_regression"), _extract_counts(head_policy, "allowed_regression"))

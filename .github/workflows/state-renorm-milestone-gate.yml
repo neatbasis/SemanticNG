@@ -18,6 +18,10 @@ on:
       - '.github/scripts/validate_doc_freshness_slo.py'
       - '.github/scripts/capability_parity_report.py'
       - '.github/scripts/render_transition_evidence.py'
+      - '.github/scripts/validate_governance_sync.py'
+      - '.github/scripts/validate_governance_docs_schema.py'
+      - '.github/scripts/run_promotion_checks.sh'
+      - 'Makefile'
       - '.github/workflows/state-renorm-milestone-gate.yml'
       - '.github/workflows/quality-guardrails.yml'
       - '.github/actions/python-test-setup/action.yml'
@@ -38,6 +42,10 @@ on:
       - '.github/scripts/validate_doc_freshness_slo.py'
       - '.github/scripts/capability_parity_report.py'
       - '.github/scripts/render_transition_evidence.py'
+      - '.github/scripts/validate_governance_sync.py'
+      - '.github/scripts/validate_governance_docs_schema.py'
+      - '.github/scripts/run_promotion_checks.sh'
+      - 'Makefile'
       - '.github/workflows/state-renorm-milestone-gate.yml'
       - '.github/workflows/quality-guardrails.yml'
       - '.github/actions/python-test-setup/action.yml'
@@ -57,6 +65,10 @@ on:
       - '.github/scripts/validate_doc_freshness_slo.py'
       - '.github/scripts/capability_parity_report.py'
       - '.github/scripts/render_transition_evidence.py'
+      - '.github/scripts/validate_governance_sync.py'
+      - '.github/scripts/validate_governance_docs_schema.py'
+      - '.github/scripts/run_promotion_checks.sh'
+      - 'Makefile'
       - '.github/workflows/state-renorm-milestone-gate.yml'
       - '.github/workflows/quality-guardrails.yml'
       - '.github/actions/python-test-setup/action.yml'
@@ -152,31 +164,12 @@ jobs:
           path: artifacts/transition_evidence.txt
           if-no-files-found: error
 
-      - name: Validate milestone manifest/doc parity
-        id: validate_milestone
+      - name: Run unified promotion checklist gate
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: |
-          set -euo pipefail
-          set +e
-          python .github/scripts/validate_milestone_docs.py 2>&1 | tee artifacts/validate_milestone_docs.log
-          validator_status=${PIPESTATUS[0]}
-          set -e
-
-          if [[ $validator_status -ne 0 ]]; then
-            echo
-            echo "Milestone validation failed. See artifacts/validate_milestone_docs.log for details."
-            exit "$validator_status"
-          fi
-
-      - name: Validate sprint handoff artifacts
-        run: |
-          python .github/scripts/validate_sprint_handoff.py
-
-      - name: Validate documentation freshness SLO
-        run: |
-          python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json
+          make promotion-check
 
       - name: Select and run milestone pytest commands for relevant changes
         run: |

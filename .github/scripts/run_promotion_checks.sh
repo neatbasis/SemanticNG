@@ -2,6 +2,10 @@
 set -euo pipefail
 
 python .github/scripts/validate_milestone_docs.py
+python .github/scripts/validate_governance_sync.py
+python .github/scripts/validate_governance_docs_schema.py
+python .github/scripts/validate_sprint_handoff.py
+python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json
 python .github/scripts/render_transition_evidence.py --check-pr-template-autogen
 
 # Optional generated-content policy: autogen must not introduce additional diffs.

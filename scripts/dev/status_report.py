@@ -170,18 +170,28 @@ def emit_check_issues(validation_issues: list[Issue]) -> None:
 
 
 def main() -> int:
+    mode_aliases = {
+        "summary": "summary",
+        "json": "json",
+        "check": "check",
+        "status": "summary",
+        "status-json": "json",
+        "status-check": "check",
+    }
+
     parser = argparse.ArgumentParser(description="Deterministic offline status reporting")
-    parser.add_argument("mode", choices=["summary", "json", "check"])
+    parser.add_argument("mode", choices=sorted(mode_aliases))
     args = parser.parse_args()
+    resolved_mode = mode_aliases[args.mode]
 
     status_show = os.environ.get("STATUS_SHOW", "active")
     payload, issues = build_status_payload(status_show=status_show)
 
-    if args.mode == "summary":
+    if resolved_mode == "summary":
         emit_human_summary(payload, issues)
         return 0
 
-    if args.mode == "json":
+    if resolved_mode == "json":
         emit_json_payload(payload)
         return 0
 

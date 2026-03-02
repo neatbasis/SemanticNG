@@ -75,10 +75,10 @@ test-cov:
 
 
 status:
-	python scripts/dev/status_report.py summary
+	python scripts/dev/status_report.py status
 
 status-json:
-	python scripts/dev/status_report.py json
+	python scripts/dev/status_report.py status-json
 
 status-check:
-	python scripts/dev/status_report.py check
+	python scripts/dev/status_report.py status-check

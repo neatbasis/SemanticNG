@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "id": "objective-a",
+      "name": "Objective A",
+      "status": "in_progress",
+      "active": true,
+      "summary": "Testing broken references",
+      "reason": "Fixture",
+      "as_of": "2026-01-01",
+      "capability_ids": ["nonexistent_capability"],
+      "depends_on": ["unknown-objective"],
+      "milestone_id": "missing-milestone",
+      "sprint_id": "missing-sprint",
+      "dod_refs": ["docs/dod_manifest.json#capabilities/nonexistent_capability"]
+    }
+  ]
+}

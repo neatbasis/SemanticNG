@@ -98,6 +98,106 @@ def _filter_items(items: list[dict[str, Any]], status_show: str) -> list[dict[st
     return [item for item in items if item.get("active")]
 
 
+def _load_manifest_capability_ids() -> set[str]:
+    manifest_path = Path("docs/dod_manifest.json")
+    if not manifest_path.exists():
+        return set()
+
+    try:
+        manifest = _load_json(manifest_path)
+    except json.JSONDecodeError:
+        return set()
+
+    capabilities = manifest.get("capabilities", []) if isinstance(manifest, dict) else []
+    return {
+        item.get("id")
+        for item in capabilities
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+
+
+def _validate_relationships(collections: dict[str, list[dict[str, Any]]]) -> list[Issue]:
+    issues: list[Issue] = []
+
+    objective_ids = {
+        item.get("id") for item in collections["objectives"] if isinstance(item.get("id"), str)
+    }
+    sprint_ids = {item.get("id") for item in collections["sprints"] if isinstance(item.get("id"), str)}
+    milestone_ids = {
+        item.get("id") for item in collections["milestones"] if isinstance(item.get("id"), str)
+    }
+    capability_ids = _load_manifest_capability_ids()
+
+    for group in ("milestones", "sprints", "objectives"):
+        for idx, item in enumerate(collections[group]):
+            context = f"docs/status/{group}.json::items[{idx}]"
+            if not isinstance(item, dict):
+                continue
+
+            depends_on = item.get("depends_on", [])
+            if isinstance(depends_on, list):
+                for ref in depends_on:
+                    if isinstance(ref, str) and ref not in objective_ids:
+                        issues.append(Issue(context, f"depends_on references unknown objective id '{ref}'"))
+
+            milestone_id = item.get("milestone_id")
+            if isinstance(milestone_id, str) and milestone_id not in milestone_ids:
+                issues.append(Issue(context, f"milestone_id references unknown milestone id '{milestone_id}'"))
+
+            sprint_id = item.get("sprint_id")
+            if isinstance(sprint_id, str) and sprint_id not in sprint_ids:
+                issues.append(Issue(context, f"sprint_id references unknown sprint id '{sprint_id}'"))
+
+            item_capability_ids = item.get("capability_ids", [])
+            if isinstance(item_capability_ids, list):
+                for capability_id in item_capability_ids:
+                    if isinstance(capability_id, str) and capability_id not in capability_ids:
+                        issues.append(
+                            Issue(
+                                context,
+                                f"capability_ids references unknown capability id '{capability_id}'",
+                            )
+                        )
+
+    objective_by_milestone: dict[str, list[dict[str, Any]]] = {}
+    objective_by_sprint: dict[str, list[dict[str, Any]]] = {}
+    for objective in collections["objectives"]:
+        milestone_id = objective.get("milestone_id")
+        if isinstance(milestone_id, str):
+            objective_by_milestone.setdefault(milestone_id, []).append(objective)
+        sprint_id = objective.get("sprint_id")
+        if isinstance(sprint_id, str):
+            objective_by_sprint.setdefault(sprint_id, []).append(objective)
+
+    for idx, milestone in enumerate(collections["milestones"]):
+        if milestone.get("status") != "done":
+            continue
+        linked = objective_by_milestone.get(milestone.get("id"), [])
+        not_done = [objective.get("id", "unknown") for objective in linked if objective.get("status") != "done"]
+        if not_done:
+            issues.append(
+                Issue(
+                    f"docs/status/milestones.json::items[{idx}]",
+                    "milestone status is 'done' but linked objectives are not done: " + ", ".join(not_done),
+                )
+            )
+
+    for idx, sprint in enumerate(collections["sprints"]):
+        if sprint.get("status") != "done":
+            continue
+        linked = objective_by_sprint.get(sprint.get("id"), [])
+        not_done = [objective.get("id", "unknown") for objective in linked if objective.get("status") != "done"]
+        if not_done:
+            issues.append(
+                Issue(
+                    f"docs/status/sprints.json::items[{idx}]",
+                    "sprint status is 'done' but linked objectives are not done: " + ", ".join(not_done),
+                )
+            )
+
+    return issues
+
+
 def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]:
     issues: list[Issue] = []
     required_files = {
@@ -105,6 +205,11 @@ def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]
     }
 
     payload = _base_payload(status_show=status_show, required_files=required_files)
+    collections: dict[str, list[dict[str, Any]]] = {
+        "milestones": [],
+        "sprints": [],
+        "objectives": [],
+    }
 
     for label, path in required_files.items():
         data, load_issues = _load_status_file(path)
@@ -126,7 +231,10 @@ def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]
             continue
 
         if isinstance(validated, list):
+            collections[label] = validated
             payload[label] = _filter_items(validated, status_show=status_show)
+
+    issues.extend(_validate_relationships(collections))
 
     return payload, issues
 
@@ -187,6 +295,8 @@ def main() -> int:
         "status": "summary",
         "status-json": "json",
         "status-check": "check",
+        "integrity": "integrity",
+        "status-integrity": "integrity",
     }
 
     parser = argparse.ArgumentParser(description="Deterministic offline status reporting")
@@ -204,6 +314,15 @@ def main() -> int:
     if resolved_mode == "json":
         emit_json_payload(payload)
         return 0
+
+    if resolved_mode == "integrity":
+        integrity_issues = [
+            issue
+            for issue in issues
+            if "references unknown" in issue.message or "linked objectives are not done" in issue.message
+        ]
+        emit_check_issues(integrity_issues)
+        return 1 if integrity_issues else 0
 
     emit_check_issues(issues)
     return 1 if issues else 0

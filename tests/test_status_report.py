@@ -113,6 +113,26 @@ def test_check_mode_exit_codes_follow_issue_presence(tmp_path: Path) -> None:
     assert json.loads(invalid_result.stdout)["issues"]
 
 
+def test_check_mode_fails_on_broken_references(tmp_path: Path) -> None:
+    run_dir = _stage_scenario(tmp_path, "broken_links")
+
+    result = _run_status("check", run_dir)
+
+    assert result.returncode == 1
+    payload = json.loads(result.stdout)
+    assert any("references unknown" in item["message"] for item in payload["issues"])
+
+
+def test_integrity_mode_fails_on_rollup_conflicts(tmp_path: Path) -> None:
+    run_dir = _stage_scenario(tmp_path, "rollup_conflict")
+
+    result = _run_status("integrity", run_dir)
+
+    assert result.returncode == 1
+    payload = json.loads(result.stdout)
+    assert any("linked objectives are not done" in item["message"] for item in payload["issues"])
+
+
 def test_status_report_json_surfaces_generated_from_provenance() -> None:
     result = _run_status("json", ROOT)
 

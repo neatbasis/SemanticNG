@@ -6,6 +6,7 @@ from typing import Any
 
 ALLOWED_STATUS = {"done", "in_progress", "planned", "blocked", "unknown"}
 REQUIRED_ITEM_KEYS = ("id", "name", "status", "active", "summary", "reason", "as_of")
+OPTIONAL_LINKAGE_KEYS = ("capability_ids", "depends_on", "milestone_id", "sprint_id", "dod_refs")
 
 PROJECT_SCHEMA_CONTRACT: dict[str, Any] = {
     "type": "object",
@@ -39,6 +40,11 @@ ITEM_COLLECTION_SCHEMA_CONTRACT: dict[str, Any] = {
                     "summary": {"type": "string"},
                     "reason": {"type": "string"},
                     "as_of": {"type": "string"},
+                    "capability_ids": {"type": "array", "items": {"type": "string"}},
+                    "depends_on": {"type": "array", "items": {"type": "string"}},
+                    "milestone_id": {"type": ["string", "null"]},
+                    "sprint_id": {"type": ["string", "null"]},
+                    "dod_refs": {"type": "array", "items": {"type": "string"}},
                 },
             },
         }
@@ -71,6 +77,17 @@ def validate_status_item(item: dict[str, Any], context: str) -> list[ValidationI
 
     if "active" in item and not isinstance(item["active"], bool):
         issues.append(ValidationIssue(context, "'active' must be boolean"))
+
+    for list_key in ("capability_ids", "depends_on", "dod_refs"):
+        if list_key in item and not (
+            isinstance(item[list_key], list)
+            and all(isinstance(value, str) for value in item[list_key])
+        ):
+            issues.append(ValidationIssue(context, f"'{list_key}' must be an array of strings"))
+
+    for id_key in ("milestone_id", "sprint_id"):
+        if id_key in item and item[id_key] is not None and not isinstance(item[id_key], str):
+            issues.append(ValidationIssue(context, f"'{id_key}' must be string or null"))
 
     return issues
 

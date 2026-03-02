@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "id": "sprint-a",
+      "name": "Sprint A",
+      "status": "done",
+      "active": true,
+      "summary": "Done sprint",
+      "reason": "Fixture",
+      "as_of": "2026-01-01",
+      "capability_ids": [],
+      "depends_on": [],
+      "milestone_id": "milestone-a",
+      "sprint_id": null,
+      "dod_refs": []
+    }
+  ]
+}

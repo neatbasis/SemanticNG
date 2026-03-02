@@ -7,7 +7,14 @@
       "active": true,
       "summary": "Milestone governance remains active and enforced through docs/test parity controls.",
       "reason": "Execution evidence in this report is static; latest CI run evidence is not resolved offline.",
-      "as_of": "2026-03-02"
+      "as_of": "2026-03-02",
+      "capability_ids": [],
+      "depends_on": [],
+      "milestone_id": null,
+      "sprint_id": "sprint-next",
+      "dod_refs": [
+        "docs/status/objectives.json#capability_invocation_governance"
+      ]
     },
     {
       "id": "core-rollout-readiness",
@@ -16,7 +23,16 @@
       "active": false,
       "summary": "Deferred until current state-renormalization scope shows sustained no-drift evidence.",
       "reason": "Roadmap and architecture docs mark future, gated expansion.",
-      "as_of": "2026-03-02"
+      "as_of": "2026-03-02",
+      "capability_ids": [],
+      "depends_on": [
+        "capability_invocation_governance"
+      ],
+      "milestone_id": null,
+      "sprint_id": "sprint-next",
+      "dod_refs": [
+        "docs/status/objectives.json#repair_aware_projection_evolution"
+      ]
     }
   ]
 }

@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "id": "m1",
+      "name": "Active Milestone",
+      "status": "in_progress",
+      "active": true,
+      "summary": "In flight",
+      "reason": "Current focus",
+      "as_of": "2026-01-01"
+    },
+    {
+      "id": "m2",
+      "name": "Inactive Milestone",
+      "status": "planned",
+      "active": false,
+      "summary": "Backlog",
+      "reason": "Deferred",
+      "as_of": "2026-01-01"
+    }
+  ]
+}

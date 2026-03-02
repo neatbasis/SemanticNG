@@ -1,0 +1,13 @@
+{
+  "items": [
+    {
+      "id": "m1",
+      "name": "Unknown-safe milestone",
+      "status": "unknown",
+      "active": true,
+      "summary": "Pending dependencies",
+      "reason": "Blocked on external signal",
+      "as_of": "2026-01-01"
+    }
+  ]
+}

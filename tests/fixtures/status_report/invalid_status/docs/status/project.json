@@ -1,0 +1,10 @@
+{
+  "id": "proj",
+  "name": "SemanticNG",
+  "status": "shipping",
+  "active": true,
+  "summary": "Status typo",
+  "reason": "Intentional invalid",
+  "as_of": "2026-01-01",
+  "analytics": []
+}

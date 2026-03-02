@@ -1066,6 +1066,78 @@ def test_halt_artifact_includes_halt_evidence_ref_and_invariant_context(tmp_path
     assert halt_observation["invariant_id"] == "evidence_link_completeness.v1"
 
 
+
+def test_invariant_halt_evidence_ref_matches_persisted_halt_row(tmp_path: Path) -> None:
+    pred = _fixed_prediction_record()
+    projected = project_current(
+        pred,
+        ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+    )
+    ep = _make_episode_with_artifacts()
+
+    gate = evaluate_invariant_gates(
+        ep=ep,
+        scope=pred.scope_key,
+        prediction_key=pred.scope_key,
+        projection_state=projected,
+        prediction_log_available=True,
+        just_written_prediction={"key": pred.scope_key, "evidence_refs": []},
+        halt_log_path=tmp_path / "halts.jsonl",
+    )
+
+    assert isinstance(gate, HaltRecord)
+    halt_rows = list(read_jsonl(tmp_path / "halts.jsonl"))
+    assert len(halt_rows) == 1
+    meta, persisted = halt_rows[0]
+    expected_ref = {"kind": "jsonl", "ref": f"halts.jsonl@{meta['lineno']}"}
+
+    invariant_outcomes = next(a for a in ep.artifacts if a.get("artifact_kind") == "invariant_outcomes")
+    halt_observation = next(a for a in ep.artifacts if a.get("artifact_kind") == "halt_observation")
+
+    assert persisted["halt_id"] == gate.halt_id
+    assert invariant_outcomes["halt_evidence_ref"] == expected_ref
+    assert halt_observation["halt_evidence_ref"] == expected_ref
+
+
+
+def test_authorization_halt_evidence_ref_matches_persisted_halt_row(
+    tmp_path: Path,
+    make_observer,
+) -> None:
+    pred = _fixed_prediction_record()
+    projected = project_current(
+        pred,
+        ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+    )
+    ep = _make_episode_with_artifacts()
+    ep.observer = make_observer(capabilities=["baseline.dialog"])
+
+    gate = evaluate_invariant_gates(
+        ep=ep,
+        scope=pred.scope_key,
+        prediction_key=pred.scope_key,
+        projection_state=projected,
+        prediction_log_available=True,
+        halt_log_path=tmp_path / "halts.jsonl",
+    )
+
+    assert isinstance(gate, HaltRecord)
+    assert gate.invariant_id == "authorization.scope.v1"
+
+    halt_rows = list(read_jsonl(tmp_path / "halts.jsonl"))
+    assert len(halt_rows) == 1
+    meta, persisted = halt_rows[0]
+    expected_ref = {"kind": "jsonl", "ref": f"halts.jsonl@{meta['lineno']}"}
+
+    invariant_outcomes = next(a for a in ep.artifacts if a.get("artifact_kind") == "invariant_outcomes")
+    halt_observation = next(a for a in ep.artifacts if a.get("artifact_kind") == "halt_observation")
+
+    assert persisted["invariant_id"] == "authorization.scope.v1"
+    assert persisted["halt_id"] == gate.halt_id
+    assert invariant_outcomes["halt_evidence_ref"] == expected_ref
+    assert halt_observation["halt_evidence_ref"] == expected_ref
+
+
 def test_append_prediction_and_projection_support_post_write_gate(tmp_path: Path) -> None:
     pred = _fixed_prediction_record()
     evidence = append_prediction_record(pred, prediction_log_path=tmp_path / "predictions.jsonl")
@@ -1160,6 +1232,40 @@ def test_gate_invariants_remain_stable_when_capability_policy_denies_side_effect
     halt_rows = [row for _, row in read_jsonl(tmp_path / "halts.jsonl")]
     assert halt_rows[0]["details"]["policy_code"] == "explicit_gate_pass_required"
     assert not (tmp_path / "predictions.jsonl").exists()
+
+
+
+def test_policy_denial_halt_evidence_ref_matches_persisted_halt_row(tmp_path: Path) -> None:
+    pred = _fixed_prediction_record()
+    projected = project_current(
+        pred,
+        ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00"),
+    )
+    ep = _make_episode_with_artifacts()
+
+    denied = append_prediction_record(
+        pred,
+        prediction_log_path=tmp_path / "predictions.jsonl",
+        halt_log_path=tmp_path / "halts.jsonl",
+        projection_state=projected,
+        explicit_gate_pass_present=False,
+        episode=ep,
+    )
+
+    assert isinstance(denied, HaltRecord)
+    assert denied.invariant_id == "capability.invocation.policy.v1"
+
+    halt_rows = list(read_jsonl(tmp_path / "halts.jsonl"))
+    assert len(halt_rows) == 1
+    meta, persisted = halt_rows[0]
+    expected_ref = {"kind": "jsonl", "ref": f"halts.jsonl@{meta['lineno']}"}
+
+    denial_artifact = next(a for a in ep.artifacts if a.get("artifact_kind") == "capability_policy_denial")
+    halt_observation = next(a for a in ep.artifacts if a.get("artifact_kind") == "halt_observation")
+
+    assert persisted["halt_id"] == denied.halt_id
+    assert denial_artifact["halt_evidence_ref"] == expected_ref
+    assert halt_observation["halt_evidence_ref"] == expected_ref
 
 
 def test_evaluate_invariant_gates_persists_halt_with_episode_stable_ids(tmp_path: Path) -> None:

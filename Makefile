@@ -1,4 +1,4 @@
-.PHONY: bootstrap qa-hook-parity qa-hook-parity-diagnostics qa-local-fast qa-full-type-surface qa-test-cov qa-ci-equivalent qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
+.PHONY: bootstrap qa-baseline qa-hook-parity qa-hook-parity-diagnostics qa-local-fast qa-full-type qa-full-type-surface qa-test-cov qa-ci-equivalent qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
 
 bootstrap:
 	@python --version
@@ -6,6 +6,9 @@ bootstrap:
 	@python -c "import importlib.util, pathlib, semanticng; assert importlib.util.find_spec('semanticng') is not None; package_path = pathlib.Path(semanticng.__file__).resolve(); print(f'semanticng import path: {package_path}')"
 	@python -c "import pydantic; print(f'pydantic {pydantic.__version__}')"
 	@python .github/scripts/print_env_provenance.py
+
+qa-baseline:
+	$(MAKE) qa-hook-parity
 
 qa-hook-parity:
 	python .github/scripts/check_python_support_policy.py
@@ -19,6 +22,9 @@ qa-local-fast: qa-hook-parity
 
 qa-test-cov:
 	pytest --cov --cov-report=term-missing --cov-report=xml
+
+qa-full-type:
+	$(MAKE) qa-full-type-surface
 
 qa-full-type-surface:
 	mypy --config-file=pyproject.toml src tests

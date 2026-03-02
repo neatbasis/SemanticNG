@@ -74,6 +74,23 @@ Quality gate policy is only authoritative when repository settings enforce it.
 
 If repository settings do not enforce these controls, treat this section as a governance defect and open an issue using `.github/ISSUE_TEMPLATE/01-enforce-no-merge-on-red.md`.
 
+### Branch protection verification checklist (required)
+
+- [ ] Required status checks include `Quality Guardrails`.
+- [ ] Required status checks include `State Renormalization Milestone Gate`.
+- [ ] Required checks are configured as blocking (no merge when failing or pending).
+- [ ] Merge queue is enabled for `main`.
+- [ ] Merge queue requires rerun of required checks on `merge_group` commits.
+- [ ] If any red merge happens, file an incident using `.github/ISSUE_TEMPLATE/01-enforce-no-merge-on-red.md` (mandatory).
+
+### Quarterly governance review task
+
+Once per quarter, open a governance issue/PR to raise strictness in the no-regression budget:
+
+- Expand mypy scope toward stricter coverage.
+- Reduce waivers and shorten rollback windows.
+- Increase fast-test surface in required guardrail checks.
+
 See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) for local commands to reach CI parity before opening or updating a PR.
 
 ## Requirements

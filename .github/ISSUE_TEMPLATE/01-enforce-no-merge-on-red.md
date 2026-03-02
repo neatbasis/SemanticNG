@@ -1,10 +1,12 @@
 ---
 name: Enforce no-merge-on-red quality gates
-description: Track branch protection and required-check enforcement so merges cannot bypass failing CI.
+description: Mandatory incident template for red merges; track branch protection and required-check enforcement so merges cannot bypass failing CI.
 title: "governance: enforce no-merge-on-red required checks on main"
 labels: ["governance", "quality-gates", "ci"]
 assignees: []
 ---
+
+> **Policy:** This is the mandatory incident template whenever a PR is merged while required checks are red/pending.
 
 ## Problem statement
 

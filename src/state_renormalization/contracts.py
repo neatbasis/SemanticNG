@@ -996,12 +996,18 @@ class RepairProposalEvent(BaseModel):
 
     event_kind: Literal["repair_proposal"] = "repair_proposal"
     repair_id: str
-    proposed_at_iso: str
+    proposed_at_iso: str = Field(
+        validation_alias=AliasChoices("proposed_at_iso", "proposed_at")
+    )
     reason: str
     invariant_id: str
     lineage_ref: RepairLineageRef
-    proposed_prediction: PredictionRecord
-    prediction_outcome: PredictionOutcome
+    proposed_prediction: PredictionRecord = Field(
+        validation_alias=AliasChoices("proposed_prediction", "candidate_prediction")
+    )
+    prediction_outcome: PredictionOutcome = Field(
+        validation_alias=AliasChoices("prediction_outcome", "outcome")
+    )
 
 
 class RepairResolutionEvent(BaseModel):
@@ -1011,12 +1017,23 @@ class RepairResolutionEvent(BaseModel):
 
     event_kind: Literal["repair_resolution"] = "repair_resolution"
     repair_id: str
-    proposal_event_kind: Literal["repair_proposal"] = "repair_proposal"
+    proposal_event_kind: Literal["repair_proposal"] = Field(
+        default="repair_proposal",
+        validation_alias=AliasChoices("proposal_event_kind", "proposal_kind"),
+    )
     decision: RepairResolution
-    resolved_at_iso: str
+    resolved_at_iso: str = Field(
+        validation_alias=AliasChoices("resolved_at_iso", "resolved_at")
+    )
     lineage_ref: RepairLineageRef
-    accepted_prediction: PredictionRecord | None = None
-    rejection_reason: str | None = None
+    accepted_prediction: PredictionRecord | None = Field(
+        default=None,
+        validation_alias=AliasChoices("accepted_prediction", "accepted_payload"),
+    )
+    rejection_reason: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("rejection_reason", "reason"),
+    )
 
     @model_validator(mode="after")
     def _validate_decision_payload(self) -> Self:

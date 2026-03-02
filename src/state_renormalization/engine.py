@@ -7,7 +7,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -140,6 +140,7 @@ GateSuccessOutcome = Success
 JsonPrimitive: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonPrimitive | dict[str, "JsonValue"] | list["JsonValue"]
 CanonicalPredictionPayload: TypeAlias = Mapping[str, object]
+RepairAcceptancePolicy: TypeAlias = Callable[[RepairProposalEvent], RepairResolution]
 
 
 class WrittenPredictionPayload(BaseModel):
@@ -1597,8 +1598,10 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
             records_processed += 1
             continue
 
-        if kind == "repair_resolution":
-            resolution = RepairResolutionEvent.model_validate(raw)
+        if kind in {"repair_resolution", "repair_decision"}:
+            normalized = dict(raw)
+            normalized["event_kind"] = "repair_resolution"
+            resolution = RepairResolutionEvent.model_validate(normalized)
             accepted = resolution.accepted_prediction
             if resolution.decision == RepairResolution.ACCEPTED and accepted is not None:
                 accepted_fingerprint = (
@@ -1672,6 +1675,7 @@ def derive_projection_analytics_from_lineage(
         "prediction",
         "repair_proposal",
         "repair_resolution",
+        "repair_decision",
         "ask_outbox_request",
         "ask_outbox_response",
     }
@@ -1690,8 +1694,10 @@ def derive_projection_analytics_from_lineage(
                 payload = {k: v for k, v in raw.items() if k in fields}
                 pred = PredictionRecord.model_validate(payload)
 
-            elif kind == "repair_resolution":
-                resolution = RepairResolutionEvent.model_validate(raw)
+            elif kind in {"repair_resolution", "repair_decision"}:
+                normalized = dict(raw)
+                normalized["event_kind"] = "repair_resolution"
+                resolution = RepairResolutionEvent.model_validate(normalized)
                 if (
                     resolution.decision == RepairResolution.ACCEPTED
                     and resolution.accepted_prediction is not None
@@ -1784,6 +1790,7 @@ def _reconcile_predictions(
     *,
     prediction_log_path: str | Path,
     invariant_handling_mode: InvariantHandlingMode = InvariantHandlingMode.STRICT_HALT,
+    repair_acceptance_policy: RepairAcceptancePolicy | None = None,
 ) -> ProjectionState:
     observed_text = extract_user_utterance(ep)
     observed_value = 1.0 if observed_text else 0.0
@@ -1824,21 +1831,32 @@ def _reconcile_predictions(
                 prediction_log_path=prediction_log_path,
                 stable_ids=stable_ids,
             )
+            decision = (
+                repair_acceptance_policy(proposal)
+                if repair_acceptance_policy is not None
+                else RepairResolution.ACCEPTED
+            )
             resolution = RepairResolutionEvent(
                 repair_id=repair_id,
-                decision=RepairResolution.ACCEPTED,
+                decision=decision,
                 resolved_at_iso=compared_at,
                 lineage_ref=lineage_ref,
-                accepted_prediction=updated_pred,
+                accepted_prediction=updated_pred if decision == RepairResolution.ACCEPTED else None,
+                rejection_reason=(
+                    None
+                    if decision == RepairResolution.ACCEPTED
+                    else "repair acceptance policy rejected proposal"
+                ),
             )
             resolution_ref = _append_repair_event(
                 resolution,
                 prediction_log_path=prediction_log_path,
                 stable_ids=stable_ids,
             )
-            updated_projection = _apply_accepted_repair_event(
-                updated_projection, resolution_event=resolution
-            )
+            if resolution.decision == RepairResolution.ACCEPTED:
+                updated_projection = _apply_accepted_repair_event(
+                    updated_projection, resolution_event=resolution
+                )
             _append_episode_artifact(
                 ep,
                 {
@@ -1966,6 +1984,7 @@ def run_mission_loop(
     ask_outbox_adapter: AskOutboxAdapter | None = None,
     observation_freshness_policy_adapter: ObservationFreshnessPolicyAdapter | None = None,
     invariant_handling_mode: InvariantHandlingMode = InvariantHandlingMode.STRICT_HALT,
+    repair_acceptance_policy: RepairAcceptancePolicy | None = None,
     halt_log_path: str | Path = "halts.jsonl",
 ) -> tuple[Episode, BeliefState, ProjectionState]:
     """
@@ -2090,6 +2109,7 @@ def run_mission_loop(
         updated_projection,
         prediction_log_path=prediction_log_path,
         invariant_handling_mode=invariant_handling_mode,
+        repair_acceptance_policy=repair_acceptance_policy,
     )
 
     post_observation_gate = evaluate_invariant_gates(

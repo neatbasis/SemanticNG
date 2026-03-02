@@ -107,3 +107,97 @@ def test_policy_includes_quality_metric_budget_surface() -> None:
     assert '"ruff_violations"' in policy_text
     assert '"mypy_errors"' in policy_text
     assert '"failing_tests"' in policy_text
+
+
+def test_script_surface_results_respects_phase_blocking(tmp_path) -> None:
+    baseline_path = tmp_path / "script-baseline.json"
+    summary_path = tmp_path / "summary.json"
+
+    baseline_path.write_text(
+        json.dumps(
+            {
+                "blocking_surfaces_by_phase": {
+                    "measure-only": [],
+                    "block-ci-scripts": ["ci_scripts"],
+                    "block-ci-and-github-scripts": ["ci_scripts", "github_scripts"],
+                },
+                "surfaces": {
+                    "ci_scripts": {
+                        "baseline_diagnostic_count": 0,
+                        "allowed_regression": 0,
+                    },
+                    "github_scripts": {
+                        "baseline_diagnostic_count": 1,
+                        "allowed_regression": 0,
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    summary_path.write_text(
+        json.dumps(
+            {
+                "surfaces": [
+                    {"surface": "ci_scripts", "diagnostic_count": 1},
+                    {"surface": "github_scripts", "diagnostic_count": 2},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    failures, warnings, _ = check_no_regression_budget._script_surface_results(
+        baseline_file=baseline_path,
+        summary_file=summary_path,
+        enforcement_phase="block-ci-scripts",
+    )
+
+    assert any("ci_scripts" in failure for failure in failures)
+    assert any("github_scripts" in warning for warning in warnings)
+
+
+def test_main_script_surface_measure_only_returns_success(tmp_path, monkeypatch) -> None:
+    baseline_path = tmp_path / "script-baseline.json"
+    summary_path = tmp_path / "summary.json"
+
+    baseline_path.write_text(
+        json.dumps(
+            {
+                "blocking_surfaces_by_phase": {
+                    "measure-only": [],
+                    "block-ci-scripts": ["ci_scripts"],
+                    "block-ci-and-github-scripts": ["ci_scripts", "github_scripts"],
+                },
+                "surfaces": {
+                    "ci_scripts": {
+                        "baseline_diagnostic_count": 0,
+                        "allowed_regression": 0,
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    summary_path.write_text(
+        json.dumps({"surfaces": [{"surface": "ci_scripts", "diagnostic_count": 2}]}),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        check_no_regression_budget.sys,
+        "argv",
+        [
+            "check_no_regression_budget.py",
+            "--skip-quality-metrics",
+            "--check-script-surfaces",
+            "--script-enforcement-phase",
+            "measure-only",
+            "--script-baseline-file",
+            str(baseline_path),
+            "--script-summary-file",
+            str(summary_path),
+        ],
+    )
+
+    assert check_no_regression_budget.main() == 0

@@ -53,12 +53,18 @@ def _parse_inline_list(value: str) -> list[str]:
     return [part.strip().strip("\"'") for part in body.split(",") if part.strip()]
 
 
-def test_stage_definitions_include_expected_timeout_budgets() -> None:
-    assert MODULE.STAGES["qa-commit"][0].timeout_seconds == 20
-    assert MODULE.STAGES["qa-commit"][1].timeout_seconds == 40
+def test_stage_definitions_are_loaded_from_manifest() -> None:
+    manifest = json.loads(Path("docs/process/quality_stage_commands.json").read_text(encoding="utf-8"))
+    stages = MODULE._load_stages()
 
-    assert MODULE.STAGES["qa-push"][-1].timeout_seconds == 80
-    assert MODULE.STAGES["qa-ci"][-1].timeout_seconds == 240
+    assert set(stages) == set(manifest["stages"])
+    for stage_name, stage_spec in manifest["stages"].items():
+        expected = [
+            (command_spec["command"], int(command_spec["timeout_seconds"]))
+            for command_spec in stage_spec["commands"]
+        ]
+        actual = [(spec.command, spec.timeout_seconds) for spec in stages[stage_name].commands]
+        assert actual == expected
 
 
 def test_failure_file_extraction_is_deterministic() -> None:
@@ -79,3 +85,21 @@ def test_stage_hooks_match_canonical_manifest() -> None:
         block = _extract_hook_block(config_lines, hook_spec["id"])
         assert _extract_field(block, "entry") == hook_spec["entry"]
         assert _parse_inline_list(_extract_field(block, "stages")) == hook_spec["stages"]
+
+
+def test_precommit_has_no_unmanaged_qa_stage_hooks() -> None:
+    manifest = json.loads(Path("docs/process/quality_stage_commands.json").read_text(encoding="utf-8"))
+    config_lines = Path(".pre-commit-config.yaml").read_text(encoding="utf-8").splitlines()
+
+    expected_hook_ids = {
+        stage_spec["precommit_hook"]["id"]
+        for stage_spec in manifest["stages"].values()
+        if isinstance(stage_spec.get("precommit_hook"), dict)
+    }
+    configured_hook_ids = {
+        match.group(1)
+        for line in config_lines
+        if (match := re.match(r"^\s*-\s+id:\s+(qa-[a-z0-9-]+-stage)\s*$", line))
+    }
+
+    assert configured_hook_ids == expected_hook_ids

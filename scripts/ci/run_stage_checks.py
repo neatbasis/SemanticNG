@@ -21,22 +21,26 @@ class CommandSpec:
     timeout_seconds: int
 
 
+@dataclass(frozen=True)
+class StageSpec:
+    commands: tuple[CommandSpec, ...]
+
+
 MANIFEST_PATH = Path(__file__).resolve().parents[2] / "docs/process/quality_stage_commands.json"
 
 
-def _load_stages() -> dict[str, list[CommandSpec]]:
+def _load_stages() -> dict[str, StageSpec]:
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     stages = manifest["stages"]
     return {
-        stage_name: [
-            CommandSpec(command=spec["command"], timeout_seconds=int(spec["timeout_seconds"]))
-            for spec in stage_spec["commands"]
-        ]
+        stage_name: StageSpec(
+            commands=tuple(
+                CommandSpec(command=spec["command"], timeout_seconds=int(spec["timeout_seconds"]))
+                for spec in stage_spec["commands"]
+            )
+        )
         for stage_name, stage_spec in stages.items()
     }
-
-
-STAGES = _load_stages()
 
 
 def _first_failing_files(output: str) -> list[str]:
@@ -92,12 +96,13 @@ def _run_command(spec: CommandSpec) -> int:
 
 
 def main() -> int:
+    stages = _load_stages()
     parser = argparse.ArgumentParser()
-    parser.add_argument("stage", choices=tuple(STAGES.keys()))
+    parser.add_argument("stage", choices=tuple(stages.keys()))
     args = parser.parse_args()
 
     print(f"QA stage: {args.stage}")
-    for spec in STAGES[args.stage]:
+    for spec in stages[args.stage].commands:
         code = _run_command(spec)
         if code != 0:
             return code

@@ -6,6 +6,16 @@ Canonical completion gates and enablement dependencies are defined in `docs/defi
 
 Cross-sprint execution sequencing, capability dependency leverage, and maturity-path exit criteria are tracked in `docs/sprint_plan_5x.md`.
 
+Governance artifacts are updated only after passing evidence exists (CI artifact/report links first, then roadmap/manifest/contract-map synchronization).
+
+## Five-sprint objective alignment (execution brief)
+
+1. **Sprint 1:** one high-impact `capability_invocation_governance` boundary slice with halt semantics + evidence reference.
+2. **Sprint 2:** same governance path hardened for allow/deny/failure edge cases + normalized audit payload.
+3. **Sprint 3:** minimal usable `repair_aware_projection_evolution` live flow with lineage/replay scenario.
+4. **Sprint 4:** finalize deferred contract fields (`schema_id`, `source`) + deterministic/back-compat coverage.
+5. **Sprint 5:** promote based on evidence, then refresh manifest/contract-map/roadmap in lockstep.
+
 ## Now (already implemented + verified tests)
 
 ### 1) Prediction-first contracts and deterministic persistence baseline
@@ -88,6 +98,8 @@ Cross-sprint execution sequencing, capability dependency leverage, and maturity-
 ### 1) Capability-invocation governance (policy-aware external actions; manifest: `capability_invocation_governance`, currently `in_progress`)
 - **Owner area/module:** Engine + Contracts + Capability adapters (`src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, adapter modules under `src/state_renormalization/adapters/`)
 - **Success criteria (test outcomes):**
+  - Sprint 1 boundary-slice tests pass with explicit halt semantics and linked evidence reference before doc promotion updates.
+  - Sprint 2 edge-case tests pass for allow/deny/failure outcomes with normalized audit payload assertions.
   - New capability-gating tests pass, showing no externally consequential action executes without a current valid prediction and explicit gate pass.
   - Failure-path tests pass, proving policy violations produce persisted explainable halts and zero side-effect invocation.
 - **Related files/tests:**
@@ -97,6 +109,8 @@ Cross-sprint execution sequencing, capability dependency leverage, and maturity-
 ### 2) Evolution path toward repair-aware projection (without silent mutation; manifest: `repair_aware_projection_evolution`, currently `planned`)
 - **Owner area/module:** Invariants + Engine (`src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py`)
 - **Success criteria (test outcomes):**
+  - Sprint 3 minimal live-flow tests pass with one documented lineage/replay scenario.
+  - Sprint 4 contract-field tests cover finalized `schema_id` and `source` with deterministic/backward-compatible replay expectations.
   - Prototype repair-mode tests pass where repair proposals are emitted as explicit auditable events (never implicit state mutation).
   - Regression tests continue to pass in strict halt-only mode, proving backward compatibility of fail-closed execution.
 - **Related files/tests:**

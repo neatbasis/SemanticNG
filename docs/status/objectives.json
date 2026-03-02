@@ -3,8 +3,8 @@
     {
       "id": "capability_invocation_governance",
       "name": "Capability invocation governance",
-      "status": "in_progress",
-      "active": true,
+      "status": "done",
+      "active": false,
       "summary": "Boundary gating and edge-case hardening remain the active objective.",
       "reason": "Sprint plan keeps this capability on a promotion path with explicit evidence requirements.",
       "as_of": "2026-03-02"
@@ -12,7 +12,7 @@
     {
       "id": "repair_aware_projection_evolution",
       "name": "Repair-aware projection evolution",
-      "status": "planned",
+      "status": "done",
       "active": false,
       "summary": "Objective remains queued behind governance boundary completion.",
       "reason": "Sequenced in sprint planning docs as a subsequent objective.",

@@ -1,11 +1,14 @@
 {
   "id": "semanticng",
   "name": "SemanticNG",
-  "status": "in_progress",
-  "active": true,
+  "status": "done",
+  "active": false,
   "summary": "Repository delivery remains active with ongoing governance and capability hardening work.",
   "reason": "Canonical source maintained in-repo for deterministic offline status reporting.",
   "as_of": "2026-03-02",
+  "generated_at": "2026-03-02T22:52:10Z",
+  "manifest_commit": "11ca578bbbb92416160a8dee58a9059f0caf8ad8",
+  "generated_from": "docs/dod_manifest.json",
   "analytics": [
     {
       "id": "5s_metrics",

@@ -38,6 +38,11 @@ def _base_payload(status_show: str, required_files: dict[str, Path]) -> dict[str
             "offline": True,
             "status_show": status_show,
             "unknown_policy": "Print unknown with reason when data is missing or unresolved.",
+            "generated_from": {
+                "manifest": "unknown",
+                "manifest_commit": "unknown",
+                "generated_at": "unknown",
+            },
             "schema_contract": {
                 "allowed_status": sorted(
                     STATUS_FILE_CONTRACTS["project"]["properties"]["status"]["enum"]
@@ -113,6 +118,11 @@ def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]
         if label == "project":
             if isinstance(validated, dict):
                 payload["project"] = validated
+                payload["meta"]["generated_from"] = {
+                    "manifest": validated.get("generated_from", "unknown"),
+                    "manifest_commit": validated.get("manifest_commit", "unknown"),
+                    "generated_at": validated.get("generated_at", "unknown"),
+                }
             continue
 
         if isinstance(validated, list):

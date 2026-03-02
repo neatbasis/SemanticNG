@@ -114,6 +114,24 @@ Enforce Python version policy parity between `pyproject.toml`, README requiremen
 python .github/scripts/check_python_support_policy.py
 ```
 
+## First 5 minutes: verify editor diagnostics
+
+1. Open the repository in VS Code.
+2. Ensure the workspace recommendations from `.vscode/settings.json` are active (Ruff + mypy).
+3. Confirm diagnostics and formatter behavior by running:
+
+```bash
+ruff check src tests
+ruff format --check src tests
+mypy --config-file=pyproject.toml src/state_renormalization src/core
+```
+
+4. If editor diagnostics are not available, use the fallback loop from [`docs/editor_setup.md`](docs/editor_setup.md):
+
+```bash
+ruff check src tests && ruff format --check src tests && mypy --config-file=pyproject.toml src/state_renormalization src/core
+```
+
 ## Definition-of-done manifest
 
 A machine-readable status inventory lives at `docs/dod_manifest.json` with capability IDs, status (`done`/`in_progress`/`planned`), code paths, and test commands.

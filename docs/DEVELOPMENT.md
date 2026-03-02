@@ -13,6 +13,26 @@ python -m pip install -e ".[test]"
 pre-commit install
 ```
 
+## First 5 minutes: verify editor diagnostics
+
+After setup, open the repo in VS Code and verify `.vscode/settings.json` is applied.
+
+Run the canonical checks once to confirm diagnostics are aligned with repository policy:
+
+```bash
+ruff check src tests
+ruff format --check src tests
+mypy --config-file=pyproject.toml src/state_renormalization src/core
+```
+
+If VS Code diagnostics are unavailable, run the fallback loop while editing:
+
+```bash
+ruff check src tests && ruff format --check src tests && mypy --config-file=pyproject.toml src/state_renormalization src/core
+```
+
+See [`docs/editor_setup.md`](editor_setup.md) for the minimal editor setup.
+
 ## Local quality scopes
 
 ### Required pre-commit scope (Tier 1 strict)

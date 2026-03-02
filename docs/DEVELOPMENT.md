@@ -151,6 +151,31 @@ make qa-hook-parity-diagnostics
 
 This command captures `precommit.log` and always writes classification artifacts (`precommit_failure_classification.json` and `precommit_failure_classification.md`) even when hook parity fails.
 
+### `policy-measurement` threshold breach remediation
+
+`Quality Guardrails / policy-measurement` now enforces bounded `.github/scripts` complexity growth with baseline + threshold policy:
+
+```bash
+python .github/scripts/analyze_script_scope_complexity.py \
+  --output artifacts/script_scope_complexity.md \
+  --baseline-file docs/process/script_scope_complexity_baseline.json \
+  --waiver-file docs/process/script_scope_complexity_waivers.json \
+  --max-script-complexity 180 \
+  --max-total-complexity-delta 60 \
+  --check
+```
+
+When this gate fails:
+
+1. Open `artifacts/script_scope_complexity.md` in CI artifacts and identify active (non-waived) breaches.
+2. Prefer code remediation first: split large scripts, extract shared helpers, or remove dead branching paths.
+3. If limits need to increase intentionally, update `docs/process/script_scope_complexity_baseline.json` only after documenting why in the PR.
+4. For temporary exceptions, add an entry in `docs/process/script_scope_complexity_waivers.json` with:
+   - `metric` + `subject` match,
+   - explicit `expires_on` date (`YYYY-MM-DD`),
+   - rationale tied to planned cleanup.
+5. Remove waiver entries as soon as remediation lands; expired waivers do **not** suppress failures.
+
 
 ## Branch protection verification checklist (required)
 

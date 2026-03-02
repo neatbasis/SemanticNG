@@ -1,0 +1,10 @@
+{
+  "waivers": [
+    {
+      "metric": "script-complexity",
+      "subject": ".github/scripts/validate_milestone_docs.py",
+      "expires_on": "2026-06-30",
+      "reason": "Historical monolith script; remediation tracked through incremental decomposition."
+    }
+  ]
+}

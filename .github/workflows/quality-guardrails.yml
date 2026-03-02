@@ -30,8 +30,13 @@ jobs:
 
       - name: Measure .github/scripts scope alignment and complexity
         run: |
-          python .github/scripts/analyze_script_scope_complexity.py --output artifacts/script_scope_complexity.md
-
+          python .github/scripts/analyze_script_scope_complexity.py \
+            --output artifacts/script_scope_complexity.md \
+            --baseline-file docs/process/script_scope_complexity_baseline.json \
+            --waiver-file docs/process/script_scope_complexity_waivers.json \
+            --max-script-complexity 180 \
+            --max-total-complexity-delta 60 \
+            --check
       - name: Publish script measurement summary
         if: always()
         run: |

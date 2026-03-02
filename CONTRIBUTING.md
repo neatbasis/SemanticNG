@@ -22,6 +22,17 @@ python scripts/dev/verify_precommit_installed.py
 
 If verification fails, follow the remediation text printed by the verifier and rerun `make bootstrap`.
 
+## Commit-time smoke-test policy
+
+The `pre-commit` hook path now includes a deterministic pytest smoke subset via `make qa-commit`.
+This ensures basic runtime regressions are surfaced before commit creation.
+
+Run manually when needed:
+
+```bash
+make qa-commit
+```
+
 ## Pre-push quality requirement
 
 Before every push, run the full pre-commit suite from the repository root:

@@ -60,3 +60,13 @@ No exception may extend past 2026-04-15 without an explicit renewal PR that upda
 - Median fix time for required-check failures is **<= 1 business day**.
 
 If any criterion regresses, stabilization status resets and the 14-day window restarts.
+
+## Local hook enforcement policy
+
+To prevent "green commit / red push" loops, local hooks enforce a split policy:
+
+- `qa-commit` (pre-commit) must run lint/type plus a deterministic pytest smoke subset.
+- `qa-push` (pre-push) must rerun the same smoke subset with the broader push-stage lint/format checks.
+- CI remains the final authority via `baseline-test-cov` (`make qa-test-cov`) and `full-type-surface`.
+
+This means pytest execution is required before both commit and push for baseline smoke coverage.

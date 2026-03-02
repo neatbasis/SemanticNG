@@ -19,6 +19,18 @@ on:
 
 jobs:
 
+  status-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Shared Python setup
+        uses: ./.github/actions/python-test-setup
+
+      - name: Run `make status-sync-check`
+        run: make status-sync-check
+
   policy-measurement:
     runs-on: ubuntu-latest
     steps:

@@ -1,0 +1,70 @@
+{
+  "stages": {
+    "qa-commit": {
+      "commands": [
+        {
+          "command": "ruff check --fix src/core src/state_renormalization",
+          "timeout_seconds": 20
+        },
+        {
+          "command": "mypy --config-file=pyproject.toml src/state_renormalization src/core",
+          "timeout_seconds": 40
+        }
+      ],
+      "precommit_hook": {
+        "id": "qa-commit-stage",
+        "entry": "python scripts/ci/run_stage_checks.py qa-commit",
+        "stages": [
+          "pre-commit"
+        ]
+      }
+    },
+    "qa-push": {
+      "commands": [
+        {
+          "command": "ruff check --fix src tests",
+          "timeout_seconds": 45
+        },
+        {
+          "command": "ruff format --check src tests",
+          "timeout_seconds": 35
+        },
+        {
+          "command": "mypy --config-file=pyproject.toml src/state_renormalization src/core",
+          "timeout_seconds": 60
+        },
+        {
+          "command": "pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py",
+          "timeout_seconds": 80
+        }
+      ],
+      "precommit_hook": {
+        "id": "qa-push-stage",
+        "entry": "python scripts/ci/run_stage_checks.py qa-push",
+        "stages": [
+          "pre-push"
+        ]
+      }
+    },
+    "qa-ci": {
+      "commands": [
+        {
+          "command": "python .github/scripts/check_no_regression_budget.py",
+          "timeout_seconds": 20
+        },
+        {
+          "command": "pre-commit run --all-files",
+          "timeout_seconds": 180
+        },
+        {
+          "command": "pytest --cov --cov-report=term-missing --cov-report=xml",
+          "timeout_seconds": 240
+        },
+        {
+          "command": "mypy --config-file=pyproject.toml src tests",
+          "timeout_seconds": 240
+        }
+      ]
+    }
+  }
+}

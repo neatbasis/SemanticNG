@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 FILE_RE = re.compile(r"(?P<path>[A-Za-z0-9_./-]+\.(?:py|pyi|yaml|yml|toml|json|md|txt))(?:[:(]|\s)")
 
@@ -19,27 +21,22 @@ class CommandSpec:
     timeout_seconds: int
 
 
-STAGES: dict[str, list[CommandSpec]] = {
-    "qa-commit": [
-        CommandSpec("ruff check --fix src/core src/state_renormalization", 20),
-        CommandSpec("mypy --config-file=pyproject.toml src/state_renormalization src/core", 40),
-    ],
-    "qa-push": [
-        CommandSpec("ruff check --fix src tests", 45),
-        CommandSpec("ruff format --check src tests", 35),
-        CommandSpec("mypy --config-file=pyproject.toml src/state_renormalization src/core", 60),
-        CommandSpec(
-            "pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py",
-            80,
-        ),
-    ],
-    "qa-ci": [
-        CommandSpec("python .github/scripts/check_no_regression_budget.py", 20),
-        CommandSpec("pre-commit run --all-files", 180),
-        CommandSpec("pytest --cov --cov-report=term-missing --cov-report=xml", 240),
-        CommandSpec("mypy --config-file=pyproject.toml src tests", 240),
-    ],
-}
+MANIFEST_PATH = Path(__file__).resolve().parents[2] / "docs/process/quality_stage_commands.json"
+
+
+def _load_stages() -> dict[str, list[CommandSpec]]:
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    stages = manifest["stages"]
+    return {
+        stage_name: [
+            CommandSpec(command=spec["command"], timeout_seconds=int(spec["timeout_seconds"]))
+            for spec in stage_spec["commands"]
+        ]
+        for stage_name, stage_spec in stages.items()
+    }
+
+
+STAGES = _load_stages()
 
 
 def _first_failing_files(output: str) -> list[str]:

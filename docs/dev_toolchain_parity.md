@@ -20,9 +20,7 @@ Policy source of truth: `docs/toolchain_parity_policy.json`.
 - Tier 1 mypy hook args: `['--config-file=pyproject.toml', 'src/state_renormalization', 'src/core']`
 - Tier 2 mypy scope: `['src', 'tests']`
 - Canonical Make targets:
-  - `make qa-hook-parity`
-  - `make qa-test-cov`
-  - `make qa-full-type-surface`
+  - `make qa-ci-equivalent`
 <!-- PARITY_POLICY:END -->
 
 ## Hook dependency map
@@ -47,7 +45,7 @@ Use Makefile targets as the single source of truth for local and CI quality comm
 
 - Canonical targets are generated from `docs/toolchain_parity_policy.json` (see parity block above).
 
-`make qa-local` composes bootstrap + all three gates above for end-to-end local CI parity.
+`make qa-local` remains the fast local flow (bootstrap + local strict gates), while `make qa-ci-equivalent` is the canonical CI-equivalent command pack.
 
 ## Drift controls
 
@@ -66,5 +64,6 @@ Use Makefile targets as the single source of truth for local and CI quality comm
   - remove obsolete hook `additional_dependencies` exceptions,
   - retire temporary dependency waivers once upstream constraints are stable,
   - confirm scheduled cold-start parity workflow results remain green.
+
 
 

@@ -1,4 +1,4 @@
-.PHONY: bootstrap qa-hook-parity qa-local-fast qa-full-type-surface qa-test-cov qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
+.PHONY: bootstrap qa-hook-parity qa-local-fast qa-full-type-surface qa-test-cov qa-ci-equivalent qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
 
 bootstrap:
 	@python --version
@@ -19,6 +19,12 @@ qa-test-cov:
 
 qa-full-type-surface:
 	mypy --config-file=pyproject.toml src tests
+
+qa-ci-equivalent:
+	python .github/scripts/check_no_regression_budget.py
+	$(MAKE) qa-hook-parity
+	$(MAKE) qa-test-cov
+	$(MAKE) qa-full-type-surface
 
 qa-local: bootstrap qa-hook-parity qa-test-cov qa-full-type-surface
 

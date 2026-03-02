@@ -9,9 +9,7 @@ Canonical parity constants are sourced from `docs/toolchain_parity_policy.json`.
 - Tier 1 mypy hook args: `['--config-file=pyproject.toml', 'src/state_renormalization', 'src/core']`
 - Tier 2 mypy scope: `['src', 'tests']`
 - Canonical Make targets:
-  - `make qa-hook-parity`
-  - `make qa-test-cov`
-  - `make qa-full-type-surface`
+  - `make qa-ci-equivalent`
 <!-- PARITY_POLICY:END -->
 
 ## One-time setup
@@ -108,11 +106,9 @@ pytest -m contract_sensitive
 Canonical Makefile command pack (used by CI jobs):
 
 ```bash
-make qa-hook-parity      # Tier 1 strict parity gate
-make qa-test-cov         # Full pytest + coverage gate
-make qa-full-type-surface  # Full mypy surface (src + tests)
+make qa-ci-equivalent    # No-regression budget + hook parity + coverage + full mypy surface
 
-# Optional single command to run all of the above with bootstrap:
+# Optional local command to run bootstrap + strict local gates:
 make qa-local
 ```
 
@@ -175,8 +171,7 @@ When an automated dependency PR fails:
    - Split group impact by temporarily narrowing update scope.
    - Add upstream issue link when blocked externally.
 3. Re-run local parity checks before merge decision:
-   - `make qa-hook-parity`
-   - `make qa-test-cov`
+   - `make qa-ci-equivalent`
    - `make qa-full-type-surface` (or Tier 2a focused scope for contract-boundary drift triage)
 4. If not fixable within the update window, close/snooze with rationale and open a tracked follow-up issue that includes blocker owner and retry target date.
 
@@ -212,5 +207,6 @@ Recommended disposition policy:
 - GitHub Actions patch/minor updates: eligible for auto-merge once required checks are green.
 - Python `dev-test-tooling` updates (`ruff`, `mypy`, `pytest`, `pre-commit`, typing stubs): require human review because they can alter lint/type gate behavior.
 - `runtime-dependencies` updates: require human review plus behavior/regression validation.
+
 
 

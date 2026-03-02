@@ -1,0 +1,84 @@
+{
+  "allowed_status": [
+    "done",
+    "in_progress",
+    "planned",
+    "blocked",
+    "unknown"
+  ],
+  "required_item_keys": [
+    "id",
+    "name",
+    "status",
+    "active",
+    "summary",
+    "reason",
+    "as_of"
+  ],
+  "files": {
+    "project": {
+      "path": "docs/status/project.json",
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "status",
+        "active",
+        "summary",
+        "reason",
+        "as_of"
+      ],
+      "optional": [
+        "analytics"
+      ]
+    },
+    "milestones": {
+      "path": "docs/status/milestones.json",
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "item_required": [
+        "id",
+        "name",
+        "status",
+        "active",
+        "summary",
+        "reason",
+        "as_of"
+      ]
+    },
+    "sprints": {
+      "path": "docs/status/sprints.json",
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "item_required": [
+        "id",
+        "name",
+        "status",
+        "active",
+        "summary",
+        "reason",
+        "as_of"
+      ]
+    },
+    "objectives": {
+      "path": "docs/status/objectives.json",
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "item_required": [
+        "id",
+        "name",
+        "status",
+        "active",
+        "summary",
+        "reason",
+        "as_of"
+      ]
+    }
+  }
+}

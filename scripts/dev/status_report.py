@@ -3,19 +3,18 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from status_schema import (
+    STATUS_FILE_CONTRACTS,
+    ValidationIssue,
+    validate_item_collection_document,
+    validate_project_document,
+)
+
 STATUS_DIR = Path("docs/status")
-ALLOWED_STATUS = {"done", "in_progress", "planned", "blocked", "unknown"}
-
-
-@dataclass(frozen=True)
-class Issue:
-    path: str
-    message: str
+Issue = ValidationIssue
 
 
 def _load_json(path: Path) -> Any:
@@ -23,27 +22,10 @@ def _load_json(path: Path) -> Any:
         return json.load(handle)
 
 
-def _validate_item(item: dict[str, Any], context: str) -> list[Issue]:
-    issues: list[Issue] = []
-    required = ["id", "name", "status", "active", "summary", "reason", "as_of"]
-    for key in required:
-        if key not in item:
-            issues.append(Issue(context, f"missing required key '{key}'"))
-    status = item.get("status")
-    if status is not None and status not in ALLOWED_STATUS:
-        issues.append(Issue(context, f"invalid status '{status}'"))
-    if "active" in item and not isinstance(item["active"], bool):
-        issues.append(Issue(context, "'active' must be boolean"))
-    return issues
-
-
 def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]:
     issues: list[Issue] = []
     required_files = {
-        "project": STATUS_DIR / "project.json",
-        "milestones": STATUS_DIR / "milestones.json",
-        "sprints": STATUS_DIR / "sprints.json",
-        "objectives": STATUS_DIR / "objectives.json",
+        label: STATUS_DIR / f"{label}.json" for label in STATUS_FILE_CONTRACTS
     }
 
     payload: dict[str, Any] = {
@@ -53,6 +35,16 @@ def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]
             "offline": True,
             "status_show": status_show,
             "unknown_policy": "Print unknown with reason when data is missing or unresolved.",
+            "schema_contract": {
+                "allowed_status": sorted(
+                    STATUS_FILE_CONTRACTS["project"]["properties"]["status"]["enum"]
+                ),
+                "required_keys": list(STATUS_FILE_CONTRACTS["project"]["required"]),
+                "files": {
+                    label: str(path)
+                    for label, path in required_files.items()
+                },
+            },
         },
         "project": {
             "id": "unknown",
@@ -73,6 +65,7 @@ def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]
         if not path.exists():
             issues.append(Issue(str(path), "file is missing"))
             continue
+
         try:
             data = _load_json(path)
         except json.JSONDecodeError as exc:
@@ -80,30 +73,17 @@ def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]
             continue
 
         if label == "project":
-            if not isinstance(data, dict):
-                issues.append(Issue(str(path), "project must be an object"))
-                continue
-            issues.extend(_validate_item(data, str(path)))
-            payload["project"] = {
-                **payload["project"],
-                **{k: v for k, v in data.items() if k != "analytics"},
-                "analytics": data.get("analytics", []),
-            }
+            issues.extend(validate_project_document(path, data))
+            if isinstance(data, dict):
+                payload["project"] = {
+                    **payload["project"],
+                    **{k: v for k, v in data.items() if k != "analytics"},
+                    "analytics": data.get("analytics", []),
+                }
             continue
 
-        if not isinstance(data, dict) or not isinstance(data.get("items"), list):
-            issues.append(Issue(str(path), "expected object with an 'items' array"))
-            continue
-
-        items: list[dict[str, Any]] = []
-        for idx, item in enumerate(data["items"]):
-            ctx = f"{path}::items[{idx}]"
-            if not isinstance(item, dict):
-                issues.append(Issue(ctx, "item must be object"))
-                continue
-            issues.extend(_validate_item(item, ctx))
-            items.append(item)
-
+        items, item_issues = validate_item_collection_document(path, data)
+        issues.extend(item_issues)
         if status_show != "all":
             items = [item for item in items if item.get("active")]
         payload[label] = items

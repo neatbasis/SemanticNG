@@ -58,6 +58,8 @@ SemanticNG is a Python project focused on state renormalization, schema selectio
 
 Architecture and planning constraints are codified in `docs/AXIOMS.md` (normative axiom set and PR usage requirements).
 
+Governance operating posture is additionally framed by `docs/DOCTRINE_5S.md` (Sort, Set in order, Shine, Standardize, Sustain), which complements repository axioms and module-local invariants.
+
 Guardrail classification guidance for contributors (invariants vs policies vs heuristics) is documented in `docs/guardrails_and_invariants.md`.
 
 ## Quality Gates

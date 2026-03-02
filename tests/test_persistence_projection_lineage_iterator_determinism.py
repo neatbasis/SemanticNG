@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from state_renormalization.adapters.persistence import append_jsonl, iter_projection_lineage_records
-from state_renormalization.contracts import HaltRecord
+from state_renormalization.contracts import EvidenceRef, HaltRecord
 
 
 @pytest.fixture
@@ -16,7 +16,7 @@ def mixed_projection_rows() -> list[dict[str, object]]:
         invariant_id="prediction_availability.v1",
         reason="missing prediction",
         details={"scope": "turn:7"},
-        evidence=[{"kind": "jsonl", "ref": "predictions.jsonl@4"}],
+        evidence=[EvidenceRef(kind="jsonl", ref="predictions.jsonl@4")],
         retryability=True,
         timestamp="2026-02-14T00:00:00+00:00",
     ).to_canonical_payload()

@@ -89,8 +89,9 @@ Governance artifacts are updated only after passing evidence exists (CI artifact
 
 ## Capability status alignment (manifest source-of-truth sync)
 
-- `done`: `prediction_persistence_baseline`, `channel_agnostic_pending_obligation`, `schema_selection_ambiguity_baseline`, `gate_halt_unification`, `invariant_matrix_coverage`, `replay_projection_analytics`, `observer_authorization_contract`.
-- `done`: `capability_invocation_governance`, `repair_aware_projection_evolution` (both statuses are canonicalized in `docs/dod_manifest.json` with linked CI evidence).
+- `done`: `prediction_persistence_baseline`, `channel_agnostic_pending_obligation`, `schema_selection_ambiguity_baseline`, `gate_halt_unification`, `invariant_matrix_coverage`, `replay_projection_analytics`, `observer_authorization_contract`, `capability_invocation_governance`, `repair_aware_projection_evolution`.
+- `in_progress`: .
+- `planned`: .
 
 ## Later (larger architecture goals)
 

@@ -16,15 +16,15 @@ All maturity claims in this document are derived from these canonical evidence s
 
 ### Capability delivery status (from `docs/dod_manifest.json`)
 
-- **Done:** 7
-- **In progress:** 1
-- **Planned:** 1
+- **Done:** 9
+- **In progress:** 0
+- **Planned:** 0
 
-Completion ratio (done / total): **77.8%** (`7/9`).
+Completion ratio (done / total): **100.0%** (`9/9`).
 
-Current bottleneck set (remaining non-`done` implementation queue): **`capability_invocation_governance`** and **`repair_aware_projection_evolution`**.
+Current bottleneck set (remaining non-`done` implementation queue): _none (all manifest capabilities are `done`)_.
 
-Current bottleneck capability: **`capability_invocation_governance`** (only active non-`done` promotion; `repair_aware_projection_evolution` remains queued as dependency-blocked `planned`).
+Current bottleneck capability: **`none`** (all manifest capabilities are `done`).
 
 ### Quality and validation signals (from `docs/dod_manifest.json`)
 
@@ -42,27 +42,27 @@ Current bottleneck capability: **`capability_invocation_governance`** (only acti
 Derived from canonical evidence:
 
 - Governance and replay baseline capabilities are recorded as delivered in `docs/dod_manifest.json`.
-- Remaining implementation work is split between one `in_progress` capability (`capability_invocation_governance`) and one dependency-blocked `planned` capability (`repair_aware_projection_evolution`) (`docs/dod_manifest.json`).
+- All listed capabilities are currently `done` in `docs/dod_manifest.json`; focus remains on non-regression validation and evidence freshness.
 - Contract maturity posture is governed by `docs/system_contract_map.md`.
 
 ## Most timely development (priority recommendation)
 
 ### #1 Immediate priority
 
-**Prioritize finishing `capability_invocation_governance` (`in_progress`) before opening `repair_aware_projection_evolution` (`planned`).**
+**Maintain non-regression evidence quality across all `done` capabilities and keep governance artifacts synchronized.**
 
 ### #2 Near-term execution sequence
 
-1. **Complete `capability_invocation_governance` (`Next`, currently `in_progress`)**
+1. **Sustain `capability_invocation_governance` (`done`) non-regression evidence**
    - `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_predictions_contracts_and_gates.py`
-2. **Then start `repair_aware_projection_evolution` (`Later`, currently `planned`)**
+2. **Sustain `repair_aware_projection_evolution` (`done`) non-regression evidence**
    - `pytest tests/test_repair_mode_projection.py tests/test_repair_events_auditability.py`
    - `pytest tests/test_predictions_contracts_and_gates.py`
 
 ## Suggested maturity targets for next review window
 
 - Keep done capabilities in non-regression coverage by validating manifest-defined command packs.
-- Move the remaining `planned` capability (`repair_aware_projection_evolution`) toward executable baseline evidence after governance promotion closes.
+- Keep completed capabilities in regression coverage and refresh CI evidence links on cadence.
 - Recompute counts and bottleneck-set assignment from canonical sources only (`docs/dod_manifest.json` + `docs/system_contract_map.md`).
 
 ## Maturity changelog

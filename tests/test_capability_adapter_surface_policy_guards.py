@@ -12,7 +12,7 @@ from state_renormalization.adapters.persistence import (
     append_prediction_event,
     read_jsonl,
 )
-from state_renormalization.contracts import CapabilityAdapterGate, HaltRecord
+from state_renormalization.contracts import CapabilityAdapterGate, EvidenceRef, HaltRecord
 
 
 def test_append_prediction_requires_policy_gate(tmp_path: Path) -> None:
@@ -54,7 +54,7 @@ def test_append_halt_rejects_denied_policy_gate(tmp_path: Path) -> None:
         invariant_id="prediction_availability.v1",
         reason="denied",
         details={"message": "denied"},
-        evidence=[{"kind": "scope", "ref": "scope:test"}],
+        evidence=[EvidenceRef(kind="scope", ref="scope:test")],
         retryability=True,
         timestamp="2026-02-13T00:00:00+00:00",
     )

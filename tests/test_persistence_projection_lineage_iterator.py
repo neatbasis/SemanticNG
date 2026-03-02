@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from state_renormalization.adapters.persistence import append_jsonl, iter_projection_lineage_records
-from state_renormalization.contracts import HaltRecord
+from state_renormalization.contracts import EvidenceRef, HaltRecord
 
 
 def _canonical_halt_payload(halt_id: str, *, timestamp: str) -> dict[str, object]:
@@ -14,7 +14,7 @@ def _canonical_halt_payload(halt_id: str, *, timestamp: str) -> dict[str, object
         invariant_id="prediction_availability.v1",
         reason="missing prediction",
         details={"scope": "turn:1"},
-        evidence=[{"kind": "jsonl", "ref": "predictions.jsonl@1"}],
+        evidence=[EvidenceRef(kind="jsonl", ref="predictions.jsonl@1")],
         retryability=True,
         timestamp=timestamp,
     ).to_canonical_payload()

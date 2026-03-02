@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from state_renormalization.contracts import EvidenceRef
 from state_renormalization.invariants import (
     Flow,
     InvariantId,
@@ -13,8 +14,6 @@ from state_renormalization.invariants import (
     default_check_context,
     normalize_outcome,
 )
-
-
 
 
 def test_authorization_scope_invariant_pass_and_fail_have_deterministic_shape() -> None:
@@ -139,7 +138,7 @@ def test_explainable_halt_completeness_invariant_pass_and_fail() -> None:
         flow=Flow.STOP,
         validity=Validity.INVALID,
         code="with_evidence",
-        evidence=({"kind": "scope", "value": "scope:test"},),
+        evidence=(EvidenceRef(kind="scope", ref="scope:test"),),
         details={"message": "has details"},
     )
     passing = check_explainable_halt_payload(

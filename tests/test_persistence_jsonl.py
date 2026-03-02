@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,7 @@ from state_renormalization.adapters.persistence import (
     read_halt_record,
     read_jsonl,
 )
-from state_renormalization.contracts import CapabilityAdapterGate, HaltRecord
+from state_renormalization.contracts import CapabilityAdapterGate, Episode, EvidenceRef, HaltRecord
 from state_renormalization.engine import to_jsonable_episode
 
 TEST_GATE = CapabilityAdapterGate(invocation_id="invoke:test", allowed=True)
@@ -43,7 +44,7 @@ def test_append_halt_jsonl_roundtrip_and_evidence_ref_format(tmp_path: Path) -> 
         invariant_id="evidence_link_completeness.v1",
         reason="x",
         details={"message": "x", "context": {"gate": "post_write"}},
-        evidence=[{"kind": "scope", "ref": "scope:test"}],
+        evidence=[EvidenceRef(kind="scope", ref="scope:test")],
         retryability=True,
         timestamp="2026-02-13T00:00:00+00:00",
     )
@@ -94,7 +95,7 @@ def test_append_jsonl_propagates_stable_ids_to_nested_events(tmp_path: Path) -> 
     assert rec["events"][1]["feature_id"] == "feat_1"
 
 
-def test_append_jsonl_persists_episode_observer(make_episode, tmp_path: Path) -> None:
+def test_append_jsonl_persists_episode_observer(make_episode: Callable[[], Episode], tmp_path: Path) -> None:
     p = tmp_path / "episodes.jsonl"
     ep = make_episode()
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,7 @@ from status_schema import (
 )
 
 STATUS_DIR = Path("docs/status")
+DOD_MANIFEST_PATH = Path("docs/dod_manifest.json")
 Issue = ValidationIssue
 
 
@@ -106,12 +108,11 @@ def _filter_items(items: list[dict[str, Any]], status_show: str) -> list[dict[st
 
 
 def _load_manifest_capability_ids() -> set[str]:
-    manifest_path = Path("docs/dod_manifest.json")
-    if not manifest_path.exists():
+    if not DOD_MANIFEST_PATH.exists():
         return set()
 
     try:
-        manifest = _load_json(manifest_path)
+        manifest = _load_json(DOD_MANIFEST_PATH)
     except json.JSONDecodeError:
         return set()
 
@@ -121,6 +122,243 @@ def _load_manifest_capability_ids() -> set[str]:
         for item in capabilities
         if isinstance(item, dict) and isinstance(item.get("id"), str)
     }
+
+
+def _extract_capability_statuses(manifest: dict[str, Any]) -> dict[str, str]:
+    capabilities = manifest.get("capabilities", [])
+    if not isinstance(capabilities, list):
+        return {}
+
+    statuses: dict[str, str] = {}
+    for item in capabilities:
+        if not isinstance(item, dict):
+            continue
+        capability_id = item.get("id")
+        status = item.get("status")
+        if isinstance(capability_id, str) and isinstance(status, str):
+            statuses[capability_id] = status
+    return statuses
+
+
+def _rollup_group_status(member_statuses: list[str]) -> str:
+    if not member_statuses:
+        return "planned"
+    if "in_progress" in member_statuses:
+        return "in_progress"
+    if "planned" in member_statuses:
+        return "planned"
+    return "done"
+
+
+def _safe_git(*args: str) -> str | None:
+    try:
+        completed = subprocess.run(
+            ["git", *args],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    if completed.returncode != 0:
+        return None
+    return completed.stdout.strip()
+
+
+def _load_manifest_at_git_ref(git_ref: str) -> dict[str, Any] | None:
+    payload = _safe_git("show", f"{git_ref}:{DOD_MANIFEST_PATH.as_posix()}")
+    if not payload:
+        return None
+    try:
+        parsed = json.loads(payload)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    return parsed
+
+
+def _recent_capability_transitions(limit: int = 5) -> list[dict[str, str]]:
+    log_output = _safe_git("log", "--format=%H\t%cI", "-n", "25", "--", DOD_MANIFEST_PATH.as_posix())
+    if not log_output:
+        return []
+
+    transitions: list[dict[str, str]] = []
+    for line in log_output.splitlines():
+        if len(transitions) >= limit:
+            break
+        parts = line.split("\t", 1)
+        if len(parts) != 2:
+            continue
+        commit, committed_at = parts
+        current_manifest = _load_manifest_at_git_ref(commit)
+        previous_manifest = _load_manifest_at_git_ref(f"{commit}^")
+        if current_manifest is None or previous_manifest is None:
+            continue
+
+        current_statuses = _extract_capability_statuses(current_manifest)
+        previous_statuses = _extract_capability_statuses(previous_manifest)
+        for capability_id, after in sorted(current_statuses.items()):
+            before = previous_statuses.get(capability_id)
+            if before and before != after:
+                transitions.append(
+                    {
+                        "capability_id": capability_id,
+                        "from": before,
+                        "to": after,
+                        "commit": commit,
+                        "committed_at": committed_at,
+                    }
+                )
+                if len(transitions) >= limit:
+                    break
+    return transitions
+
+
+def _build_dod_summary() -> tuple[dict[str, Any], list[Issue], dict[str, dict[str, str]]]:
+    summary: dict[str, Any] = {
+        "manifest": DOD_MANIFEST_PATH.as_posix(),
+        "available": False,
+        "counts_by_status": {"done": 0, "in_progress": 0, "planned": 0},
+        "recent_transitions": [],
+        "missing_metadata": [],
+        "derived_status": {"objectives": {}, "milestones": {}, "sprints": {}},
+    }
+    issues: list[Issue] = []
+    if not DOD_MANIFEST_PATH.exists():
+        return summary, issues, summary["derived_status"]
+
+    try:
+        manifest = _load_json(DOD_MANIFEST_PATH)
+    except json.JSONDecodeError as exc:
+        issues.append(Issue(str(DOD_MANIFEST_PATH), f"invalid JSON: {exc.msg}"))
+        return summary, issues, summary["derived_status"]
+
+    if not isinstance(manifest, dict):
+        issues.append(Issue(str(DOD_MANIFEST_PATH), "manifest root must be an object"))
+        return summary, issues, summary["derived_status"]
+
+    summary["available"] = True
+    counts = {"done": 0, "in_progress": 0, "planned": 0}
+    capabilities = manifest.get("capabilities", [])
+    if isinstance(capabilities, list):
+        for capability in capabilities:
+            if not isinstance(capability, dict):
+                continue
+            capability_id = capability.get("id", "unknown")
+            status = capability.get("status")
+            if status in counts:
+                counts[status] += 1
+
+            pytest_commands = capability.get("pytest_commands")
+            if not isinstance(pytest_commands, list) or not pytest_commands or not all(
+                isinstance(command, str) and command.strip() for command in pytest_commands
+            ):
+                summary["missing_metadata"].append(
+                    {"capability_id": capability_id, "field": "pytest_commands"}
+                )
+
+            evidence = capability.get("ci_evidence_links")
+            if not isinstance(evidence, list) or not evidence:
+                summary["missing_metadata"].append(
+                    {"capability_id": capability_id, "field": "ci_evidence_links"}
+                )
+            else:
+                for idx, entry in enumerate(evidence):
+                    if not isinstance(entry, dict):
+                        summary["missing_metadata"].append(
+                            {
+                                "capability_id": capability_id,
+                                "field": f"ci_evidence_links[{idx}]",
+                                "reason": "entry must be an object",
+                            }
+                        )
+                        continue
+                    if not isinstance(entry.get("command"), str) or not entry.get("command", "").strip():
+                        summary["missing_metadata"].append(
+                            {
+                                "capability_id": capability_id,
+                                "field": f"ci_evidence_links[{idx}].command",
+                            }
+                        )
+                    if not isinstance(entry.get("evidence"), str) or not entry.get("evidence", "").strip():
+                        summary["missing_metadata"].append(
+                            {
+                                "capability_id": capability_id,
+                                "field": f"ci_evidence_links[{idx}].evidence",
+                            }
+                        )
+
+    summary["counts_by_status"] = counts
+    summary["recent_transitions"] = _recent_capability_transitions()
+
+    capability_status = _extract_capability_statuses(manifest)
+    objective_statuses: dict[str, str] = {}
+    for group in manifest.get("capability_groups", []):
+        if not isinstance(group, dict):
+            continue
+        group_id = group.get("id")
+        members = group.get("capability_ids", [])
+        if not isinstance(group_id, str) or not isinstance(members, list):
+            continue
+        member_statuses = [
+            capability_status[member]
+            for member in members
+            if isinstance(member, str) and member in capability_status
+        ]
+        objective_statuses[group_id] = _rollup_group_status(member_statuses)
+
+    milestone_statuses: dict[str, str] = {}
+    for group in manifest.get("milestone_groups", []):
+        if isinstance(group, dict) and isinstance(group.get("id"), str) and isinstance(group.get("status"), str):
+            milestone_statuses[group["id"]] = group["status"]
+
+    sprint_statuses: dict[str, str] = {}
+    for group in manifest.get("sprint_groups", []):
+        if isinstance(group, dict) and isinstance(group.get("id"), str) and isinstance(group.get("status"), str):
+            sprint_statuses[group["id"]] = group["status"]
+
+    derived_status = {
+        "objectives": objective_statuses,
+        "milestones": milestone_statuses,
+        "sprints": sprint_statuses,
+    }
+    summary["derived_status"] = derived_status
+    return summary, issues, derived_status
+
+
+def _validate_dod_status_alignment(
+    collections: dict[str, list[dict[str, Any]]],
+    derived_status: dict[str, dict[str, str]],
+) -> list[Issue]:
+    issues: list[Issue] = []
+    for group, doc_key in (("objectives", "objectives"), ("milestones", "milestones"), ("sprints", "sprints")):
+        expected = derived_status.get(group, {})
+        if not expected:
+            continue
+        observed = {
+            item["id"]: item["status"]
+            for item in collections[doc_key]
+            if isinstance(item, dict) and isinstance(item.get("id"), str) and isinstance(item.get("status"), str)
+        }
+        for item_id, expected_status in expected.items():
+            observed_status = observed.get(item_id)
+            if observed_status is None:
+                issues.append(
+                    Issue(
+                        f"docs/status/{group}.json",
+                        f"DoD alignment mismatch: expected id '{item_id}' with status '{expected_status}' but item is missing",
+                    )
+                )
+                continue
+            if observed_status != expected_status:
+                issues.append(
+                    Issue(
+                        f"docs/status/{group}.json",
+                        f"DoD alignment mismatch for '{item_id}': docs/status has '{observed_status}' but DoD aggregate is '{expected_status}'",
+                    )
+                )
+    return issues
 
 
 def _validate_relationships(collections: dict[str, list[dict[str, Any]]]) -> list[Issue]:
@@ -218,6 +456,10 @@ def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]
         "objectives": [],
     }
 
+    dod_summary, dod_issues, derived_status = _build_dod_summary()
+    issues.extend(dod_issues)
+    payload["dod"] = dod_summary
+
     for label, path in required_files.items():
         data, load_issues = _load_status_file(path)
         issues.extend(load_issues)
@@ -242,6 +484,7 @@ def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]
             payload[label] = _filter_items(validated, status_show=status_show)
 
     issues.extend(_validate_relationships(collections))
+    issues.extend(_validate_dod_status_alignment(collections=collections, derived_status=derived_status))
 
     return payload, issues
 

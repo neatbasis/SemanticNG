@@ -161,6 +161,78 @@ def test_status_report_json_surfaces_generated_from_provenance() -> None:
     assert generated_from["generated_at"].endswith("Z")
 
 
+def test_json_mode_includes_dod_summary_block() -> None:
+    result = _run_status("json", ROOT)
+
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    dod = payload["dod"]
+    assert dod["available"] is True
+    assert dod["counts_by_status"] == {"done": 9, "in_progress": 0, "planned": 0}
+    assert isinstance(dod["recent_transitions"], list)
+    assert dod["missing_metadata"] == []
+
+
+def test_check_mode_fails_when_dod_aggregate_and_status_docs_disagree(tmp_path: Path) -> None:
+    run_dir = _stage_scenario(tmp_path, "valid")
+    docs_dir = run_dir / "docs"
+    manifest = {
+        "capabilities": [
+            {
+                "id": "cap-alpha",
+                "status": "done",
+                "pytest_commands": ["pytest tests/test_alpha.py"],
+                "ci_evidence_links": [
+                    {
+                        "command": "pytest tests/test_alpha.py",
+                        "evidence": "https://example.test/run/1",
+                    }
+                ],
+            }
+        ],
+        "capability_groups": [
+            {"id": "o1", "capability_ids": ["cap-alpha"]},
+        ],
+        "milestone_groups": [
+            {"id": "m1", "status": "done"},
+        ],
+        "sprint_groups": [
+            {"id": "s1", "status": "done"},
+        ],
+    }
+    (docs_dir / "dod_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+    result = _run_status("check", run_dir)
+
+    assert result.returncode == 1
+    payload = json.loads(result.stdout)
+    assert any("DoD alignment mismatch" in item["message"] for item in payload["issues"])
+
+
+def test_check_mode_reports_missing_dod_required_metadata(tmp_path: Path) -> None:
+    run_dir = _stage_scenario(tmp_path, "valid")
+    docs_dir = run_dir / "docs"
+    manifest = {
+        "capabilities": [
+            {
+                "id": "cap-alpha",
+                "status": "done",
+                "pytest_commands": [],
+                "ci_evidence_links": [{"command": "", "evidence": ""}],
+            }
+        ]
+    }
+    (docs_dir / "dod_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+    json_result = _run_status("json", run_dir)
+    assert json_result.returncode == 0
+    payload = json.loads(json_result.stdout)
+    missing = payload["dod"]["missing_metadata"]
+    assert {"capability_id": "cap-alpha", "field": "pytest_commands"} in missing
+    assert {"capability_id": "cap-alpha", "field": "ci_evidence_links[0].command"} in missing
+    assert {"capability_id": "cap-alpha", "field": "ci_evidence_links[0].evidence"} in missing
+
+
 def test_summary_mode_prints_compact_waste_metrics_block(tmp_path: Path) -> None:
     run_dir = _stage_scenario(tmp_path, "valid")
 

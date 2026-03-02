@@ -47,6 +47,9 @@ jobs:
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
 
+      - name: Verify toolchain parity sync
+        run: python scripts/ci/check_toolchain_parity.py
+
       # Failing job command (verbatim): make qa-baseline
       - name: Run `make qa-baseline` (verbose, capture log)
         id: hook_parity

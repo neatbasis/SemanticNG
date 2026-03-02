@@ -30,6 +30,7 @@ CI enforces the metadata requirement and will fail if baseline numbers change wi
 ## Allowed regression policy
 
 - Default policy is strict: all `allowed_regression` values remain `0`.
+- Parser ambiguity is fail-closed: if metric output cannot be parsed deterministically, CI must fail until parser expectations or tool output are corrected.
 - Re-baselining must keep `allowed_regression` at `0` unless an exception is both:
   - explicitly time-boxed (`approval_expires_on`), and
   - approved (`approved_by`) with a linked remediation plan.

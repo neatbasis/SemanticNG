@@ -25,4 +25,9 @@ def test_weekly_toolchain_parity_workflow_exists_and_is_scheduled() -> None:
 
     assert "schedule:" in text
     assert "pre-commit clean" in text
-    assert "mypy --config-file=pyproject.toml src tests" in text
+    quality_guardrails = (ROOT / ".github" / "workflows" / "quality-guardrails.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "make qa-hook-parity" in quality_guardrails
+    assert "make qa-test-cov" in quality_guardrails
+    assert "make qa-full-type-surface" in quality_guardrails

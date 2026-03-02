@@ -94,9 +94,14 @@ Pytest markers are auto-assigned in collection, so you can also run:
 pytest -m contract_sensitive
 ```
 
-`make qa-local` remains the one-command CI-parity option (parity checks + tests + Tier 2 mypy):
+Canonical Makefile command pack (used by CI jobs):
 
 ```bash
+make qa-hook-parity      # Tier 1 strict parity gate
+make qa-test-cov         # Full pytest + coverage gate
+make qa-full-type-surface  # Full mypy surface (src + tests)
+
+# Optional single command to run all of the above with bootstrap:
 make qa-local
 ```
 
@@ -141,22 +146,22 @@ When an automated dependency PR fails:
    - Split group impact by temporarily narrowing update scope.
    - Add upstream issue link when blocked externally.
 3. Re-run local parity checks before merge decision:
-   - `pre-commit run --all-files`
-   - `pytest`
-   - `mypy --config-file=pyproject.toml src tests` (or Tier 2a focused scope for contract-boundary drift triage)
+   - `make qa-hook-parity`
+   - `make qa-test-cov`
+   - `make qa-full-type-surface` (or Tier 2a focused scope for contract-boundary drift triage)
 4. If not fixable within the update window, close/snooze with rationale and open a tracked follow-up issue that includes blocker owner and retry target date.
 
 ### `baseline-lint-type` failing
 
 ```bash
-pre-commit run --all-files
+make qa-hook-parity
 git add -A
 ```
 
 ### `full-type-surface` failing
 
 ```bash
-mypy --config-file=pyproject.toml src tests
+make qa-full-type-surface
 ```
 
 If the failure is isolated to contract boundaries, start with Tier 2a to iterate faster:

@@ -9,7 +9,7 @@ name: Quality Guardrails
 # | [tool.mypy] (Tier 1 strict scope) | make qa-hook-parity | mypy hook is scoped to strict core/application paths for fast local feedback. |
 # | [tool.mypy] (full surface) | make qa-full-type-surface | Separate CI gate for tests + legacy/BDD namespaces under bounded relaxations. |
 # | [tool.ruff], [tool.black], [tool.isort], other lint tooling sections | make qa-hook-parity | Lint/format policy is enforced through configured pre-commit hooks. |
-# | Combined CI-equivalent command pack | make qa-ci-equivalent | Runs no-regression budget + hook parity + test coverage + full type surface in canonical order. |
+# | Combined CI-equivalent command pack | make qa-ci | Runs no-regression budget + hook parity + test coverage + full type surface in canonical order. |
 
 on:
   pull_request:

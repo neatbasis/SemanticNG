@@ -1,4 +1,4 @@
-.PHONY: bootstrap verify-precommit-installed qa-baseline qa-hook-parity qa-hook-parity-diagnostics qa-local-fast qa-full-type qa-full-type-surface qa-test-cov qa-ci-equivalent qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
+.PHONY: bootstrap verify-precommit-installed qa-commit qa-push qa-ci qa-baseline qa-hook-parity qa-hook-parity-diagnostics qa-local-fast qa-full-type qa-full-type-surface qa-test-cov qa-ci-equivalent qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
 
 bootstrap:
 	pre-commit install --hook-type pre-commit --hook-type pre-push
@@ -13,8 +13,18 @@ bootstrap:
 verify-precommit-installed:
 	python scripts/dev/verify_precommit_installed.py
 
+qa-commit:
+	python scripts/ci/run_stage_checks.py qa-commit
+
+qa-push:
+	python scripts/ci/run_stage_checks.py qa-push
+
+qa-ci:
+	python scripts/ci/run_stage_checks.py qa-ci
+
+
 qa-baseline:
-	$(MAKE) qa-hook-parity
+	$(MAKE) qa-push
 
 qa-hook-parity:
 	python .github/scripts/check_python_support_policy.py
@@ -24,7 +34,7 @@ qa-hook-parity:
 qa-hook-parity-diagnostics:
 	python .github/scripts/run_hook_parity_with_diagnostics.py
 
-qa-local-fast: qa-hook-parity
+qa-local-fast: qa-commit
 
 qa-test-cov:
 	pytest --cov --cov-report=term-missing --cov-report=xml
@@ -36,12 +46,9 @@ qa-full-type-surface:
 	mypy --config-file=pyproject.toml src tests
 
 qa-ci-equivalent:
-	python .github/scripts/check_no_regression_budget.py
-	$(MAKE) qa-hook-parity-diagnostics
-	$(MAKE) qa-test-cov
-	$(MAKE) qa-full-type-surface
+	$(MAKE) qa-ci
 
-qa-local: bootstrap qa-hook-parity qa-test-cov qa-full-type-surface
+qa-local: bootstrap qa-push qa-test-cov qa-full-type-surface
 
 scratch-hygiene:
 	python .github/scripts/check_root_scratch_files.py

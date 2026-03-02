@@ -52,20 +52,19 @@ def test_docs_include_generated_parity_policy_block() -> None:
         assert f"- Python baseline: `{python_version}`" in text
 
 
-def test_makefile_qa_ci_equivalent_target_runs_canonical_sequence() -> None:
+def test_makefile_qa_ci_target_runs_stage_runner() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
 
+    assert "qa-ci:" in makefile
+    assert "	python scripts/ci/run_stage_checks.py qa-ci" in makefile
     assert "qa-ci-equivalent:" in makefile
-    assert "	python .github/scripts/check_no_regression_budget.py" in makefile
-    assert "	$(MAKE) qa-hook-parity" in makefile
-    assert "	$(MAKE) qa-test-cov" in makefile
-    assert "	$(MAKE) qa-full-type-surface" in makefile
+    assert "	$(MAKE) qa-ci" in makefile
 
 
 def test_makefile_qa_local_remains_fast_dev_flow() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
 
-    assert "qa-local: bootstrap qa-hook-parity qa-test-cov qa-full-type-surface" in makefile
+    assert "qa-local: bootstrap qa-push qa-test-cov qa-full-type-surface" in makefile
 
 
 def test_state_renorm_milestone_baseline_uses_canonical_make_targets() -> None:

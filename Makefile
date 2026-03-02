@@ -1,4 +1,4 @@
-.PHONY: bootstrap qa-hook-parity qa-local promotion-checks scratch-hygiene test test-cov
+.PHONY: bootstrap qa-hook-parity qa-local-fast qa-full-type-surface qa-test-cov qa-local promotion-checks scratch-hygiene test test-cov
 
 bootstrap:
 	@python --version
@@ -12,9 +12,15 @@ qa-hook-parity:
 	python .github/scripts/check_precommit_parity.py
 	pre-commit run --all-files
 
-qa-local: bootstrap qa-hook-parity
+qa-local-fast: qa-hook-parity
+
+qa-test-cov:
 	pytest --cov --cov-report=term-missing --cov-report=xml
+
+qa-full-type-surface:
 	mypy --config-file=pyproject.toml src tests
+
+qa-local: bootstrap qa-hook-parity qa-test-cov qa-full-type-surface
 
 scratch-hygiene:
 	python .github/scripts/check_root_scratch_files.py
@@ -26,4 +32,4 @@ test:
 	pytest
 
 test-cov:
-	pytest --cov --cov-report=term-missing --cov-report=xml
+	$(MAKE) qa-test-cov

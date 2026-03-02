@@ -32,6 +32,16 @@ It defines:
 
 Canonical source: `[tool.semanticng.mypy_tiers]` in `pyproject.toml`.
 
+## Canonical quality command pack (Makefile)
+
+Use Makefile targets as the single source of truth for local and CI quality commands:
+
+- `make qa-hook-parity` — Tier 1 strict pre-commit parity gate.
+- `make qa-test-cov` — full pytest + coverage gate (`pytest --cov --cov-report=term-missing --cov-report=xml`).
+- `make qa-full-type-surface` — full mypy surface (`mypy --config-file=pyproject.toml src tests`).
+
+`make qa-local` composes bootstrap + all three gates above for end-to-end local CI parity.
+
 ## Drift controls
 
 - `.github/scripts/check_precommit_parity.py` enforces known parity invariants:

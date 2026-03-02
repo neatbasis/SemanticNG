@@ -23,6 +23,15 @@ MYPY_SCOPE_DOCS = (
     Path("docs/dev_toolchain_parity.md"),
     Path("docs/DEVELOPMENT.md"),
 )
+COMMAND_PARITY_DOCS = (
+    Path("docs/dev_toolchain_parity.md"),
+    Path("docs/DEVELOPMENT.md"),
+)
+CANONICAL_MAKE_TARGETS = (
+    "make qa-hook-parity",
+    "make qa-test-cov",
+    "make qa-full-type-surface",
+)
 
 
 class ParityError(RuntimeError):
@@ -167,6 +176,31 @@ def _ensure_docs_match_mypy_scope(mypy_files: list[str], mypy_hook_args: list[st
             raise ParityError("Documented mypy scope strings are out of sync.")
 
 
+def _ensure_command_parity_strings() -> None:
+    workflow = Path(".github/workflows/quality-guardrails.yml")
+    workflow_text = workflow.read_text(encoding="utf-8")
+
+    missing_workflow = [target for target in CANONICAL_MAKE_TARGETS if target not in workflow_text]
+    if missing_workflow:
+        print("Pre-commit parity failure: workflow command parity drift.")
+        print(f"  workflow: {workflow}")
+        print("  missing exact string(s):")
+        for entry in missing_workflow:
+            print(f"    - {entry}")
+        raise ParityError("Workflow command parity strings are out of sync.")
+
+    for doc in COMMAND_PARITY_DOCS:
+        text = doc.read_text(encoding="utf-8")
+        missing_doc = [target for target in CANONICAL_MAKE_TARGETS if target not in text]
+        if missing_doc:
+            print("Pre-commit parity failure: docs command parity drift.")
+            print(f"  file: {doc}")
+            print("  missing exact string(s):")
+            for entry in missing_doc:
+                print(f"    - {entry}")
+            raise ParityError("Documentation command parity strings are out of sync.")
+
+
 def main() -> int:
     config_lines = Path(".pre-commit-config.yaml").read_text(encoding="utf-8").splitlines()
     pyproject_path = Path("pyproject.toml")
@@ -197,6 +231,7 @@ def main() -> int:
         return 1
 
     _ensure_docs_match_mypy_scope(mypy_files, expected_mypy_hook_args)
+    _ensure_command_parity_strings()
 
     mypy_dep_specs = _extract_additional_dependencies(mypy_block)
     mypy_constraints = {

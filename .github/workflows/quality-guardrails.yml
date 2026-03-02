@@ -2,12 +2,12 @@ name: Quality Guardrails
 
 # Pyproject-to-CI quality gate mapping
 #
-# | pyproject.toml section | CI command in this workflow | Notes |
+# | pyproject.toml section | Canonical command (Makefile) | Notes |
 # | --- | --- | --- |
-# | [tool.pytest.ini_options] | pytest --cov --cov-report=term-missing --cov-report=xml | Test discovery/runtime flags and marker/filter behavior apply to the test-cov job. |
-# | [tool.coverage.run], [tool.coverage.report] | pytest --cov --cov-report=term-missing --cov-report=xml | Coverage configuration (including fail_under) is enforced by pytest-cov in test-cov. |
+# | [tool.pytest.ini_options] | make qa-test-cov | Test discovery/runtime flags and marker/filter behavior apply to the test-cov job. |
+# | [tool.coverage.run], [tool.coverage.report] | make qa-test-cov | Coverage configuration (including fail_under) is enforced by pytest-cov in test-cov. |
 # | [tool.mypy] (Tier 1 strict scope) | make qa-hook-parity | mypy hook is scoped to strict core/application paths for fast local feedback. |
-# | [tool.mypy] (full surface) | mypy --config-file=pyproject.toml src tests | Separate CI gate for tests + legacy/BDD namespaces under bounded relaxations. |
+# | [tool.mypy] (full surface) | make qa-full-type-surface | Separate CI gate for tests + legacy/BDD namespaces under bounded relaxations. |
 # | [tool.ruff], [tool.black], [tool.isort], other lint tooling sections | make qa-hook-parity | Lint/format policy is enforced through configured pre-commit hooks. |
 
 on:
@@ -25,21 +25,12 @@ jobs:
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
 
-      - name: Verify Python support policy sync
-        run: python .github/scripts/check_python_support_policy.py
-
-      - name: Print environment provenance
-        run: python .github/scripts/print_env_provenance.py
-
-      - name: Verify pre-commit parity wiring
-        run: python .github/scripts/check_precommit_parity.py
-
-      - name: Run pre-commit (verbose, capture log)
-        id: precommit
+      - name: Run hook parity gate (verbose, capture log)
+        id: hook_parity
         continue-on-error: true
         run: |
           set -o pipefail
-          pre-commit run --all-files -v 2>&1 | tee precommit.log
+          make qa-hook-parity 2>&1 | tee precommit.log
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
       - name: Show pre-commit log
@@ -60,8 +51,8 @@ jobs:
           path: precommit.log
           if-no-files-found: warn
 
-      - name: Fail job on pre-commit errors
-        if: steps.precommit.outcome == 'failure'
+      - name: Fail job on hook parity errors
+        if: steps.hook_parity.outcome == 'failure'
         run: exit 1
 
   baseline-test-cov:
@@ -73,14 +64,8 @@ jobs:
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
 
-      - name: Verify Python support policy sync
-        run: python .github/scripts/check_python_support_policy.py
-
-      - name: Print environment provenance
-        run: python .github/scripts/print_env_provenance.py
-
       - name: Run tests with coverage gate
-        run: pytest --cov --cov-report=term-missing --cov-report=xml
+        run: make qa-test-cov
 
   full-type-surface:
     runs-on: ubuntu-latest
@@ -91,11 +76,5 @@ jobs:
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
 
-      - name: Verify Python support policy sync
-        run: python .github/scripts/check_python_support_policy.py
-
-      - name: Print environment provenance
-        run: python .github/scripts/print_env_provenance.py
-
       - name: Run mypy (full type surface)
-        run: mypy --config-file=pyproject.toml src tests
+        run: make qa-full-type-surface

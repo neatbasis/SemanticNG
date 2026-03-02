@@ -22,7 +22,22 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -e ".[test]"
-pre-commit install
+make bootstrap
+```
+
+
+Hook installation is mandatory. `make bootstrap` installs both required hooks (`pre-commit` and `pre-push`), installs hook environments, and fails fast if they are missing/misconfigured via:
+
+```bash
+python scripts/dev/verify_precommit_installed.py
+```
+
+If this verifier fails, run:
+
+```bash
+pre-commit install --hook-type pre-commit --hook-type pre-push
+pre-commit install-hooks
+python scripts/dev/verify_precommit_installed.py
 ```
 
 ## First 5 minutes: verify editor diagnostics
@@ -213,6 +228,3 @@ Recommended disposition policy:
 - GitHub Actions patch/minor updates: eligible for auto-merge once required checks are green.
 - Python `dev-test-tooling` updates (`ruff`, `mypy`, `pytest`, `pre-commit`, typing stubs): require human review because they can alter lint/type gate behavior.
 - `runtime-dependencies` updates: require human review plus behavior/regression validation.
-
-
-

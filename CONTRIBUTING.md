@@ -1,5 +1,23 @@
 # Contributing
 
+## Mandatory hook installation
+
+Local development requires both Git hooks installed via `pre-commit` (`pre-commit` and `pre-push`).
+
+```bash
+make bootstrap
+```
+
+This runs:
+
+```bash
+pre-commit install --hook-type pre-commit --hook-type pre-push
+pre-commit install-hooks
+python scripts/dev/verify_precommit_installed.py
+```
+
+If verification fails, follow the remediation text printed by the verifier and rerun `make bootstrap`.
+
 ## Pre-push quality requirement
 
 Before every push, run the full pre-commit suite from the repository root:

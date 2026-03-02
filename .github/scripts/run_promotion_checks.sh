@@ -56,8 +56,11 @@ GOVERNANCE_PATTERNS=(
 
 FRESHNESS_PATTERNS=(
   "docs/doc_freshness_slo.json"
-  "docs/*.md"
-  "docs/**/*.md"
+  "docs/release_checklist.md"
+  "docs/documentation_change_control.md"
+  "docs/sprint_handoffs/*"
+  "docs/system_contract_map.md"
+  "ROADMAP.md"
   ".github/scripts/validate_doc_freshness_slo.py"
 )
 

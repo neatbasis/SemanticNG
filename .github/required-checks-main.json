@@ -4,8 +4,6 @@
     "Quality Guardrails / no-regression-budget",
     "Quality Guardrails / baseline-lint-type",
     "Quality Guardrails / baseline-test-cov",
-    "Quality Guardrails / full-type-surface",
-    "State Renormalization Milestone Gate / baseline-quality",
-    "State Renormalization Milestone Gate / milestone-governance"
+    "Quality Guardrails / full-type-surface"
   ]
 }

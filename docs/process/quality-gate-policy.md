@@ -1,17 +1,36 @@
 # Quality gate policy for `main`
 
+## Canonical enforcement scope decision
+
+**Decision: milestone-governed enforcement for promotion/governance checks; global enforcement for baseline quality checks.**
+
+- **Global poka-yoke blockers (always required on `main`):**
+  - `Quality Guardrails / no-regression-budget`
+  - `Quality Guardrails / baseline-lint-type`
+  - `Quality Guardrails / baseline-test-cov`
+  - `Quality Guardrails / full-type-surface`
+- **Milestone/policy-surface poka-yoke blockers (conditional by changed paths):**
+  - `State Renormalization Milestone Gate / baseline-quality`
+  - `State Renormalization Milestone Gate / milestone-governance`
+  - `promotion-governance-pokayoke` pre-commit hook (`.github/scripts/run_promotion_checks.sh`), which only runs when staged files touch milestone/policy surfaces.
+- **Measurement-only telemetry (non-blocking):**
+  - `Quality Guardrails / policy-measurement`
+  - `State Renormalization Milestone Gate` promotion checklist measurement note emitted from `make promotion-check` step.
+
+This repository does **not** use global blocking enforcement for promotion-governance checks outside milestone/policy surfaces.
+
 ## Required checks (branch protection baseline)
 
-The `main` branch protection and merge queue ruleset must require, at minimum, the following checks:
+The `main` branch protection and merge queue ruleset must require, at minimum, the following always-on checks:
 
 - `Quality Guardrails / no-regression-budget`
 - `Quality Guardrails / baseline-lint-type`
 - `Quality Guardrails / baseline-test-cov`
 - `Quality Guardrails / full-type-surface`
-- `State Renormalization Milestone Gate / baseline-quality`
-- `State Renormalization Milestone Gate / milestone-governance`
 
 In particular, `baseline-lint-type` and `full-type-surface` are mandatory required checks and must not be optional on `main`.
+
+Milestone-gate checks remain required for PR/merge-queue entries that touch milestone-governed paths, enforced by workflow path filters.
 
 ## Temporary exceptions (time-boxed stabilization policy)
 

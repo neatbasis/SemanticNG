@@ -1,15 +1,15 @@
 # Branch protection drift audit
 
-This repository treats the following checks as **critical** for both direct PR merges and merge queue entries:
+This repository treats the following checks as **always-on critical** for both direct PR merges and merge queue entries:
 
 - `Quality Guardrails / no-regression-budget`
 - `Quality Guardrails / baseline-lint-type`
 - `Quality Guardrails / baseline-test-cov`
 - `Quality Guardrails / full-type-surface`
-- `State Renormalization Milestone Gate / baseline-quality`
-- `State Renormalization Milestone Gate / milestone-governance`
 
-These checks are derived from workflow YAML (`.github/workflows/quality-guardrails.yml` and `.github/workflows/state-renorm-milestone-gate.yml`) by `.github/scripts/audit_branch_protection.py`.
+Milestone-gate checks are conditional blockers and are enforced when workflow path filters match milestone-governed changes.
+
+These checks are sourced from `.github/required-checks-main.json` and verified to exist in workflow YAML by `.github/scripts/audit_branch_protection.py`.
 
 ## Automated enforcement
 

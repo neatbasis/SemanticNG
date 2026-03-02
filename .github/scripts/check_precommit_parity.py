@@ -235,12 +235,14 @@ def _ensure_command_parity_strings(canonical_make_targets: list[str], parity_doc
 
 def _ensure_stage_hook_parity(config_lines: list[str], stage_manifest: dict[str, object]) -> None:
     manifest_stages = stage_manifest["stages"]
+    expected_hook_ids: set[str] = set()
     for _, stage_spec in manifest_stages.items():
         hook_spec = stage_spec.get("precommit_hook")
         if not isinstance(hook_spec, dict):
             continue
 
         hook_id = str(hook_spec["id"])
+        expected_hook_ids.add(hook_id)
         expected_entry = str(hook_spec["entry"])
         expected_stages = [str(stage) for stage in hook_spec["stages"]]
 
@@ -254,6 +256,24 @@ def _ensure_stage_hook_parity(config_lines: list[str], stage_manifest: dict[str,
         if actual_stages != expected_stages:
             _report_drift(".pre-commit-config.yaml", f"hooks.{hook_id}.stages", expected_stages, actual_stages)
             raise ParityError("Stage hook stages are out of sync with canonical stage manifest.")
+
+    configured_stage_hook_ids = {
+        match.group("hook_id")
+        for line in config_lines
+        if (match := re.match(r"^\s*-\s+id:\s+(?P<hook_id>qa-[a-z0-9-]+-stage)\s*$", line))
+    }
+    unmanaged_hook_ids = sorted(configured_stage_hook_ids - expected_hook_ids)
+    if unmanaged_hook_ids:
+        _report_drift(
+            ".pre-commit-config.yaml",
+            "hooks.<qa-stage>",
+            sorted(expected_hook_ids),
+            sorted(configured_stage_hook_ids),
+        )
+        raise ParityError(
+            "Detected qa-*-stage hooks in .pre-commit-config.yaml not declared in canonical stage manifest: "
+            + ", ".join(unmanaged_hook_ids)
+        )
 
 def main() -> int:
     config_lines = Path(".pre-commit-config.yaml").read_text(encoding="utf-8").splitlines()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 SCRIPT_PATH = (
@@ -119,18 +120,24 @@ def test_transition_to_done_includes_done_commands_when_docs_present() -> None:
 def test_pre_push_hooks_include_required_quality_gates() -> None:
     config_path = Path(__file__).resolve().parents[1] / ".pre-commit-config.yaml"
     config_text = config_path.read_text(encoding="utf-8")
+    stage_manifest = json.loads(
+        (Path(__file__).resolve().parents[1] / "docs/process/quality_stage_commands.json").read_text(
+            encoding="utf-8"
+        )
+    )
 
-    assert "- id: qa-commit-stage" in config_text
-    assert "entry: python scripts/ci/run_stage_checks.py qa-commit" in config_text
-    assert "stages: [pre-commit]" in config_text
+    for stage_spec in stage_manifest["stages"].values():
+        hook_spec = stage_spec.get("precommit_hook")
+        if not isinstance(hook_spec, dict):
+            continue
+
+        assert f"- id: {hook_spec['id']}" in config_text
+        assert f"entry: {hook_spec['entry']}" in config_text
+        assert f"stages: [{', '.join(hook_spec['stages'])}]" in config_text
 
     assert "- id: precommit-governance-selector" in config_text
     assert "entry: .github/scripts/run_precommit_governance_checks.py" in config_text
     assert "stages: [pre-commit]" in config_text
-
-    assert "- id: qa-push-stage" in config_text
-    assert "entry: python scripts/ci/run_stage_checks.py qa-push" in config_text
-    assert "stages: [pre-push]" in config_text
 
     assert "- id: ruff" in config_text
     assert "args: [--fix]" in config_text

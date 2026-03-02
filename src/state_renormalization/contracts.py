@@ -206,9 +206,18 @@ class SchemaHit(BaseModel):
     name: str
     score: float
     about: AmbiguityAbout | None = None
-    # TODO: add these when it's time
-    # schema_id: Optional[str] = None
-    # source: Optional[str] = None
+    schema_id: str | None = None
+    source: str | None = None
+
+    @field_validator("schema_id", "source", mode="before")
+    @classmethod
+    def _normalize_optional_strings(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        return value
 
 
 class SchemaSelection(BaseModel):

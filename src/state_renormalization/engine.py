@@ -2415,7 +2415,14 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
             "kind": "schema_selection",
             "observer": _to_dict(getattr(ep, "observer", None)),
             "schemas": [
-                {"name": h.name, "score": h.score, "about": _to_dict(h.about)} for h in sel.schemas
+                {
+                    "name": h.name,
+                    "score": h.score,
+                    "about": _to_dict(h.about),
+                    "schema_id": h.schema_id,
+                    "source": h.source,
+                }
+                for h in sel.schemas
             ],
             "ambiguities": [_to_dict(a) for a in belief.ambiguities_active],
             "ambiguity_state": belief.ambiguity_state.value,

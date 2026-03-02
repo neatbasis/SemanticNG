@@ -69,6 +69,8 @@ ruff check src tests && ruff format --check src tests && mypy --config-file=pypr
 
 See [`docs/editor_setup.md`](editor_setup.md) for the minimal editor setup.
 
+Governed source scope (canonical): src/core/**, src/state_renormalization/** (source: `docs/dod_manifest.json#governed_paths.src`).
+
 ## Local quality scopes
 
 ### Required pre-commit scope (Tier 1 strict)

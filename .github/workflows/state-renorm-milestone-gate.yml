@@ -4,6 +4,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, edited, ready_for_review]
     paths:
+      - 'src/core/**'
       - 'src/state_renormalization/**'
       - 'docs/dod_manifest.json'
       - 'docs/doc_freshness_slo.json'
@@ -28,6 +29,7 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened, edited, ready_for_review]
     paths:
+      - 'src/core/**'
       - 'src/state_renormalization/**'
       - 'docs/dod_manifest.json'
       - 'docs/doc_freshness_slo.json'
@@ -51,6 +53,7 @@ on:
       - '.github/actions/python-test-setup/action.yml'
   merge_group:
     paths:
+      - 'src/core/**'
       - 'src/state_renormalization/**'
       - 'docs/dod_manifest.json'
       - 'docs/doc_freshness_slo.json'

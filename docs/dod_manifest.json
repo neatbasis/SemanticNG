@@ -388,5 +388,35 @@
       "mypy_debt_delta": 0,
       "flaky_test_count": 0
     }
+  },
+  "governed_paths": {
+    "src": [
+      "src/core/**",
+      "src/state_renormalization/**"
+    ],
+    "ci_triggers": [
+      "src/core/**",
+      "src/state_renormalization/**",
+      "docs/dod_manifest.json",
+      "docs/doc_freshness_slo.json",
+      "docs/release_checklist.md",
+      "docs/documentation_change_control.md",
+      "docs/sprint_handoffs/**",
+      "docs/system_contract_map.md",
+      "ROADMAP.md",
+      ".github/pull_request_template.md",
+      ".github/scripts/validate_milestone_docs.py",
+      ".github/scripts/validate_sprint_handoff.py",
+      ".github/scripts/validate_doc_freshness_slo.py",
+      ".github/scripts/capability_parity_report.py",
+      ".github/scripts/render_transition_evidence.py",
+      ".github/scripts/validate_governance_sync.py",
+      ".github/scripts/validate_governance_docs_schema.py",
+      ".github/scripts/run_promotion_checks.sh",
+      "Makefile",
+      ".github/workflows/state-renorm-milestone-gate.yml",
+      ".github/workflows/quality-guardrails.yml",
+      ".github/actions/python-test-setup/action.yml"
+    ]
   }
 }

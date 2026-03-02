@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import subprocess
 import sys
@@ -20,6 +21,17 @@ def _matches_code_path(changed_file: str, code_path: str) -> bool:
     normalized = code_path.rstrip("/")
     return changed_file == normalized or changed_file.startswith(f"{normalized}/")
 
+
+
+
+def _governed_src_globs(manifest: dict[str, Any]) -> list[str]:
+    governed = manifest.get("governed_paths", {})
+    src = governed.get("src", []) if isinstance(governed, dict) else []
+    return [item for item in src if isinstance(item, str)]
+
+
+def _touches_governed_src(changed_files: list[str], src_globs: list[str]) -> bool:
+    return any(fnmatch.fnmatch(path, pattern) for path in changed_files for pattern in src_globs)
 
 def _dedupe(commands: list[str]) -> list[str]:
     ordered: list[str] = []
@@ -65,9 +77,8 @@ def select_milestone_commands(
 
     docs_only = _is_docs_only_change(changed_files, filters)
     impacting_docs = _touches_impacting_docs(changed_files, filters)
-    touches_state_renorm = any(
-        path.startswith("src/state_renormalization/") for path in changed_files
-    )
+    governed_src = _governed_src_globs(head_manifest)
+    touches_governed_src = _touches_governed_src(changed_files, governed_src)
     manifest_changed = "docs/dod_manifest.json" in changed_files
 
     commands: list[str] = []
@@ -81,7 +92,7 @@ def select_milestone_commands(
                 continue
             capability_paths = capability.get("code_paths", [])
             capability_changed = (
-                touches_state_renorm
+                touches_governed_src
                 or manifest_changed
                 or any(
                     _matches_code_path(changed, code_path)

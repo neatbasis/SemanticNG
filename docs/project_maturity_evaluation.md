@@ -1,6 +1,6 @@
 # Project Maturity Evaluation
 
-_Last regenerated from manifest: 2026-02-28T15:48:35Z (UTC)._
+_Last regenerated from manifest: 2026-03-02T00:53:00Z (UTC)._
 _Regeneration command: `python .github/scripts/capability_parity_report.py` (then update this summary from `docs/dod_manifest.json` and `docs/system_contract_map.md`)._
 
 ## Executive assessment
@@ -22,7 +22,7 @@ All maturity claims in this document are derived from these canonical evidence s
 
 Completion ratio (done / total): **77.8%** (`7/9`).
 
-Current bottleneck capability (highest-priority non-`done`): **`capability_invocation_governance`**.
+Current bottleneck set (remaining non-`done` implementation queue): **`capability_invocation_governance`** and **`repair_aware_projection_evolution`**.
 
 ### Quality and validation signals (from `docs/dod_manifest.json`)
 
@@ -35,19 +35,19 @@ Current bottleneck capability (highest-priority non-`done`): **`capability_invoc
 
 ## Maturity conclusion
 
-**Current stage: Post-replay governance maturation (authorization-first)**
+**Current stage: Late-Now completion with dual-capability hardening runway**
 
 Derived from canonical evidence:
 
 - Governance and replay baseline capabilities are recorded as delivered in `docs/dod_manifest.json`.
-- Remaining implementation work is concentrated in `capability_invocation_governance` and `repair_aware_projection_evolution` (`planned` in `docs/dod_manifest.json`).
+- Remaining implementation work is fully concentrated in the two `planned` capabilities: `capability_invocation_governance` and `repair_aware_projection_evolution` (`docs/dod_manifest.json`).
 - Contract maturity posture is governed by `docs/system_contract_map.md`.
 
 ## Most timely development (priority recommendation)
 
 ### #1 Immediate priority
 
-**Prioritize `capability_invocation_governance` as the single current implementation target.**
+**Prioritize the remaining planned pair, starting with `capability_invocation_governance` and immediately sequencing `repair_aware_projection_evolution`.**
 
 ### #2 Near-term execution sequence
 
@@ -60,11 +60,12 @@ Derived from canonical evidence:
 ## Suggested maturity targets for next review window
 
 - Keep done capabilities in non-regression coverage by validating manifest-defined command packs.
-- Move `capability_invocation_governance` from `planned` toward executable baseline evidence.
-- Recompute counts and bottleneck assignment from canonical sources only (`docs/dod_manifest.json` + `docs/system_contract_map.md`).
+- Move both remaining `planned` capabilities (`capability_invocation_governance`, `repair_aware_projection_evolution`) toward executable baseline evidence.
+- Recompute counts and bottleneck-set assignment from canonical sources only (`docs/dod_manifest.json` + `docs/system_contract_map.md`).
 
 ## Maturity changelog
 
+- 2026-03-02T00:53:00Z: **Canonical maturity refresh** — recomputed capability totals (`7 done / 0 in_progress / 2 planned`), updated stage language to late-Now completion posture, and reframed the bottleneck as the two-capability planned queue (`capability_invocation_governance`, `repair_aware_projection_evolution`).
 - 2026-02-28T15:48:35Z: **Canonical manifest refresh** — deduplicated prior overlapping refresh notes into one event; recomputed totals (`7 done / 0 in_progress / 2 planned`), retained `capability_invocation_governance` as highest-priority non-done bottleneck, and aligned command packs to manifest `pytest_commands`.
 - 2026-02-28T15:48:35Z: **Gate/halt evidence confirmation** — retained gate/halt baseline validation as canonical evidence under `docs/dod_manifest.json` command/evidence mappings and maturity interpretation in `docs/system_contract_map.md`.
 
@@ -80,7 +81,7 @@ Run a maturity review whenever one of these triggers occurs:
 For each review, execute this update sequence:
 
 1. Recompute capability ratios directly from `docs/dod_manifest.json` and update `done`, `in_progress`, and `planned` totals.
-2. Set the **current bottleneck capability** to the highest-priority non-`done` capability (prefer `in_progress`; otherwise blocking `planned`).
+2. Set the **current bottleneck capability/set** to the highest-priority non-`done` work queue (prefer `in_progress`; otherwise the remaining blocking `planned` capabilities).
 3. Verify contract maturity interpretation against `docs/system_contract_map.md` and update conclusions accordingly.
 4. Pull validation command packs directly from `pytest_commands` arrays in `docs/dod_manifest.json` (no ad-hoc command variants).
 5. Update the top metadata timestamp to the refresh-run generated UTC timestamp.

@@ -106,6 +106,40 @@ def test_refactored_selector_matches_legacy_snapshots(
     assert refactored.model_dump(mode="json") == legacy.model_dump(mode="json")
 
 
+def test_schema_hit_backward_compatible_optional_fields_and_stable_json_shape() -> None:
+    legacy_payload = {"name": "actionable_intent", "score": 0.7, "about": None}
+    hit_from_legacy = SchemaHit.model_validate(legacy_payload)
+
+    assert hit_from_legacy.schema_id is None
+    assert hit_from_legacy.source is None
+    assert hit_from_legacy.model_dump(mode="json") == {
+        "name": "actionable_intent",
+        "score": 0.7,
+        "about": None,
+        "schema_id": None,
+        "source": None,
+    }
+    assert (
+        hit_from_legacy.model_dump_json()
+        == '{"name":"actionable_intent","score":0.7,"about":null,"schema_id":null,"source":null}'
+    )
+
+
+def test_schema_hit_optional_fields_trim_and_round_trip() -> None:
+    hit = SchemaHit(
+        name="actionable_intent",
+        score=0.7,
+        schema_id="  schema:lights  ",
+        source="  selector:v2  ",
+    )
+
+    dumped = hit.model_dump(mode="json")
+
+    assert dumped["schema_id"] == "schema:lights"
+    assert dumped["source"] == "selector:v2"
+    assert list(dumped) == ["name", "score", "about", "schema_id", "source"]
+
+
 def test_build_selector_context_normalizes_once_and_exposes_signals() -> None:
     ctx = build_selector_context("They're coming in ten", error=None)
 

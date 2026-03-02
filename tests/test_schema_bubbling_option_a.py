@@ -93,7 +93,16 @@ def test_schema_selection_artifact_does_not_leak_channel_specific_terms(
     make_episode: Callable[..., Episode],
 ) -> None:
     sel = SchemaSelection(
-        schemas=[SchemaHit(name="actionable_intent", score=0.7)], ambiguities=[], notes="ok"
+        schemas=[
+            SchemaHit(
+                name="actionable_intent",
+                score=0.7,
+                schema_id="schema:actionable_intent",
+                source="selector:default",
+            )
+        ],
+        ambiguities=[],
+        notes="ok",
     )
 
     def fake_selector(user_text: str | None, *, error: CaptureOutcome | None) -> SchemaSelection:
@@ -108,3 +117,5 @@ def test_schema_selection_artifact_does_not_leak_channel_specific_terms(
 
     assert "ha_" not in s
     assert "satellite_" not in s
+    assert art["schemas"][0]["schema_id"] == "schema:actionable_intent"
+    assert art["schemas"][0]["source"] == "selector:default"

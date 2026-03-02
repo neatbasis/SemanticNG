@@ -70,6 +70,55 @@ jobs:
             --md-out precommit_failure_classification.md
           cat precommit_failure_classification.md >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Detect pre-commit autofix working-tree changes
+        if: always()
+        id: precommit_dirty
+        run: |
+          set -euo pipefail
+
+          status_file="precommit_status.txt"
+          git status --porcelain > "$status_file"
+
+          if [[ -s "$status_file" ]]; then
+            echo "dirty=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Hook parity left uncommitted changes"
+              echo
+              echo "Run \`pre-commit run --all-files\` locally and commit the resulting changes before pushing."
+              echo
+              echo "Touched paths:"
+              sed 's/^/- `/' "$status_file" | sed 's/$/`/'
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            echo "===== git status --porcelain ====="
+            cat "$status_file"
+
+            echo "===== bounded diff preview (docs/ src/ .github/) ====="
+            git --no-pager diff -- docs/ src/ .github/ | sed -n '1,300p'
+            echo "===== (end bounded preview) ====="
+
+            git --no-pager diff > precommit_autofix.patch
+          else
+            echo "dirty=false" >> "$GITHUB_OUTPUT"
+            echo "No working-tree changes detected after hook parity." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload pre-commit autofix patch artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: precommit-autofix-patch
+          path: precommit_autofix.patch
+          if-no-files-found: warn
+
+      - name: Add autofix artifact note to job summary
+        if: always() && steps.precommit_dirty.outputs.dirty == 'true'
+        run: |
+          {
+            echo
+            echo "Download artifact \`precommit-autofix-patch\` for the full diff."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload pre-commit log artifact
         if: always()
         uses: actions/upload-artifact@v7
@@ -90,7 +139,12 @@ jobs:
 
       - name: Fail job on hook parity errors
         if: steps.hook_parity.outcome == 'failure'
-        run: exit 1
+        run: |
+          {
+            echo
+            echo "❌ Hook parity failed. Run \`pre-commit run --all-files\` locally, commit all changes, and push again."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
   baseline-test-cov:
     runs-on: ubuntu-latest

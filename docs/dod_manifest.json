@@ -218,8 +218,12 @@
       "status_semantics": {
         "baseline_shipped": "Repair-event projection baseline is already shipped and test-backed: mission loop emits proposal/resolution records, replay applies accepted repairs deterministically, and prediction records stay append-only without silent mutation.",
         "full_completion_scope": "Promotion to done still requires broader contract evolution and sequencing dependencies (notably capability invocation governance completion and deferred field/back-compat hardening).",
-        "missing_acceptance_gates": [],
-        "evidence_policy": "Acceptance gates covered with CI evidence links; dependency `capability_invocation_governance` is done."
+        "missing_acceptance_gates": [
+          "schema_evolution_repair_aliases",
+          "replay_backward_compatibility_repair_resolution_aliases",
+          "multiturn_repair_acceptance_policy_flow"
+        ],
+        "evidence_policy": "Acceptance gates covered with CI evidence links; dependency `capability_invocation_governance` is done and evidenced in this manifest."
       },
       "code_paths": [
         "src/state_renormalization/invariants.py",

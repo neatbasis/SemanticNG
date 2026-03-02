@@ -67,3 +67,32 @@ def test_repair_resolution_accepts_legacy_field_aliases() -> None:
     assert resolution.proposal_event_kind == "repair_proposal"
     assert resolution.resolved_at_iso == "2026-02-13T00:00:01+00:00"
     assert resolution.accepted_prediction is not None
+
+
+def test_repair_resolution_accepts_extended_legacy_aliases() -> None:
+    resolution = RepairResolutionEvent.model_validate(
+        {
+            "event_kind": "repair_resolution",
+            "repair_id": "repair:legacy:2",
+            "resolution": "accepted",
+            "resolved_at": "2026-02-13T00:00:02+00:00",
+            "lineage_ref": {
+                "scope_key": "turn:2",
+                "prediction_id": "pred:2",
+                "correction_root_prediction_id": "pred:2",
+            },
+            "accepted_prediction_record": {
+                "prediction_id": "pred:2",
+                "scope_key": "turn:2",
+                "filtration_id": "conversation:c1",
+                "target_variable": "user_response_present",
+                "target_horizon_iso": "2026-02-13T00:00:00+00:00",
+                "expectation": 0.9,
+                "issued_at_iso": "2026-02-13T00:00:00+00:00",
+            },
+        }
+    )
+
+    assert resolution.decision == RepairResolution.ACCEPTED
+    assert resolution.accepted_prediction is not None
+    assert resolution.accepted_prediction.prediction_id == "pred:2"

@@ -212,3 +212,52 @@ def test_done_status_transition_retains_at_least_one_passing_regression_command(
             f"Capability {cap['id']} transitioned to done and must retain at least one passing pytest command\n"
             f"commands={commands}"
         )
+
+
+def _capability_by_id(manifest: ManifestDocument, capability_id: str) -> dict[str, Any]:
+    raw = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    for cap in raw.get("capabilities", []):
+        if isinstance(cap, dict) and cap.get("id") == capability_id:
+            return cast(dict[str, Any], cap)
+    raise AssertionError(f"Missing capability in manifest: {capability_id}")
+
+
+def test_repair_aware_projection_done_status_has_acceptance_gate_evidence() -> None:
+    manifest = _load_manifest()
+    repair_cap = _capability_by_id(manifest, "repair_aware_projection_evolution")
+    governance_cap = _capability_by_id(manifest, "capability_invocation_governance")
+
+    assert governance_cap.get("status") == "done"
+    governance_evidence = governance_cap.get("ci_evidence_links", [])
+    assert isinstance(governance_evidence, list) and governance_evidence
+
+    assert repair_cap.get("status") == "done"
+    status_semantics = repair_cap.get("status_semantics", {})
+    assert isinstance(status_semantics, dict)
+
+    missing_gates = status_semantics.get("missing_acceptance_gates", [])
+    assert isinstance(missing_gates, list)
+    assert set(missing_gates) == {
+        "schema_evolution_repair_aliases",
+        "replay_backward_compatibility_repair_resolution_aliases",
+        "multiturn_repair_acceptance_policy_flow",
+    }
+
+    pytest_commands = repair_cap.get("pytest_commands", [])
+    assert isinstance(pytest_commands, list)
+    expected_test_targets = {
+        "tests/test_schema_contract_evolution.py",
+        "tests/test_replay_backward_compatibility.py",
+        "tests/test_repair_mode_projection_multiturn.py",
+        "tests/test_repair_acceptance_policy.py",
+    }
+    command_blob = "\n".join(str(cmd) for cmd in pytest_commands)
+    for test_target in expected_test_targets:
+        assert test_target in command_blob
+
+    repair_evidence = repair_cap.get("ci_evidence_links", [])
+    assert isinstance(repair_evidence, list) and repair_evidence
+    assert all(
+        isinstance(link, dict) and str(link.get("evidence", "")).startswith("https://")
+        for link in repair_evidence
+    )

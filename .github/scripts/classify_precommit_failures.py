@@ -18,6 +18,10 @@ PYTEST_ERROR_PATTERN = re.compile(
     re.IGNORECASE,
 )
 PATH_PATTERN = re.compile(r"\b(?P<path>(?:src|tests|docs|\.github)/[\w./-]+\.[A-Za-z0-9]+)")
+HOOK_BLOCK_PATTERN = re.compile(
+    r"^(?P<name>.+?)\.{10,}(?P<status>Passed|Failed)\s*$", re.MULTILINE
+)
+FILES_LIST_PATTERN = re.compile(r"^files?:\s*(?P<files>.+)$", re.MULTILINE)
 
 TAXONOMY_KEYS: tuple[str, ...] = ("ruff", "mypy", "pytest", "autofix_drift", "infra_setup")
 SCHEMA_VERSION = "1.0"
@@ -53,6 +57,8 @@ def classify(log_text: str) -> dict[str, Any]:
     if missing_dependency:
         classes.add("infra_setup")
 
+    failing_hooks = extract_failing_hooks(log_text)
+
     return {
         "schema_version": SCHEMA_VERSION,
         "taxonomy": list(TAXONOMY_KEYS),
@@ -64,8 +70,32 @@ def classify(log_text: str) -> dict[str, Any]:
             "mypy_codes": sorted(mypy_codes),
             "pytest_failure_detected": bool(PYTEST_ERROR_PATTERN.search(log_text)),
         },
+        "failing_hooks": failing_hooks,
         "touched_paths": sorted(touched_paths),
     }
+
+
+
+def extract_failing_hooks(log_text: str) -> list[dict[str, Any]]:
+    hooks: list[dict[str, Any]] = []
+    blocks = list(HOOK_BLOCK_PATTERN.finditer(log_text))
+    for index, block in enumerate(blocks):
+        if block.group("status") != "Failed":
+            continue
+        start = block.end()
+        end = blocks[index + 1].start() if index + 1 < len(blocks) else len(log_text)
+        section = log_text[start:end]
+
+        files: set[str] = set(PATH_PATTERN.findall(section))
+        files_line = FILES_LIST_PATTERN.search(section)
+        if files_line:
+            for candidate in files_line.group("files").split(","):
+                file_text = candidate.strip().strip('"').strip("'")
+                if file_text:
+                    files.add(file_text)
+
+        hooks.append({"name": block.group("name").strip(), "files": sorted(files)})
+    return hooks
 
 
 def render_summary(classification: dict[str, Any]) -> str:
@@ -98,6 +128,14 @@ def render_summary(classification: dict[str, Any]) -> str:
 
     if signals["pytest_failure_detected"]:
         lines.append("- **Pytest signal detected** in hook output.")
+
+    failing_hooks = classification.get("failing_hooks", [])
+    if failing_hooks:
+        lines.append("- **Failing hooks:**")
+        for hook in failing_hooks[:10]:
+            first_files = hook.get("files", [])[:5]
+            file_segment = f" (files: `{', '.join(first_files)}`)" if first_files else ""
+            lines.append(f"  - `{hook.get('name', 'unknown hook')}`{file_segment}")
 
     touched = classification["touched_paths"]
     lines.append(

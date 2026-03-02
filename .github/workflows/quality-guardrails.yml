@@ -51,7 +51,7 @@ jobs:
         run: python scripts/ci/check_toolchain_parity.py
 
       # Failing job command (verbatim): make qa-baseline
-      - name: Run `make qa-baseline` (verbose, capture log)
+      - name: Run `make qa-baseline` (capture concise console + full artifact log)
         id: hook_parity
         continue-on-error: true
         run: |
@@ -59,12 +59,16 @@ jobs:
           make qa-baseline 2>&1 | tee precommit.log
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
-      - name: Show pre-commit log
+      - name: Show concise grouped pre-commit log excerpt
         if: always()
         run: |
-          echo "===== precommit.log ====="
-          sed -n '1,200p' precommit.log || true
-          echo "===== (end) ====="
+          echo "::group::precommit.log (head)"
+          sed -n '1,80p' precommit.log || true
+          echo "::endgroup::"
+          echo "::group::precommit.log (tail)"
+          tail -n 120 precommit.log || true
+          echo "::endgroup::"
+
       - name: Classify pre-commit output
         if: always()
         run: |
@@ -98,18 +102,56 @@ jobs:
               sed 's/^/- `/' "$status_file" | sed 's/$/`/'
             } >> "$GITHUB_STEP_SUMMARY"
 
-            echo "===== git status --porcelain ====="
-            cat "$status_file"
-
-            echo "===== bounded diff preview (docs/ src/ .github/) ====="
-            git --no-pager diff -- docs/ src/ .github/ | sed -n '1,300p'
-            echo "===== (end bounded preview) ====="
-
             git --no-pager diff > precommit_autofix.patch
           else
             echo "dirty=false" >> "$GITHUB_OUTPUT"
             echo "No working-tree changes detected after hook parity." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - name: Build baseline-lint-type quality summary artifact
+        if: always()
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = {}
+          class_path = Path("precommit_failure_classification.json")
+          if class_path.exists():
+            data = json.loads(class_path.read_text(encoding="utf-8"))
+
+          hooks = data.get("failing_hooks", [])
+          classes = data.get("classes_detected", [])
+          first_files = []
+          for hook in hooks:
+            for file_path in hook.get("files", []):
+              if file_path not in first_files:
+                first_files.append(file_path)
+              if len(first_files) >= 8:
+                break
+            if len(first_files) >= 8:
+              break
+
+          lines = [
+            "# Quality summary (baseline-lint-type)",
+            "",
+            f"- Failed command: `make qa-baseline`",
+            f"- Top error classes: `{', '.join(classes[:5]) if classes else 'none detected'}`",
+            f"- First failing files: `{', '.join(first_files[:5]) if first_files else 'none detected'}`",
+            "",
+            "## Local remediation",
+            "- `pre-commit run --all-files`",
+            "- `mypy --config-file=pyproject.toml src tests`",
+            "",
+            "## Artifacts",
+            "- `precommit-log`",
+            "- `precommit-classification`",
+            "- `precommit-autofix-patch`",
+          ]
+          Path("quality-summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+          cat quality-summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload pre-commit autofix patch artifact
         if: always()
@@ -118,14 +160,6 @@ jobs:
           name: precommit-autofix-patch
           path: precommit_autofix.patch
           if-no-files-found: warn
-
-      - name: Add autofix artifact note to job summary
-        if: always() && steps.precommit_dirty.outputs.dirty == 'true'
-        run: |
-          {
-            echo
-            echo "Download artifact \`precommit-autofix-patch\` for the full diff."
-          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload pre-commit log artifact
         if: always()
@@ -145,6 +179,14 @@ jobs:
             precommit_failure_classification.md
           if-no-files-found: warn
 
+      - name: Upload baseline-lint-type quality summary artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: quality-summary-baseline-lint-type
+          path: quality-summary.md
+          if-no-files-found: warn
+
       - name: Add pre-commit remediation summary
         if: always()
         run: |
@@ -153,7 +195,7 @@ jobs:
           failing_hooks="$(python -c '
           import json
           from pathlib import Path
-          
+
           path = Path("precommit_failure_classification.json")
           if not path.exists():
               print("none detected (classification artifact missing)")
@@ -172,26 +214,54 @@ jobs:
             echo
             echo "- Failing hooks: $failing_hooks"
             echo "- Changed files: $changed_count"
-            echo "- Local fix command: \`pre-commit run --all-files && git add -A && git commit -m \"Apply pre-commit fixes\"\`"
+            echo "- Local fix command: \`pre-commit run --all-files\`"
+            echo "- Local type-check command: \`mypy --config-file=pyproject.toml src tests\`"
+            echo "- Quality summary artifact: \`quality-summary-baseline-lint-type\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Final end-of-job failure summary
+        if: always()
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          failed = []
+          if "${{ steps.hook_parity.outputs.exit_code || '0' }}" != "0":
+            failed.append("make qa-baseline")
+          if "${{ steps.precommit_dirty.outputs.dirty || 'false' }}" == "true":
+            failed.append("pre-commit run --all-files (autofix drift)")
+
+          data = {}
+          path = Path("precommit_failure_classification.json")
+          if path.exists():
+            data = json.loads(path.read_text(encoding="utf-8"))
+
+          classes = data.get("classes_detected", [])
+          files = []
+          for hook in data.get("failing_hooks", []):
+            for file_path in hook.get("files", []):
+              if file_path not in files:
+                files.append(file_path)
+              if len(files) >= 5:
+                break
+            if len(files) >= 5:
+              break
+
+          print("\n### End-of-job summary (baseline-lint-type)")
+          print(f"- Failed command(s): `{', '.join(failed) if failed else 'none'}`")
+          print(f"- Top error classes: `{', '.join(classes[:5]) if classes else 'none detected'}`")
+          print(f"- First failing files: `{', '.join(files) if files else 'none detected'}`")
+          PY
 
       - name: Fail job on pre-commit autofix changes
         if: always() && steps.precommit_dirty.outputs.dirty == 'true'
-        run: |
-          {
-            echo
-            echo "❌ pre-commit modified files. Apply the autofix patch artifact or run \`pre-commit run --all-files\` locally, then commit the changes."
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit 1
+        run: exit 1
 
       - name: Fail job on hook parity errors
         if: steps.hook_parity.outcome == 'failure'
-        run: |
-          {
-            echo
-            echo "❌ Hook parity failed. Run \`pre-commit run --all-files\` locally, commit all changes, and push again."
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit 1
+        run: exit 1
 
   baseline-test-cov:
     runs-on: ubuntu-latest
@@ -218,5 +288,102 @@ jobs:
         run: pre-commit run --all-files
 
       # Failing job command (verbatim): make qa-full-type
-      - name: Run `make qa-full-type`
-        run: make qa-full-type
+      - name: Run `make qa-full-type` (capture concise console + full artifact log)
+        id: full_type
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          make qa-full-type 2>&1 | tee full_type.log
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Show concise grouped mypy log excerpt
+        if: always()
+        run: |
+          echo "::group::full_type.log (head)"
+          sed -n '1,80p' full_type.log || true
+          echo "::endgroup::"
+          echo "::group::full_type.log (tail)"
+          tail -n 120 full_type.log || true
+          echo "::endgroup::"
+
+      - name: Build full-type quality summary artifact
+        if: always()
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          log_text = Path("full_type.log").read_text(encoding="utf-8", errors="replace") if Path("full_type.log").exists() else ""
+          codes = []
+          for code in re.findall(r"error: .*?\[([^\]]+)\]", log_text):
+            if code not in codes:
+              codes.append(code)
+          files = []
+          for file_path in re.findall(r"\b(?:src|tests|docs|\.github)/[\w./-]+\.[A-Za-z0-9]+", log_text):
+            if file_path not in files:
+              files.append(file_path)
+
+          lines = [
+            "# Quality summary (full-type-surface)",
+            "",
+            "- Failed command: `make qa-full-type`",
+            f"- Top error classes: `{', '.join(codes[:5]) if codes else 'none detected'}`",
+            f"- First failing files: `{', '.join(files[:5]) if files else 'none detected'}`",
+            "",
+            "## Local remediation",
+            "- `pre-commit run --all-files`",
+            "- `mypy --config-file=pyproject.toml src tests`",
+            "",
+            "## Artifacts",
+            "- `full-type-log`",
+          ]
+          Path("quality-summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+          cat quality-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload full-type log artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: full-type-log
+          path: full_type.log
+          if-no-files-found: warn
+
+      - name: Upload full-type quality summary artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: quality-summary-full-type-surface
+          path: quality-summary.md
+          if-no-files-found: warn
+
+      - name: Final end-of-job failure summary
+        if: always()
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import re
+          from pathlib import Path
+
+          log_text = Path("full_type.log").read_text(encoding="utf-8", errors="replace") if Path("full_type.log").exists() else ""
+          classes = []
+          for code in re.findall(r"error: .*?\[([^\]]+)\]", log_text):
+            if code not in classes:
+              classes.append(code)
+          files = []
+          for file_path in re.findall(r"\b(?:src|tests|docs|\.github)/[\w./-]+\.[A-Za-z0-9]+", log_text):
+            if file_path not in files:
+              files.append(file_path)
+
+          failed = "make qa-full-type" if "${{ steps.full_type.outputs.exit_code || '0' }}" != "0" else "none"
+          print("\n### End-of-job summary (full-type-surface)")
+          print(f"- Failed command(s): `{failed}`")
+          print(f"- Top error classes: `{', '.join(classes[:5]) if classes else 'none detected'}`")
+          print(f"- First failing files: `{', '.join(files[:5]) if files else 'none detected'}`")
+          print("- Quality summary artifact: `quality-summary-full-type-surface`")
+          PY
+
+      - name: Fail job on full-type errors
+        if: steps.full_type.outcome == 'failure'
+        run: exit 1

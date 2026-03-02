@@ -1,6 +1,6 @@
 # Project Maturity Evaluation
 
-_Last regenerated from manifest: 2026-03-02T00:53:00Z (UTC)._
+_Last regenerated from manifest: 2026-03-02T01:22:00Z (UTC)._
 _Regeneration command: `python .github/scripts/capability_parity_report.py` (then update this summary from `docs/dod_manifest.json` and `docs/system_contract_map.md`)._
 
 ## Executive assessment
@@ -17,12 +17,14 @@ All maturity claims in this document are derived from these canonical evidence s
 ### Capability delivery status (from `docs/dod_manifest.json`)
 
 - **Done:** 7
-- **In progress:** 0
-- **Planned:** 2
+- **In progress:** 1
+- **Planned:** 1
 
 Completion ratio (done / total): **77.8%** (`7/9`).
 
 Current bottleneck set (remaining non-`done` implementation queue): **`capability_invocation_governance`** and **`repair_aware_projection_evolution`**.
+
+Current bottleneck capability: **`capability_invocation_governance`** (only active non-`done` promotion; `repair_aware_projection_evolution` remains queued as dependency-blocked `planned`).
 
 ### Quality and validation signals (from `docs/dod_manifest.json`)
 
@@ -35,36 +37,37 @@ Current bottleneck set (remaining non-`done` implementation queue): **`capabilit
 
 ## Maturity conclusion
 
-**Current stage: Late-Now completion with dual-capability hardening runway**
+**Current stage: Next-entry governance execution with one active promotion and one queued dependency**
 
 Derived from canonical evidence:
 
 - Governance and replay baseline capabilities are recorded as delivered in `docs/dod_manifest.json`.
-- Remaining implementation work is fully concentrated in the two `planned` capabilities: `capability_invocation_governance` and `repair_aware_projection_evolution` (`docs/dod_manifest.json`).
+- Remaining implementation work is split between one `in_progress` capability (`capability_invocation_governance`) and one dependency-blocked `planned` capability (`repair_aware_projection_evolution`) (`docs/dod_manifest.json`).
 - Contract maturity posture is governed by `docs/system_contract_map.md`.
 
 ## Most timely development (priority recommendation)
 
 ### #1 Immediate priority
 
-**Prioritize the remaining planned pair, starting with `capability_invocation_governance` and immediately sequencing `repair_aware_projection_evolution`.**
+**Prioritize finishing `capability_invocation_governance` (`in_progress`) before opening `repair_aware_projection_evolution` (`planned`).**
 
 ### #2 Near-term execution sequence
 
-1. **Start `capability_invocation_governance` (`Later`)**
+1. **Complete `capability_invocation_governance` (`Next`, currently `in_progress`)**
    - `pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_predictions_contracts_and_gates.py`
-2. **Then start `repair_aware_projection_evolution` (`Later`)**
+2. **Then start `repair_aware_projection_evolution` (`Later`, currently `planned`)**
    - `pytest tests/test_repair_mode_projection.py tests/test_repair_events_auditability.py`
    - `pytest tests/test_predictions_contracts_and_gates.py`
 
 ## Suggested maturity targets for next review window
 
 - Keep done capabilities in non-regression coverage by validating manifest-defined command packs.
-- Move both remaining `planned` capabilities (`capability_invocation_governance`, `repair_aware_projection_evolution`) toward executable baseline evidence.
+- Move the remaining `planned` capability (`repair_aware_projection_evolution`) toward executable baseline evidence after governance promotion closes.
 - Recompute counts and bottleneck-set assignment from canonical sources only (`docs/dod_manifest.json` + `docs/system_contract_map.md`).
 
 ## Maturity changelog
 
+- 2026-03-02T01:22:00Z: **Canonical maturity refresh** — recomputed capability totals (`7 done / 1 in_progress / 1 planned`), updated stage language to active Next-entry governance execution, and reframed the bottleneck as completing `capability_invocation_governance` before promoting `repair_aware_projection_evolution`.
 - 2026-03-02T00:53:00Z: **Canonical maturity refresh** — recomputed capability totals (`7 done / 0 in_progress / 2 planned`), updated stage language to late-Now completion posture, and reframed the bottleneck as the two-capability planned queue (`capability_invocation_governance`, `repair_aware_projection_evolution`).
 - 2026-02-28T15:48:35Z: **Canonical manifest refresh** — deduplicated prior overlapping refresh notes into one event; recomputed totals (`7 done / 0 in_progress / 2 planned`), retained `capability_invocation_governance` as highest-priority non-done bottleneck, and aligned command packs to manifest `pytest_commands`.
 - 2026-02-28T15:48:35Z: **Gate/halt evidence confirmation** — retained gate/halt baseline validation as canonical evidence under `docs/dod_manifest.json` command/evidence mappings and maturity interpretation in `docs/system_contract_map.md`.

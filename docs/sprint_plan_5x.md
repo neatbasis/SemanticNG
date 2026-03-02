@@ -41,6 +41,12 @@ Canonical references:
 2. Allow `src/core` expansion only after the coherence/refactor milestone confirms naming/boundary cleanup with invariant freeze still green.
 3. Execute first `src/core` inclusion as a gated, single-sprint rollout with rollback criteria, then widen only after one additional green sprint cycle.
 
+
+## Current promotion-state ledger (manifest synchronized)
+
+- `capability_invocation_governance`: `in_progress` (acceptance command pack is active in CI; retain `operational` contract maturity until completion evidence closes).
+- `repair_aware_projection_evolution`: `planned` (sequenced after governance reaches `done`; no independent promotion is valid yet).
+
 ## Sprint 1 — Governance substrate lock
 
 ### Objective
@@ -91,7 +97,7 @@ Finalize no-regression budget, doc freshness SLO checks, handoff minimums, and p
 ## Sprint 2 — Capability invocation governance
 
 ### Objective
-Promote `capability_invocation_governance` to `done` with policy-aware side-effect gate tests and explicit exception rollback controls.
+Advance `capability_invocation_governance` from its current `in_progress` state to `done` with policy-aware side-effect gate tests and explicit exception rollback controls.
 
 ### Capability IDs in scope
 - `capability_invocation_governance`
@@ -116,7 +122,7 @@ Promote `capability_invocation_governance` to `done` with policy-aware side-effe
 - `Projection view contract`: hold at `operational` unless replay/repair evidence also satisfies promotion protocol.
 
 ### Measurable exits
-- `capability_invocation_governance` transitions `planned` -> `in_progress` -> `done` with linked evidence.
+- `capability_invocation_governance` transitions `in_progress` -> `done` with linked evidence (the `planned` -> `in_progress` step is already recorded in `docs/dod_manifest.json`).
 - Policy-aware side-effect gates fail closed for unauthorized invocations in CI suites.
 - Dependency impact statements and timeboxed rollback plans are present in all sprint PRs.
 
@@ -137,7 +143,7 @@ Promote `capability_invocation_governance` to `done` with policy-aware side-effe
 ## Sprint 3 — Repair-aware projection evolution
 
 ### Objective
-Deliver auditable repair events and deterministic replay/restart guarantees while preserving governance constraints from Sprint 2.
+Deliver auditable repair events and deterministic replay/restart guarantees while preserving governance constraints from Sprint 2 once `capability_invocation_governance` reaches `done`.
 
 ### Capability IDs in scope
 - `repair_aware_projection_evolution`
@@ -160,7 +166,7 @@ Deliver auditable repair events and deterministic replay/restart guarantees whil
 - `Projection view contract`: `operational` -> `proven` (conditioned on deterministic replay/restart + repair-event audit evidence).
 
 ### Measurable exits
-- `repair_aware_projection_evolution` transitions `planned` -> `in_progress` -> `done` with evidence links.
+- `repair_aware_projection_evolution` remains `planned` until governance dependency closure, then transitions `planned` -> `in_progress` -> `done` with evidence links.
 - Repair events are append-only, auditable, and replayable without silent mutation.
 - Replay/restart determinism is repeated and documented across command packs.
 

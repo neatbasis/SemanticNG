@@ -75,33 +75,33 @@ Cross-sprint execution sequencing, capability dependency leverage, and maturity-
 
 ## Next (promotion checkpoint)
 
-_No planned capabilities remain in `Next`; observer authorization promotion is complete (`observer_authorization_contract` = `done`) and remains a non-regression dependency while `Later` capabilities advance._
+`capability_invocation_governance` has advanced to `in_progress` in the manifest because its acceptance command pack is now actively used as a promotion gate in CI. `repair_aware_projection_evolution` remains `planned` because it is still sequenced after governance completion (`capability_invocation_governance` = `done`).
 
 ## Capability status alignment (manifest source-of-truth sync)
 
 - `done`: `prediction_persistence_baseline`, `channel_agnostic_pending_obligation`, `schema_selection_ambiguity_baseline`, `gate_halt_unification`, `invariant_matrix_coverage`, `replay_projection_analytics`, `observer_authorization_contract`.
-- `in_progress`: _none currently recorded_.
-- `planned`: `capability_invocation_governance`, `repair_aware_projection_evolution`.
+- `in_progress`: `capability_invocation_governance` (promotion started; policy-aware side-effect gate coverage is active, but completion criteria for done are not yet closed).
+- `planned`: `repair_aware_projection_evolution` (dependency on completed governance capability remains open).
 
 ## Later (larger architecture goals)
 
-### 1) Capability-invocation governance (policy-aware external actions; manifest: `capability_invocation_governance`)
+### 1) Capability-invocation governance (policy-aware external actions; manifest: `capability_invocation_governance`, currently `in_progress`)
 - **Owner area/module:** Engine + Contracts + Capability adapters (`src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, adapter modules under `src/state_renormalization/adapters/`)
 - **Success criteria (test outcomes):**
   - New capability-gating tests pass, showing no externally consequential action executes without a current valid prediction and explicit gate pass.
   - Failure-path tests pass, proving policy violations produce persisted explainable halts and zero side-effect invocation.
 - **Related files/tests:**
   - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, capability adapter files (as added)
-  - Tests: add capability governance suites under `tests/` (prediction + halt + side-effect guards).
+  - Tests: `tests/test_capability_invocation_governance.py`, `tests/test_capability_adapter_policy_guards.py`, `tests/test_predictions_contracts_and_gates.py`.
 
-### 2) Evolution path toward repair-aware projection (without silent mutation; manifest: `repair_aware_projection_evolution`)
+### 2) Evolution path toward repair-aware projection (without silent mutation; manifest: `repair_aware_projection_evolution`, currently `planned`)
 - **Owner area/module:** Invariants + Engine (`src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py`)
 - **Success criteria (test outcomes):**
   - Prototype repair-mode tests pass where repair proposals are emitted as explicit auditable events (never implicit state mutation).
   - Regression tests continue to pass in strict halt-only mode, proving backward compatibility of fail-closed execution.
 - **Related files/tests:**
   - Files: `src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py`
-  - Tests: existing `tests/test_predictions_contracts_and_gates.py` plus new repair-mode tests.
+  - Tests: `tests/test_repair_mode_projection.py`, `tests/test_repair_events_auditability.py`, `tests/test_predictions_contracts_and_gates.py`.
 
 ## Sequencing gate (enforced branch merge policy)
 
@@ -112,7 +112,7 @@ _No planned capabilities remain in `Next`; observer authorization promotion is c
 ## Backlog dependency tags
 
 - `Later` item 1 (`replay_projection_analytics`): see `docs/dod_manifest.json` for canonical status; maintain replay analytics suites as non-regression gates while sequencing `Next` governance contracts.
-- `Later` item 2 (`capability_invocation_governance`): dependency on `observer_authorization_contract` is met per `docs/dod_manifest.json`; capability-side policy gating is the next dependency-unblocked scope.
+- `Next`/promotion item (`capability_invocation_governance`): dependency on `observer_authorization_contract` is met per `docs/dod_manifest.json`; promotion is currently `in_progress` and gated by policy-side CI command-pack evidence.
 - `Later` item 3 (`repair_aware_projection_evolution`): sequence after `replay_projection_analytics` and `capability_invocation_governance` per canonical dependency map in `docs/sprint_plan_5x.md`.
 
 
@@ -180,8 +180,8 @@ Use this short table at each planning checkpoint to pick exactly one next PR sco
 | --- | --- | --- | --- | --- | --- |
 | `replay_projection_analytics` | met (`status=done`) | aligned | complete | 2/5 | Keep replay analytics tests green as non-regression guardrails while sequencing capability invocation governance. |
 | `observer_authorization_contract` | met (`status=done`) | aligned | complete | 4/5 | Maintain authorization gate/invariant allowlist tests as non-regression guardrails. |
-| `capability_invocation_governance` | met (observer authorization dependency complete) | partial | missing | 5/5 | Promote as next implementation PR scope with policy-aware side-effect gating tests. |
-| `repair_aware_projection_evolution` | blocked (sequence after replay analytics hardening) | blocked | missing | 3/5 | Draft explicit auditable repair-event contract tests while keeping strict halt-only behavior as default. |
+| `capability_invocation_governance` | met (observer authorization dependency complete) | partial (promotion in progress) | partial | 5/5 | Continue in-progress promotion: keep policy-aware side-effect gate suites green and close remaining `done` criteria. |
+| `repair_aware_projection_evolution` | blocked (requires `capability_invocation_governance` = `done`) | blocked | missing | 3/5 | Keep status at `planned`; prepare auditable repair-event contract tests without enabling mutation paths. |
 
 ## Guardrails (unchanged until Next milestones are complete)
 

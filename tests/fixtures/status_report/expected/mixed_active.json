@@ -1,0 +1,56 @@
+{
+  "meta": {
+    "deterministic": true,
+    "generator": "scripts/dev/status_report.py",
+    "offline": true,
+    "schema_contract": {
+      "allowed_status": [
+        "blocked",
+        "done",
+        "in_progress",
+        "planned",
+        "unknown"
+      ],
+      "files": {
+        "milestones": "docs/status/milestones.json",
+        "objectives": "docs/status/objectives.json",
+        "project": "docs/status/project.json",
+        "sprints": "docs/status/sprints.json"
+      },
+      "required_keys": [
+        "id",
+        "name",
+        "status",
+        "active",
+        "summary",
+        "reason",
+        "as_of"
+      ]
+    },
+    "status_show": "active",
+    "unknown_policy": "Print unknown with reason when data is missing or unresolved."
+  },
+  "milestones": [
+    {
+      "active": true,
+      "as_of": "2026-01-01",
+      "id": "m1",
+      "name": "Active Milestone",
+      "reason": "Current focus",
+      "status": "in_progress",
+      "summary": "In flight"
+    }
+  ],
+  "objectives": [],
+  "project": {
+    "active": true,
+    "analytics": [],
+    "as_of": "2026-01-01",
+    "id": "proj",
+    "name": "SemanticNG",
+    "reason": "Roadmap execution",
+    "status": "in_progress",
+    "summary": "Working"
+  },
+  "sprints": []
+}

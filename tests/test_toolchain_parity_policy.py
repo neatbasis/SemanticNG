@@ -62,3 +62,13 @@ def test_makefile_qa_local_remains_fast_dev_flow() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
 
     assert "qa-local: bootstrap qa-hook-parity qa-test-cov qa-full-type-surface" in makefile
+
+
+def test_state_renorm_milestone_baseline_uses_canonical_make_targets() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "state-renorm-milestone-gate.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "run: make qa-hook-parity" in workflow
+    assert "run: make qa-test-cov" in workflow
+    assert "pytest --cov --cov-report=term-missing --cov-report=xml" not in workflow

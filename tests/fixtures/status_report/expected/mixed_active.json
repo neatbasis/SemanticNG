@@ -1,4 +1,20 @@
 {
+  "dod": {
+    "available": false,
+    "counts_by_status": {
+      "done": 0,
+      "in_progress": 0,
+      "planned": 0
+    },
+    "derived_status": {
+      "milestones": {},
+      "objectives": {},
+      "sprints": {}
+    },
+    "manifest": "docs/dod_manifest.json",
+    "missing_metadata": [],
+    "recent_transitions": []
+  },
   "meta": {
     "deterministic": true,
     "generated_from": {

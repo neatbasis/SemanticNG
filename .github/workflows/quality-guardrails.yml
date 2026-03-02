@@ -29,13 +29,13 @@ jobs:
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
 
-      - name: Validate baseline-update governance metadata
+      - name: Run `python .github/scripts/validate_no_regression_budget_update.py`
         env:
           HEAD_SHA: ${{ github.sha }}
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
         run: python .github/scripts/validate_no_regression_budget_update.py
 
-      - name: Enforce no-regression budget policy
+      - name: Run `python .github/scripts/check_no_regression_budget.py`
         run: python .github/scripts/check_no_regression_budget.py
 
   baseline-lint-type:
@@ -47,12 +47,13 @@ jobs:
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
 
-      - name: Run hook parity gate (verbose, capture log)
+      # Failing job command (verbatim): make qa-baseline
+      - name: Run `make qa-baseline` (verbose, capture log)
         id: hook_parity
         continue-on-error: true
         run: |
           set -o pipefail
-          make qa-hook-parity 2>&1 | tee precommit.log
+          make qa-baseline 2>&1 | tee precommit.log
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
       - name: Show pre-commit log
@@ -155,7 +156,7 @@ jobs:
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
 
-      - name: Run tests with coverage gate
+      - name: Run `make qa-test-cov`
         run: make qa-test-cov
 
   full-type-surface:
@@ -167,5 +168,6 @@ jobs:
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
 
-      - name: Run mypy (full type surface)
-        run: make qa-full-type-surface
+      # Failing job command (verbatim): make qa-full-type
+      - name: Run `make qa-full-type`
+        run: make qa-full-type

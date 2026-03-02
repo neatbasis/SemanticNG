@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Protocol, TypeAlias
+from typing import Any, Protocol, TypeAlias
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -814,7 +814,7 @@ def classify_utterance(sentence: str | None, error: CaptureOutcome | None) -> Ut
     return UtteranceType.NORMAL
 
 
-def _to_dict(obj: object) -> object:
+def _to_dict(obj: object) -> Any:
     """
     Convert dataclasses / pydantic models / enums / nested containers into JSON-safe primitives.
     """
@@ -838,6 +838,20 @@ def _to_dict(obj: object) -> object:
 
     # Primitives / unknowns
     return obj
+
+
+def _to_mapping(obj: object) -> dict[str, Any]:
+    normalized = _to_dict(obj)
+    return dict(normalized) if isinstance(normalized, Mapping) else {}
+
+
+def _to_list_of_mappings(items: Sequence[object]) -> list[dict[str, Any]]:
+    normalized_items: list[dict[str, Any]] = []
+    for item in items:
+        normalized = _to_dict(item)
+        if isinstance(normalized, Mapping):
+            normalized_items.append(dict(normalized))
+    return normalized_items
 
 
 def _find_stable_ids_from_payload(payload: Mapping[str, object]) -> dict[str, str]:
@@ -942,10 +956,11 @@ def _episode_stable_ids(ep: Episode) -> dict[str, str]:
 
 
 def _append_episode_artifact(
-    ep: Episode, artifact: dict[str, object], *, stable_ids: Mapping[str, str] | None = None
+    ep: Episode, artifact: Mapping[str, object], *, stable_ids: Mapping[str, str] | None = None
 ) -> None:
     sid = dict(stable_ids or _episode_stable_ids(ep))
-    ep.artifacts.append({**sid, **artifact} if sid else artifact)
+    materialized_artifact = dict(artifact)
+    ep.artifacts.append({**sid, **materialized_artifact} if sid else materialized_artifact)
 
 
 def _run_invariant(invariant_id: InvariantId, *, ctx: CheckContext) -> InvariantOutcome:
@@ -980,8 +995,8 @@ def _invariant_audit_result_from_checker(
         validity=normalized.validity,
         code=normalized.code,
         evidence=list(normalized.evidence),
-        details=_to_dict(normalized.details) or {},
-        action_hints=[_to_dict(item) for item in normalized.action_hints],
+        details=_to_mapping(normalized.details),
+        action_hints=_to_list_of_mappings(normalized.action_hints),
     )
 
 
@@ -1105,8 +1120,9 @@ def _apply_intervention_hook(
     if normalized_input is None:
         normalized_input = {"action": InterventionAction.NONE.value}
     if not isinstance(normalized_input, Mapping):
-        normalized_input = _to_dict(normalized_input)
-    normalized_input = dict(normalized_input)
+        normalized_input = _to_mapping(normalized_input)
+    else:
+        normalized_input = dict(normalized_input)
 
     if normalized_input.get(
         "action"
@@ -1127,7 +1143,7 @@ def _apply_intervention_hook(
             responded_at_iso=responded_at_iso,
             status=decision.action.value,
             escalation=decision.action == InterventionAction.ESCALATE,
-            metadata=_to_dict(decision.metadata),
+            metadata=_to_mapping(decision.metadata),
         )
         response_ref = append_ask_outbox_response_event(
             response_artifact.model_dump(mode="json"),
@@ -1318,7 +1334,7 @@ def evaluate_invariant_gates(
         )
         if authorization_evaluation is not None:
             halt_outcome = authorization_evaluation.outcome
-            if halt_outcome.invariant_id == InvariantId.AUTHORIZATION_SCOPE:
+            if ep is not None and halt_outcome.invariant_id == InvariantId.AUTHORIZATION_SCOPE:
                 _append_authorization_issue(ep, halt=result, context=auth_context)
 
     if ep is not None:
@@ -1992,7 +2008,7 @@ def bind_prediction_outcome(
     recorded_at_iso: str | None = None,
 ) -> tuple[PredictionRecord, PredictionOutcome]:
     expected = pred.expectation
-    observed_value = float(observed_outcome)
+    observed_value = float(_to_dict(observed_outcome))
     if expected is None:
         error_metric = 0.0
         absolute_error = 0.0
@@ -2256,17 +2272,20 @@ def build_episode(
     else:
         status = AskStatus.OK
 
-    m = payload.get("metrics") or {}
+    m = payload.get("metrics")
+    metrics_payload = m if isinstance(m, Mapping) else {}
     metrics = AskMetrics(
-        elapsed_s=float(m.get("elapsed_s", 0.0)),
-        question_chars=int(m.get("question_chars", 0)),
-        question_words=int(m.get("question_words", 0)),
+        elapsed_s=float(metrics_payload.get("elapsed_s", 0.0)),
+        question_chars=int(metrics_payload.get("question_chars", 0)),
+        question_words=int(metrics_payload.get("question_words", 0)),
     )
 
+    sentence = payload.get("sentence")
+    slots = payload.get("slots")
     ask = AskResult(
         status=status,
-        sentence=payload.get("sentence"),
-        slots=payload.get("slots") or {},
+        sentence=sentence if isinstance(sentence, str) else None,
+        slots=dict(slots) if isinstance(slots, Mapping) else {},
         error=capture,
         metrics=metrics,
     )

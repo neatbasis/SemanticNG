@@ -109,7 +109,12 @@ show_error_codes = true
 ignore_missing_imports = false
 
 [[tool.mypy.overrides]]
-module = ["tests", "tests.*"]
+module = ["src.features.steps.*", "semanticng.bdd_compat", "semanticng.deeponto_compat"]
+# Explicit Tier-2a adapter/BDD seams tracked in overrides while kept at strict defaults.
+strict = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
 # Tests prioritize readability and controlled fakes over full annotation coverage.
 # Relax only the noisiest strict rules needed for this tier while preserving basic
 # signal (e.g. import/type checking for annotated code).
@@ -117,7 +122,6 @@ strict = false
 disallow_any_generics = false
 check_untyped_defs = false
 disallow_untyped_defs = false
-warn_return_any = false
 
 [tool.coverage.run]
 branch = true

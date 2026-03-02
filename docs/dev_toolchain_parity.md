@@ -60,6 +60,28 @@ Version pin authority for Python quality tooling is centralized as follows:
 
 When adding new pins for these tools in other files, update this section and the parity checker (`scripts/ci/check_toolchain_parity.py`) in the same change.
 
+## Local hook runtime model
+
+Critical Python quality hooks run in isolated pre-commit Python environments to reduce dependence on ambient PATH/interpreter state:
+
+- `qa-commit-stage`, `qa-push-stage`, and `precommit-governance-selector` use `language: python` with `additional_dependencies: [".[test]"]`.
+- This keeps tool/runtime resolution aligned with `pyproject.toml` (`[project]` + `test` extra) while avoiding ad-hoc global installs.
+
+### Tradeoff
+
+- **Reliability win:** deterministic hook environments with explicit dependency materialization.
+- **Cost:** first-run hook bootstrapping is slower because pre-commit builds isolated virtualenvs.
+
+### Intentional `language: system` invariant
+
+`promotion-governance-pokayoke` remains `language: system` because it is a shell orchestration hook (`.github/scripts/run_promotion_checks.sh`) that relies on repo tooling and staged git state with minimal startup overhead.
+
+Required local runtime assumptions for this hook:
+
+- `bash`
+- `git`
+- `python`
+
 ## Drift controls
 
 - `.github/scripts/check_precommit_parity.py` enforces known parity invariants:

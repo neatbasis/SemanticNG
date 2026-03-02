@@ -56,9 +56,9 @@ def test_makefile_qa_ci_target_runs_stage_runner() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
 
     assert "qa-ci:" in makefile
-    assert "	python scripts/ci/run_stage_checks.py qa-ci" in makefile
+    assert "\tpython scripts/ci/run_stage_checks.py qa-ci" in makefile
     assert "qa-ci-equivalent:" in makefile
-    assert "	$(MAKE) qa-ci" in makefile
+    assert "\t$(MAKE) qa-ci" in makefile
 
 
 def test_makefile_qa_local_remains_fast_dev_flow() -> None:
@@ -75,3 +75,40 @@ def test_state_renorm_milestone_baseline_uses_canonical_make_targets() -> None:
     assert "run: make qa-hook-parity" in workflow
     assert "run: make qa-test-cov" in workflow
     assert "pytest --cov --cov-report=term-missing --cov-report=xml" not in workflow
+
+
+def test_local_quality_hooks_use_python_language_with_project_test_extra() -> None:
+    precommit = (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+
+    for hook_id in ("qa-commit-stage", "qa-push-stage", "precommit-governance-selector"):
+        start = precommit.index(f"- id: {hook_id}")
+        end = precommit.find("\n      - id:", start + 1)
+        block = precommit[start:] if end == -1 else precommit[start:end]
+        assert "language: python" in block
+        assert "additional_dependencies:" in block
+        assert "- .[test]" in block
+
+
+def test_system_hook_runtime_assumptions_are_documented() -> None:
+    precommit = (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+    docs = (ROOT / "docs" / "dev_toolchain_parity.md").read_text(encoding="utf-8")
+
+    start = precommit.index("- id: promotion-governance-pokayoke")
+    end = precommit.find("\n      - id:", start + 1)
+    block = precommit[start:] if end == -1 else precommit[start:end]
+
+    assert "language: system" in block
+    for required_tool in ("bash", "git", "python"):
+        assert f"- `{required_tool}`" in docs
+
+
+def test_check_toolchain_parity_script_passes_for_repo_state() -> None:
+    result = subprocess.run(
+        [sys.executable, "scripts/ci/check_toolchain_parity.py"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr

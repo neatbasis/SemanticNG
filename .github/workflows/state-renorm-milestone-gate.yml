@@ -95,7 +95,7 @@ jobs:
         run: make qa-hook-parity
 
       - name: Run baseline tests with coverage gate
-        run: pytest --cov --cov-report=term-missing --cov-report=xml
+        run: make qa-test-cov
 
   milestone-governance:
     runs-on: self-hosted

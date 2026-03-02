@@ -1,0 +1,33 @@
+{
+  "id": "semanticng",
+  "name": "SemanticNG",
+  "status": "in_progress",
+  "active": true,
+  "summary": "Repository delivery remains active with ongoing governance and capability hardening work.",
+  "reason": "Canonical source maintained in-repo for deterministic offline status reporting.",
+  "as_of": "2026-03-02",
+  "analytics": [
+    {
+      "id": "5s_metrics",
+      "name": "5S mission metrics",
+      "entrypoint": "python scripts/ci/validate_5s_metrics.py",
+      "source": "docs/process/5s_metrics.json",
+      "status": "ready"
+    },
+    {
+      "id": "milestone_doc_parity",
+      "name": "Milestone documentation parity",
+      "entrypoint": "python .github/scripts/validate_milestone_docs.py",
+      "source": "docs/dod_manifest.json",
+      "status": "ready"
+    },
+    {
+      "id": "no_regression_budget",
+      "name": "No-regression budget guard",
+      "entrypoint": "python .github/scripts/validate_no_regression_budget.py",
+      "source": "docs/no_regression_budget.json",
+      "status": "unknown",
+      "reason": "Entrypoint expected by policy docs; confirm script availability before execution."
+    }
+  ]
+}

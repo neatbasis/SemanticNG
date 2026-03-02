@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "id": "sprint-5",
+      "name": "Sprint 5",
+      "status": "done",
+      "active": false,
+      "summary": "Sprint 5 handoff is documented with exit checks and carry-over risks.",
+      "reason": "See docs/sprint_handoffs/sprint-5-handoff.md for closure evidence.",
+      "as_of": "2026-03-02"
+    },
+    {
+      "id": "sprint-next",
+      "name": "Next sprint planning",
+      "status": "in_progress",
+      "active": true,
+      "summary": "Planning and preload sequencing are active for the next objective slice.",
+      "reason": "Current planning artifacts track pending objective transitions.",
+      "as_of": "2026-03-02"
+    }
+  ]
+}

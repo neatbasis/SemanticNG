@@ -1,6 +1,9 @@
-.PHONY: bootstrap verify-precommit-installed qa-commit qa-push qa-ci qa-baseline qa-hook-parity qa-hook-parity-diagnostics qa-local-fast qa-full-type qa-full-type-surface qa-test-cov qa-ci-equivalent qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
+.PHONY: bootstrap-preflight bootstrap verify-precommit-installed qa-commit qa-push qa-ci qa-baseline qa-hook-parity qa-hook-parity-diagnostics qa-local-fast qa-full-type qa-full-type-surface qa-test-cov qa-ci-equivalent qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
 
-bootstrap:
+bootstrap-preflight:
+	python scripts/dev/bootstrap_preflight.py
+
+bootstrap: bootstrap-preflight
 	pre-commit install --hook-type pre-commit --hook-type pre-push
 	pre-commit install-hooks
 	$(MAKE) verify-precommit-installed

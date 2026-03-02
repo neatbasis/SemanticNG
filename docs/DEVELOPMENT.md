@@ -25,8 +25,9 @@ python -m pip install -e ".[test]"
 make bootstrap
 ```
 
+`make bootstrap` now runs `bootstrap-preflight` first. The preflight stage fails fast for unsupported Python versions (derived from `pyproject.toml`), missing `pre-commit`, or missing editable `semanticng` import, and prints explicit one-line fix commands.
 
-Hook installation is mandatory. `make bootstrap` installs both required hooks (`pre-commit` and `pre-push`), installs hook environments, and fails fast if they are missing/misconfigured via:
+Hook installation is mandatory. After preflight passes, `make bootstrap` installs both required hooks (`pre-commit` and `pre-push`), installs hook environments, and fails fast if they are missing/misconfigured via:
 
 ```bash
 python scripts/dev/verify_precommit_installed.py

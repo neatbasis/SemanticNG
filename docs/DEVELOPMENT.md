@@ -106,7 +106,7 @@ pytest -m contract_sensitive
 Canonical Makefile command pack (used by CI jobs):
 
 ```bash
-make qa-ci-equivalent    # No-regression budget + hook parity + coverage + full mypy surface
+make qa-ci-equivalent    # No-regression budget + hook parity diagnostics + coverage + full mypy surface
 
 # Optional local command to run bootstrap + strict local gates:
 make qa-local
@@ -117,8 +117,10 @@ make qa-local
 For local triage parity with CI-style pre-commit failures, run:
 
 ```bash
-python .github/scripts/classify_precommit_failures.py --log precommit.log
+make qa-hook-parity-diagnostics
 ```
+
+This command captures `precommit.log` and always writes classification artifacts (`precommit_failure_classification.json` and `precommit_failure_classification.md`) even when hook parity fails.
 
 
 ## Branch protection verification checklist (required)
@@ -178,7 +180,11 @@ When an automated dependency PR fails:
 ### `baseline-lint-type` failing
 
 ```bash
-make qa-hook-parity
+make qa-hook-parity-diagnostics
+# Expected local artifacts:
+# - precommit.log
+# - precommit_failure_classification.json
+# - precommit_failure_classification.md
 git add -A
 ```
 

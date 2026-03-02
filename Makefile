@@ -1,4 +1,4 @@
-.PHONY: bootstrap qa-hook-parity qa-local-fast qa-full-type-surface qa-test-cov qa-ci-equivalent qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
+.PHONY: bootstrap qa-hook-parity qa-hook-parity-diagnostics qa-local-fast qa-full-type-surface qa-test-cov qa-ci-equivalent qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
 
 bootstrap:
 	@python --version
@@ -12,6 +12,9 @@ qa-hook-parity:
 	python .github/scripts/check_precommit_parity.py
 	pre-commit run --all-files
 
+qa-hook-parity-diagnostics:
+	python .github/scripts/run_hook_parity_with_diagnostics.py
+
 qa-local-fast: qa-hook-parity
 
 qa-test-cov:
@@ -22,7 +25,7 @@ qa-full-type-surface:
 
 qa-ci-equivalent:
 	python .github/scripts/check_no_regression_budget.py
-	$(MAKE) qa-hook-parity
+	$(MAKE) qa-hook-parity-diagnostics
 	$(MAKE) qa-test-cov
 	$(MAKE) qa-full-type-surface
 

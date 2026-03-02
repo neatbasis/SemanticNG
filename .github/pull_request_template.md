@@ -21,6 +21,16 @@
 - If `no`, provide timeboxed follow-up issue/PR and owner:
 
 
+
+## Baseline update checklist (required when `docs/no_regression_budget.json` baseline/allowed values change)
+
+- Baseline before counts (ruff/mypy/tests):
+- Baseline after counts (ruff/mypy/tests):
+- Justification category (interpreter/toolchain/test-surface/false-positive):
+- Remediation plan link if any count increased (issue/PR):
+- [ ] `docs/no_regression_budget_update_request.json` updated and complete
+- [ ] `allowed_regression` remains `0` (or time-boxed + approved exception documented)
+
 ## Quality gate change declaration (mandatory)
 
 - Quality gate changed? (`yes`/`no`):

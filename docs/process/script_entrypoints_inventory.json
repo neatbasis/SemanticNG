@@ -1,0 +1,420 @@
+[
+  {
+    "entrypoint_path": ".github/scripts/aggregate_precommit_failure_learning.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "workflow:.github/workflows/precommit-learning-loop-weekly.yml:L28"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/analyze_script_scope_complexity.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "workflow:.github/workflows/quality-guardrails.yml:L65"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/audit_branch_protection.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "workflow:.github/workflows/branch-protection-audit.yml:L22"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/capability_parity_report.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/check_no_regression_budget.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "quality_stage:qa-ci:commands[0]",
+      "workflow:.github/workflows/quality-guardrails.yml:L103"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/check_precommit_parity.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "make:qa-hook-parity:L38",
+      "workflow:.github/workflows/toolchain-parity-weekly.yml:L33"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/check_python_support_policy.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "make:qa-hook-parity:L37",
+      "workflow:.github/workflows/state-renorm-milestone-gate.yml:L89",
+      "workflow:.github/workflows/toolchain-parity-weekly.yml:L27"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/check_root_scratch_files.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "make:scratch-hygiene:L61"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/classify_precommit_failures.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "workflow:.github/workflows/quality-guardrails.yml:L139"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/inventory_script_entrypoints.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/mypy_override_inventory.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/print_env_provenance.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "make:setup-dev:L14",
+      "workflow:.github/workflows/state-renorm-milestone-gate.yml:L95"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/reliability_report.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/render_toolchain_parity_docs.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/render_transition_evidence.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "workflow:.github/workflows/state-renorm-milestone-gate.yml:L142",
+      "workflow:.github/workflows/state-renorm-milestone-gate.yml:L154"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/required_check_sentinel.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "workflow:.github/workflows/required-check-regression-sentinel.yml:L27"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/run_hook_parity_with_diagnostics.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "make:qa-hook-parity-diagnostics:L42"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/run_precommit_governance_checks.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "precommit:precommit-governance-selector:L52"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/run_promotion_checks.sh",
+    "entrypoint_type": "shell_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "make:promotion-governance-check:L64",
+      "precommit:promotion-governance-pokayoke:L60"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/select_milestone_test_commands.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "workflow:.github/workflows/state-renorm-milestone-gate.yml:L196"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/validate_doc_freshness_slo.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/validate_governance_docs_schema.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/validate_governance_sync.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/validate_milestone_docs.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/validate_no_regression_budget_update.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "workflow:.github/workflows/quality-guardrails.yml:L100"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": ".github/scripts/validate_sprint_handoff.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "Makefile:promotion-check",
+    "entrypoint_type": "make_target",
+    "invoked_from": [
+      "workflow:.github/workflows/state-renorm-milestone-gate.yml:L177"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "Makefile:qa-baseline",
+    "entrypoint_type": "make_target",
+    "invoked_from": [
+      "workflow:.github/workflows/quality-guardrails.yml:L123"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "Makefile:qa-ci",
+    "entrypoint_type": "make_target",
+    "invoked_from": [
+      "make:qa-ci-equivalent:L56"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "Makefile:qa-full-type",
+    "entrypoint_type": "make_target",
+    "invoked_from": [
+      "workflow:.github/workflows/quality-guardrails.yml:L360"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "Makefile:qa-full-type-surface",
+    "entrypoint_type": "make_target",
+    "invoked_from": [
+      "make:qa-full-type:L50"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "Makefile:qa-hook-parity",
+    "entrypoint_type": "make_target",
+    "invoked_from": [
+      "workflow:.github/workflows/state-renorm-milestone-gate.yml:L98"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "Makefile:qa-push",
+    "entrypoint_type": "make_target",
+    "invoked_from": [
+      "make:qa-baseline:L34"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "Makefile:qa-test-cov",
+    "entrypoint_type": "make_target",
+    "invoked_from": [
+      "make:test-cov:L74",
+      "workflow:.github/workflows/quality-guardrails.yml:L340",
+      "workflow:.github/workflows/state-renorm-milestone-gate.yml:L101"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "Makefile:verify-precommit-installed",
+    "entrypoint_type": "make_target",
+    "invoked_from": [
+      "make:setup-dev:L9"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "hook:precommit-governance-selector",
+    "entrypoint_type": "precommit_hook",
+    "invoked_from": [
+      "precommit:precommit-governance-selector:L52"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "hook:promotion-governance-pokayoke",
+    "entrypoint_type": "precommit_hook",
+    "invoked_from": [
+      "precommit:promotion-governance-pokayoke:L60"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "hook:qa-commit-stage",
+    "entrypoint_type": "precommit_hook",
+    "invoked_from": [
+      "precommit:qa-commit-stage:L44"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "hook:qa-push-stage",
+    "entrypoint_type": "precommit_hook",
+    "invoked_from": [
+      "precommit:qa-push-stage:L66"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "scripts/ci/apply_precommit_patch.sh",
+    "entrypoint_type": "shell_script",
+    "invoked_from": [
+      "filesystem_scan"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "scripts/ci/check_toolchain_parity.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "workflow:.github/workflows/quality-guardrails.yml:L115",
+      "workflow:.github/workflows/state-renorm-milestone-gate.yml:L92",
+      "workflow:.github/workflows/toolchain-parity-weekly.yml:L30"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "scripts/ci/run_stage_checks.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "make:qa-ci:L30",
+      "make:qa-commit:L24",
+      "make:qa-push:L27",
+      "precommit:qa-commit-stage:L44",
+      "precommit:qa-push-stage:L66",
+      "quality_stage:qa-commit:precommit_hook",
+      "quality_stage:qa-push:precommit_hook"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "scripts/ci/scan_unused_code.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "quality_stage:qa-ci:commands[3]"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "scripts/ci/validate_5s_metrics.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "quality_stage:qa-ci:commands[2]",
+      "workflow:.github/workflows/quality-guardrails.yml:L34",
+      "workflow:.github/workflows/quality-guardrails.yml:L47"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "scripts/ci/validate_5s_mission_traceability.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "quality_stage:qa-ci:commands[1]"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "scripts/dev/bootstrap_preflight.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "make:bootstrap-preflight:L4"
+    ],
+    "documented": false
+  },
+  {
+    "entrypoint_path": "scripts/dev/verify_precommit_installed.py",
+    "entrypoint_type": "python_script",
+    "invoked_from": [
+      "filesystem_scan",
+      "make:verify-precommit-installed:L19"
+    ],
+    "documented": false
+  }
+]

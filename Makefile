@@ -1,9 +1,9 @@
-.PHONY: bootstrap-preflight bootstrap verify-precommit-installed qa-commit qa-push qa-ci qa-baseline qa-hook-parity qa-hook-parity-diagnostics qa-local-fast qa-full-type qa-full-type-surface qa-test-cov qa-ci-equivalent qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
+.PHONY: bootstrap-preflight setup-dev bootstrap verify-precommit-installed verify-dev-setup qa-commit qa-push qa-ci qa-baseline qa-hook-parity qa-hook-parity-diagnostics qa-local-fast qa-full-type qa-full-type-surface qa-test-cov qa-ci-equivalent qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
 
 bootstrap-preflight:
 	python scripts/dev/bootstrap_preflight.py
 
-bootstrap: bootstrap-preflight
+setup-dev: bootstrap-preflight
 	pre-commit install --hook-type pre-commit --hook-type pre-push
 	pre-commit install-hooks
 	$(MAKE) verify-precommit-installed
@@ -13,8 +13,12 @@ bootstrap: bootstrap-preflight
 	@python -c "import pydantic; print(f'pydantic {pydantic.__version__}')"
 	@python .github/scripts/print_env_provenance.py
 
+bootstrap: setup-dev
+
 verify-precommit-installed:
 	python scripts/dev/verify_precommit_installed.py
+
+verify-dev-setup: bootstrap-preflight verify-precommit-installed
 
 qa-commit:
 	python scripts/ci/run_stage_checks.py qa-commit
@@ -51,7 +55,7 @@ qa-full-type-surface:
 qa-ci-equivalent:
 	$(MAKE) qa-ci
 
-qa-local: bootstrap qa-push qa-test-cov qa-full-type-surface
+qa-local: verify-dev-setup qa-push qa-test-cov qa-full-type-surface
 
 scratch-hygiene:
 	python .github/scripts/check_root_scratch_files.py

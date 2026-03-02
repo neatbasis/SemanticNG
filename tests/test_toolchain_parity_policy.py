@@ -64,7 +64,9 @@ def test_makefile_qa_ci_target_runs_stage_runner() -> None:
 def test_makefile_qa_local_remains_fast_dev_flow() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
 
-    assert "qa-local: bootstrap qa-push qa-test-cov qa-full-type-surface" in makefile
+    assert "qa-local: verify-dev-setup qa-push qa-test-cov qa-full-type-surface" in makefile
+    assert "bootstrap: setup-dev" in makefile
+    assert "verify-dev-setup: bootstrap-preflight verify-precommit-installed" in makefile
 
 
 def test_state_renorm_milestone_baseline_uses_canonical_make_targets() -> None:

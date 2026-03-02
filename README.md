@@ -125,11 +125,13 @@ After installation, run deterministic bootstrap preflight checks (Python lower-b
 make bootstrap-preflight
 ```
 
-Then validate your full local bootstrap state (hook install + provenance prints):
+Then run one-time developer setup (hook install + provenance prints):
 
 ```bash
-make bootstrap
+make setup-dev
 ```
+
+`make bootstrap` is kept as a backward-compatible alias to `make setup-dev`.
 
 If preflight fails, each error includes a one-line remediation command (for example `python -m pip install -e ".[test]"`).
 
@@ -253,7 +255,13 @@ Run guardrail parity checks (Python policy + pre-commit parity + all hooks):
 make qa-hook-parity
 ```
 
-Run the local full QA pass aligned to CI (bootstrap + pre-commit + coverage + full mypy):
+Validate setup state (non-installing) before QA:
+
+```bash
+make verify-dev-setup
+```
+
+Run the local full QA pass aligned to CI (pre-push gate + coverage + full mypy):
 
 ```bash
 make qa-local

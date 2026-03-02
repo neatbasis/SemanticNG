@@ -22,15 +22,23 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -e ".[test]"
-make bootstrap
+make setup-dev
 ```
 
-`make bootstrap` now runs `bootstrap-preflight` first. The preflight stage fails fast for unsupported Python versions (derived from `pyproject.toml`), missing `pre-commit`, or missing editable `semanticng` import, and prints explicit one-line fix commands.
+`make setup-dev` runs `bootstrap-preflight` first. The preflight stage fails fast for unsupported Python versions (derived from `pyproject.toml`), missing `pre-commit`, or missing editable `semanticng` import, and prints explicit one-line fix commands.
 
-Hook installation is mandatory. After preflight passes, `make bootstrap` installs both required hooks (`pre-commit` and `pre-push`), installs hook environments, and fails fast if they are missing/misconfigured via:
+Hook installation is mandatory. After preflight passes, `make setup-dev` installs both required hooks (`pre-commit` and `pre-push`), installs hook environments, and fails fast if they are missing/misconfigured via:
 
 ```bash
 python scripts/dev/verify_precommit_installed.py
+```
+
+`make bootstrap` remains a backward-compatible alias to `make setup-dev`.
+
+For repeat runs, validate setup state without installing anything:
+
+```bash
+make verify-dev-setup
 ```
 
 If this verifier fails, run:
@@ -147,7 +155,7 @@ Canonical Makefile command pack (used by CI jobs):
 ```bash
 make qa-ci              # No-regression budget + hook parity + coverage + full mypy surface
 
-# Optional local command to run bootstrap + strict local gates:
+# Optional local command to run strict local gates (setup verification + QA checks):
 make qa-local
 ```
 

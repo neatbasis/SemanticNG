@@ -46,7 +46,7 @@ Use Makefile targets as the single source of truth for local and CI quality comm
 
 - Canonical targets are generated from `docs/toolchain_parity_policy.json` (see parity block above).
 
-`make qa-local` remains the fast local flow (bootstrap + local strict gates), while `make qa-ci` is the canonical CI-equivalent command pack (`qa-ci-equivalent` remains a compatibility alias).
+`make qa-local` remains the fast local flow (non-installing setup verification + local strict gates), while `make qa-ci` is the canonical CI-equivalent command pack (`qa-ci-equivalent` remains a compatibility alias).
 
 
 ## Authoritative tool pin locations
@@ -100,6 +100,3 @@ Required local runtime assumptions for this hook:
   - remove obsolete hook `additional_dependencies` exceptions,
   - retire temporary dependency waivers once upstream constraints are stable,
   - confirm scheduled cold-start parity workflow results remain green.
-
-
-

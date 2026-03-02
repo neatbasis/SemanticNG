@@ -70,6 +70,71 @@
       },
       "breach_severity": "high",
       "enforcement_mode": "measure-only"
+    },
+    {
+      "s": "sort",
+      "metric_id": "unused_symbol_count_core",
+      "definition": "Count of newly introduced unused symbols detected in src/core relative to the approved baseline allowlist.",
+      "source_of_truth": "Per-surface unused-symbol scan output (Vulture default) for src/core plus baseline allowlist diff artifact",
+      "target_threshold": {
+        "operator": "<=",
+        "value": 0,
+        "unit": "new-count"
+      },
+      "breach_severity": "critical",
+      "enforcement_mode": "blocking"
+    },
+    {
+      "s": "sort",
+      "metric_id": "unused_symbol_count_state_renorm",
+      "definition": "Count of newly introduced unused symbols detected in src/state_renormalization relative to the approved baseline allowlist.",
+      "source_of_truth": "Per-surface unused-symbol scan output (Vulture default) for src/state_renormalization plus baseline allowlist diff artifact",
+      "target_threshold": {
+        "operator": "<=",
+        "value": 0,
+        "unit": "new-count"
+      },
+      "breach_severity": "critical",
+      "enforcement_mode": "blocking"
+    },
+    {
+      "s": "sort",
+      "metric_id": "unused_symbol_count_features",
+      "definition": "Count of unused symbols detected in src/features to track feature-surface entropy until promotion to stricter enforcement.",
+      "source_of_truth": "Per-surface unused-symbol scan output (Vulture default) for src/features with capability-mapping review notes",
+      "target_threshold": {
+        "operator": "<=",
+        "value": 0,
+        "unit": "new-count"
+      },
+      "breach_severity": "medium",
+      "enforcement_mode": "measure-only"
+    },
+    {
+      "s": "sort",
+      "metric_id": "orphan_module_count",
+      "definition": "Number of modules with no inbound import path from sanctioned entrypoints across canonical surfaces.",
+      "source_of_truth": "Import-graph reachability report from canonical entrypoints and orphan-module detector artifact",
+      "target_threshold": {
+        "operator": "<=",
+        "value": 0,
+        "unit": "count"
+      },
+      "breach_severity": "high",
+      "enforcement_mode": "blocking"
+    },
+    {
+      "s": "sort",
+      "metric_id": "duplicate_logic_cross_surface",
+      "definition": "Count of confirmed cross-surface logic duplication findings, including semanticng logic duplicated from core/state surfaces.",
+      "source_of_truth": "Cross-surface duplication scan report and architectural review adjudication log",
+      "target_threshold": {
+        "operator": "<=",
+        "value": 0,
+        "unit": "count"
+      },
+      "breach_severity": "high",
+      "enforcement_mode": "blocking"
     }
   ]
 }

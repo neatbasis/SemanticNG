@@ -11,9 +11,9 @@ It defines:
 
 ## Python policy baseline
 
-- Project runtime and CI baseline: Python 3.10 (`pyproject.toml` `[project].requires-python`
+- Project runtime and CI baseline: Python 3.11 (`pyproject.toml` `[project].requires-python`
   and `.github/actions/python-test-setup/action.yml`).
-- Hook parity policy: pin hook `language_version` to `python3.10` for tools that execute in an
+- Hook parity policy: pin hook `language_version` to `python3.11` for tools that execute in an
   isolated pre-commit environment.
 
 ## Hook dependency map
@@ -37,7 +37,7 @@ Canonical source: `[tool.semanticng.mypy_tiers]` in `pyproject.toml`.
 - `.github/scripts/check_precommit_parity.py` enforces known parity invariants:
   - `mypy` includes all required third-party dependency declarations for its scan scope.
   - `mypy` additional dependency constraints stay aligned with `pyproject.toml` dependency constraints.
-  - `mypy`, `ruff`, and `ruff-format` pin `language_version` to `python3.10`.
+  - `mypy`, `ruff`, and `ruff-format` pin `language_version` to `python3.11`.
   - Workflow Python versions used for parity-sensitive quality jobs stay aligned with the project Python baseline.
 - CI runs this parity check before `pre-commit run --all-files`.
 

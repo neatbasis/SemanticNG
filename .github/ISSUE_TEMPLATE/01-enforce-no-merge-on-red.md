@@ -18,15 +18,21 @@ Merged PRs can currently land without all relevant checks passing, which creates
 - Makes README quality policy advisory rather than enforced.
 - Allows drift between documented and operational governance.
 
+## Exception ownership and closure
+
+- Exception owner (GitHub handle/team): 
+- Target closure date (UTC, YYYY-MM-DD): 
+
 ## Acceptance criteria
 
 - [ ] Branch protection on `main` requires `Quality Guardrails`.
 - [ ] Branch protection requires `State Renormalization Milestone Gate` (or equivalent scoped requirement for milestone-governed changes).
 - [ ] Merges are blocked when required checks are failing or pending.
-- [ ] (Optional) Merge queue is enabled and required checks run on merge-group commit.
-- [ ] README "Quality Gates" section is verified against actual branch protection settings.
+- [ ] Merge queue is enabled and required checks run on `merge_group` commit.
+- [ ] README "Quality Gates" section is verified against actual branch protection settings and quarterly audit evidence is linked.
 
 ## Evidence to attach
 
 - Screenshot or exported settings from repository branch protection.
 - Example PR showing blocked merge on failing required check.
+- Completed/closed date (UTC, YYYY-MM-DD): 

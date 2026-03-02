@@ -1,0 +1,22 @@
+name: Branch Protection Audit
+
+on:
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+jobs:
+  audit-branch-protection:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Audit branch protection required checks
+        env:
+          GH_TOKEN: ${{ secrets.BRANCH_PROTECTION_AUDIT_TOKEN != '' && secrets.BRANCH_PROTECTION_AUDIT_TOKEN || github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python .github/scripts/audit_branch_protection.py --branch main

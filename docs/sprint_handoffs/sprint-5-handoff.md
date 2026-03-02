@@ -1,5 +1,10 @@
 # Sprint 5 handoff
 
+## Governance update ordering confirmation
+
+- Passing evidence links were captured before governance artifact updates.
+- Governance artifacts (`ROADMAP.md`, `docs/dod_manifest.json`, `docs/system_contract_map.md`) were refreshed only after evidence passed.
+
 ## Exit criteria pass/fail matrix
 
 | Exit criterion | Status (`pass`/`fail`) | Evidence |
@@ -17,7 +22,7 @@
 
 | Capability ID | Preload objective | Dependency notes |
 | --- | --- | --- |
-| `capability_invocation_governance` | Reconfirm no-regression command packs and evidence links remain current after handoff gating rollout. | Depends on milestone governance workflow and no-regression policy checks. |
-| `repair_aware_projection_evolution` | Prepare implementation sequencing and test scaffolding before moving status. | Depends on replay/invariant suites and policy guard stability. |
+| `capability_invocation_governance` | Promote governance status only from passing evidence for the boundary slice + edge-case hardening path. | Depends on milestone governance workflow and no-regression policy checks. |
+| `repair_aware_projection_evolution` | Advance minimal usable live flow with lineage/replay scenario, then defer doc promotion until deterministic/back-compat evidence passes. | Depends on replay/invariant suites and policy guard stability. |
 
 _Last regenerated from manifest: 2026-03-01T00:00:00Z (UTC)._

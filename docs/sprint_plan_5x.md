@@ -15,6 +15,7 @@ Canonical references:
 ## Sprint-close artifact evidence requirement
 
 - [ ] Sprint-close checklist includes coverage artifact evidence for the closing sprint (link to CI artifact or attached report summary), including enough detail to validate governance decisions.
+- [ ] Governance artifacts (`ROADMAP.md`, `docs/dod_manifest.json`, `docs/system_contract_map.md`, and sprint handoff records) are updated only after passing evidence exists and is linked from sprint-close notes.
 
 ## Source-of-truth matrix
 
@@ -47,10 +48,10 @@ Canonical references:
 - `capability_invocation_governance`: `in_progress` (acceptance command pack is active in CI; retain `operational` contract maturity until completion evidence closes).
 - `repair_aware_projection_evolution`: `planned` (sequenced after governance reaches `done`; no independent promotion is valid yet).
 
-## Sprint 1 — Governance substrate lock
+## Sprint 1 — Governance boundary slice (halt semantics + evidence ref)
 
 ### Objective
-Finalize no-regression budget, doc freshness SLO checks, handoff minimums, and parity validators so governance substrate controls are enforced before new capability promotions.
+Deliver one high-impact `capability_invocation_governance` boundary slice that exercises halt semantics end-to-end, with an explicit evidence reference attached before any governance artifact updates.
 
 ### Capability IDs in scope
 - `capability_invocation_governance`
@@ -75,10 +76,9 @@ Finalize no-regression budget, doc freshness SLO checks, handoff minimums, and p
 - `Projection view contract`: hold at `operational` under no-regression freeze.
 
 ### Measurable exits
-- No-regression budget policy approved and referenced in CI checks for all `done` capabilities.
-- Doc freshness SLO checks implemented for canonical governance docs.
-- Handoff minimum template published and required in sprint-close artifacts.
-- Parity validators fail closed on capability-ID mismatch across roadmap/manifest/contract map.
+- One boundary slice for `capability_invocation_governance` is green with fail-closed halt semantics and persisted explainable stop records.
+- Sprint-close artifact includes a direct evidence reference (CI link/report excerpt) for the boundary-slice command pack.
+- Governance artifacts are updated only after the passing evidence reference is present and reviewable.
 
 ### Doc-alignment checkpoints
 - Capability IDs and statuses in sprint notes exactly match `docs/dod_manifest.json`.
@@ -97,7 +97,7 @@ Finalize no-regression budget, doc freshness SLO checks, handoff minimums, and p
 ## Sprint 2 — Capability invocation governance
 
 ### Objective
-Advance `capability_invocation_governance` from its current `in_progress` state to `done` with policy-aware side-effect gate tests and explicit exception rollback controls.
+Harden the same governance path for allow/deny/failure edge cases, and standardize the emitted audit payload shape before promotion updates are recorded.
 
 ### Capability IDs in scope
 - `capability_invocation_governance`
@@ -122,9 +122,9 @@ Advance `capability_invocation_governance` from its current `in_progress` state 
 - `Projection view contract`: hold at `operational` unless replay/repair evidence also satisfies promotion protocol.
 
 ### Measurable exits
-- `capability_invocation_governance` transitions `in_progress` -> `done` with linked evidence (the `planned` -> `in_progress` step is already recorded in `docs/dod_manifest.json`).
-- Policy-aware side-effect gates fail closed for unauthorized invocations in CI suites.
-- Dependency impact statements and timeboxed rollback plans are present in all sprint PRs.
+- Allow-path, deny-path, and failure-path edge-case suites pass on the same boundary slice without weakening halt semantics.
+- Audit payload output is normalized and validated for deterministic field shape across governance outcomes.
+- Governance artifacts are updated only after passing edge-case evidence is linked in sprint-close materials.
 
 ### Doc-alignment checkpoints
 - Manifest status for `capability_invocation_governance` is updated and mirrored in roadmap notes.
@@ -143,7 +143,7 @@ Advance `capability_invocation_governance` from its current `in_progress` state 
 ## Sprint 3 — Repair-aware projection evolution
 
 ### Objective
-Deliver auditable repair events and deterministic replay/restart guarantees while preserving governance constraints from Sprint 2 once `capability_invocation_governance` reaches `done`.
+Deliver a minimal usable `repair_aware_projection_evolution` live flow, including one lineage/replay scenario that proves auditable repair behavior.
 
 ### Capability IDs in scope
 - `repair_aware_projection_evolution`
@@ -166,9 +166,9 @@ Deliver auditable repair events and deterministic replay/restart guarantees whil
 - `Projection view contract`: `operational` -> `proven` (conditioned on deterministic replay/restart + repair-event audit evidence).
 
 ### Measurable exits
-- `repair_aware_projection_evolution` remains `planned` until governance dependency closure, then transitions `planned` -> `in_progress` -> `done` with evidence links.
-- Repair events are append-only, auditable, and replayable without silent mutation.
-- Replay/restart determinism is repeated and documented across command packs.
+- Minimal live flow for `repair_aware_projection_evolution` is usable end-to-end without silent mutation.
+- At least one lineage/replay scenario is demonstrated and repeatable from persisted evidence.
+- Governance artifacts are updated only after passing live-flow and lineage/replay evidence is linked.
 
 ### Doc-alignment checkpoints
 - Manifest status transitions for `repair_aware_projection_evolution` are reflected in roadmap and sprint close notes.
@@ -184,10 +184,10 @@ Deliver auditable repair events and deterministic replay/restart guarantees whil
 - [ ] `docs/system_contract_map.md` contains corresponding maturity changes and changelog entries.
 - [ ] Parity validator reports no ID/name/status mismatch.
 
-## Sprint 4 — Coherence refactor under invariant freeze
+## Sprint 4 — Contract-field finalization + deterministic compatibility
 
 ### Objective
-Complete module boundary cleanup and naming normalization under invariant freeze with zero behavior drift.
+Finalize deferred contract fields (`schema_id`, `source`) and prove deterministic/backward-compatible behavior for existing consumers.
 
 ### Capability IDs in scope
 - `schema_selection_ambiguity_baseline`
@@ -211,9 +211,9 @@ Complete module boundary cleanup and naming normalization under invariant freeze
 - `Halt normalization contract`: hold at `proven` with strict no-regression budget enforcement.
 
 ### Measurable exits
-- Refactor PRs demonstrate zero behavior drift through unchanged test outcomes and artifact parity.
-- Naming normalization is completed with backward-compatible references and no contract-ID churn.
-- Invariant freeze exceptions, if any, include timeboxed rollback plans.
+- Deferred contract fields `schema_id` and `source` are finalized in the canonical contract surfaces.
+- Deterministic and backward-compatibility suites confirm no behavior drift for historical payload readers.
+- Governance artifacts are updated only after passing deterministic/back-compat evidence is linked.
 
 ### Doc-alignment checkpoints
 - Contract names, invariants, and producing/consuming stage labels remain canonical in contract map.
@@ -229,10 +229,10 @@ Complete module boundary cleanup and naming normalization under invariant freeze
 - [ ] `docs/system_contract_map.md` reflects no behavior drift and only approved naming updates.
 - [ ] Parity validator confirms roadmap/manifest/contract map consistency.
 
-## Sprint 5 — Proven-maturity hardening + release readiness
+## Sprint 5 — Evidence-based promotion + canonical refresh
 
 ### Objective
-Upgrade qualifying contracts from `operational` to `proven` using repeated evidence and close governance requirements for release readiness.
+Promote capabilities based on accumulated passing evidence, then refresh manifest/contract-map/roadmap in one synchronized documentation closeout.
 
 ### Capability IDs in scope
 - `capability_invocation_governance`
@@ -264,9 +264,9 @@ Upgrade qualifying contracts from `operational` to `proven` using repeated evide
 - `Replay projection analytics contract`: ensure `proven` closure if not already complete in Sprint 3.
 
 ### Measurable exits
-- All targeted contract promotions are changelogged with required syntax and evidence URLs.
-- Governance closure package includes no-regression budget compliance report, freshness SLO report, and handoff artifact audit.
-- Release readiness review signs off only after parity gate passes across roadmap/manifest/contract map.
+- Promotion decisions are explicitly evidence-based, with linked pass history for each promoted contract/capability.
+- Manifest, contract map, and roadmap are refreshed only after evidence-backed promotion decisions are approved.
+- Governance artifacts are updated only after passing evidence exists and parity gates confirm synchronized state.
 
 ### Doc-alignment checkpoints
 - Final roadmap capability states exactly match manifest terminal states.

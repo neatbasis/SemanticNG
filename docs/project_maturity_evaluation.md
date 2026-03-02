@@ -7,12 +7,16 @@ _Regeneration command: `python .github/scripts/capability_parity_report.py` (the
 
 SemanticNG is in an **authorization-first governance hardening** state.
 
+This **Executive assessment** section is the authoritative statement of the **current** project maturity state for this document revision.
+
 All maturity claims in this document are derived from these canonical evidence sources only:
 
 1. `docs/dod_manifest.json` (capability status, command packs, and CI evidence mappings).
 2. `docs/system_contract_map.md` (contract maturity labels and promotion policy).
 
 ## Evidence snapshot (canonical-source derived)
+
+This **Evidence snapshot** section is the authoritative **current-state** count and signal baseline, derived from canonical sources at the regeneration timestamp above.
 
 ### Capability delivery status (from `docs/dod_manifest.json`)
 
@@ -67,10 +71,10 @@ Derived from canonical evidence:
 
 ## Maturity changelog
 
-- 2026-03-02T01:22:00Z: **Canonical maturity refresh** — recomputed capability totals (`7 done / 1 in_progress / 1 planned`), updated stage language to active Next-entry governance execution, and reframed the bottleneck as completing `capability_invocation_governance` before promoting `repair_aware_projection_evolution`.
-- 2026-03-02T00:53:00Z: **Canonical maturity refresh** — recomputed capability totals (`7 done / 0 in_progress / 2 planned`), updated stage language to late-Now completion posture, and reframed the bottleneck as the two-capability planned queue (`capability_invocation_governance`, `repair_aware_projection_evolution`).
-- 2026-02-28T15:48:35Z: **Canonical manifest refresh** — deduplicated prior overlapping refresh notes into one event; recomputed totals (`7 done / 0 in_progress / 2 planned`), retained `capability_invocation_governance` as highest-priority non-done bottleneck, and aligned command packs to manifest `pytest_commands`.
-- 2026-02-28T15:48:35Z: **Gate/halt evidence confirmation** — retained gate/halt baseline validation as canonical evidence under `docs/dod_manifest.json` command/evidence mappings and maturity interpretation in `docs/system_contract_map.md`.
+- 2026-03-02T01:22:00Z: **Historical snapshot — canonical maturity refresh (prior state, not current)** — at that time, capability totals were `7 done / 1 in_progress / 1 planned`; stage language reflected active Next-entry governance execution, and the bottleneck was completing `capability_invocation_governance` before promoting `repair_aware_projection_evolution`.
+- 2026-03-02T00:53:00Z: **Historical snapshot — canonical maturity refresh (prior state, not current)** — at that time, capability totals were `7 done / 0 in_progress / 2 planned`; stage language reflected a late-Now completion posture, and the bottleneck was the two-capability planned queue (`capability_invocation_governance`, `repair_aware_projection_evolution`).
+- 2026-02-28T15:48:35Z: **Historical snapshot — canonical manifest refresh (prior state, not current)** — at that time, totals were `7 done / 0 in_progress / 2 planned`; `capability_invocation_governance` remained the highest-priority non-done bottleneck, and command packs were aligned to manifest `pytest_commands`.
+- 2026-02-28T15:48:35Z: **Historical snapshot — gate/halt evidence confirmation (prior state, not current)** — retained gate/halt baseline validation as then-current canonical evidence under `docs/dod_manifest.json` command/evidence mappings and maturity interpretation in `docs/system_contract_map.md`.
 
 ## Maturity review protocol
 

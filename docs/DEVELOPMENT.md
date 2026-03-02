@@ -35,6 +35,22 @@ git add -A
 pre-commit run --all-files
 ```
 
+### Required pre-push gate (strict, no bypass)
+
+**Policy: no push unless the pre-push gate passes.**
+
+Run this before every push (or rely on the installed `pre-push` hook):
+
+```bash
+pre-commit run --hook-stage pre-push
+```
+
+The pre-push gate must include all of the following checks:
+
+- `ruff` with `--fix`
+- `mypy --config-file=pyproject.toml src/state_renormalization src/core`
+- Fast deterministic pytest smoke subset (`pytest-quick`)
+
 ### Full-surface optional / CI scope (Tier 2 extended)
 
 Use this for full local confidence and CI parity coverage:
@@ -65,6 +81,12 @@ make qa-local
 ```
 
 ## CI failure triage
+
+For local triage parity with CI-style pre-commit failures, run:
+
+```bash
+python .github/scripts/classify_precommit_failures.py --log precommit.log
+```
 
 ## Automated dependency update policy
 

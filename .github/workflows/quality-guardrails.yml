@@ -82,6 +82,10 @@ jobs:
           path: artifacts/script_scope_complexity.md
           if-no-files-found: error
 
+      - name: Validate script inventory/catalog parity (non-blocking during stabilization)
+        continue-on-error: true
+        run: python .github/scripts/validate_script_docs_parity.py
+
   no-regression-budget:
     runs-on: ubuntu-latest
     steps:

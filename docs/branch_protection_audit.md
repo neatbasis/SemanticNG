@@ -34,3 +34,10 @@ Set `BRANCH_PROTECTION_AUDIT_TOKEN` with repository administration read access w
 GH_TOKEN=<token> GITHUB_REPOSITORY=<owner/repo> \
   python .github/scripts/audit_branch_protection.py --branch main
 ```
+
+## `main` required-check enforcement
+
+`main` branch protection must keep both `Quality Guardrails / baseline-lint-type` and `Quality Guardrails / full-type-surface` as required checks at all times (no optional downgrade).
+
+Canonical required-check policy and temporary exception handling live in `docs/process/quality-gate-policy.md`.
+

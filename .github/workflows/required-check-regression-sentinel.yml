@@ -1,0 +1,27 @@
+name: Required Check Regression Sentinel
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - '.github/scripts/**'
+      - '.github/required-checks-main.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - '.github/scripts/**'
+      - '.github/required-checks-main.json'
+  schedule:
+    - cron: '30 4 * * 1'
+  workflow_dispatch:
+
+jobs:
+  required-check-regression-sentinel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Verify required checks are still defined in workflow YAML
+        run: python .github/scripts/required_check_sentinel.py

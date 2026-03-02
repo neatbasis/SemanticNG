@@ -29,6 +29,15 @@ DMAIC change-type routing (required files, validators, evidence locations, and m
 - [ ] **Python version-contract drift blocked:** `pyproject.toml` `[project].requires-python`, README requirements text, and CI workflow `setup-python` versions must match in the same PR; any drift is a merge blocker for infra/docs changes.
 - [ ] **Tooling/config PR parity evidence attached:** For any tooling or CI/configuration change, include a checked PR checklist entry for **"pre-commit parity verified"** and paste command evidence from `python .github/scripts/check_precommit_parity.py` and `pre-commit run --all-files -v`.
 
+### Weekly main health review checklist
+
+- [ ] **Required-check pass rate captured:** Report trailing 7-day required-check pass rate for `main` and compare to policy target.
+- [ ] **Median fix time captured:** Report median time-to-green for required-check failures and compare to policy target.
+- [ ] **Drift sentinels green:** Confirm both `Required Check Regression Sentinel` and `Branch Protection Audit` workflows are green.
+- [ ] **Stabilization criteria status updated:** Record whether `main` meets the stabilized exit criteria in `docs/process/quality-gate-policy.md`.
+
+Reference checklist template: `docs/process/main-health-review-checklist.md`.
+
 ### Operational audit checklist (quarterly branch-protection verification)
 
 Run this audit once per quarter and attach evidence in the release/governance review artifact.

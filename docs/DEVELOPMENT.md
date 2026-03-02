@@ -113,6 +113,24 @@ For local triage parity with CI-style pre-commit failures, run:
 python .github/scripts/classify_precommit_failures.py --log precommit.log
 ```
 
+
+## Branch protection verification checklist (required)
+
+- [ ] Required checks include `Quality Guardrails`.
+- [ ] Required checks include `State Renormalization Milestone Gate`.
+- [ ] Required checks block merge while failing or pending.
+- [ ] Merge queue is enabled for `main`.
+- [ ] Merge queue runs required checks on `merge_group` commits.
+- [ ] Any red merge incident is filed with `.github/ISSUE_TEMPLATE/01-enforce-no-merge-on-red.md` (mandatory template).
+
+## Quarterly governance review (raise strictness)
+
+Run this review once per quarter and track it in a governance issue/PR:
+
+1. Expand mypy scope (especially strict coverage in tests and integration paths).
+2. Reduce no-regression waivers and shorten rollback windows.
+3. Increase fast-test required surface in CI guardrails.
+
 ## Automated dependency update policy
 
 Repository dependency update automation is defined in `.github/dependabot.yml` and follows governance defaults from release and quality-gate policy.

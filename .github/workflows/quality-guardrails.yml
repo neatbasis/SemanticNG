@@ -16,6 +16,18 @@ on:
     branches: [main]
 
 jobs:
+  no-regression-budget:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Shared Python setup
+        uses: ./.github/actions/python-test-setup
+
+      - name: Enforce no-regression budget policy
+        run: python .github/scripts/check_no_regression_budget.py
+
   baseline-lint-type:
     runs-on: ubuntu-latest
     steps:

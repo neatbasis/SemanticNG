@@ -1,5 +1,32 @@
 {
   "version": 1,
+  "quality_metric_budget": {
+    "description": "No-regression baseline budget for static analysis and test stability. CI must fail if any metric exceeds baseline + allowed_regression.",
+    "commands": {
+      "ruff_violations": "ruff check src tests",
+      "mypy_errors": "mypy --config-file=pyproject.toml src tests",
+      "failing_tests": "pytest -q --maxfail=0"
+    },
+    "baseline": {
+      "ruff_violations": 14,
+      "mypy_errors": 62,
+      "failing_tests": 3
+    },
+    "allowed_regression": {
+      "ruff_violations": 0,
+      "mypy_errors": 0,
+      "failing_tests": 0
+    },
+    "governance_review": {
+      "cadence": "quarterly",
+      "owner": "@quality-gates",
+      "raise_strictness_targets": [
+        "expand_mypy_scope",
+        "reduce_waivers",
+        "increase_fast_test_surface"
+      ]
+    }
+  },
   "done_capability_ids": [
     "prediction_persistence_baseline",
     "channel_agnostic_pending_obligation",

@@ -106,6 +106,49 @@ def test_refactored_selector_matches_legacy_snapshots(
     assert refactored.model_dump(mode="json") == legacy.model_dump(mode="json")
 
 
+def test_schema_hit_validation_is_backward_compatible_without_provenance() -> None:
+    hit = SchemaHit.model_validate({"name": "actionable_intent", "score": 0.7})
+
+    assert hit.name == "actionable_intent"
+    assert hit.score == 0.7
+    assert hit.schema_id is None
+    assert hit.source is None
+
+
+def test_schema_hit_serialization_is_deterministic_with_or_without_provenance() -> None:
+    base = SchemaHit(name="actionable_intent", score=0.7)
+    with_provenance = SchemaHit(
+        name="actionable_intent",
+        score=0.7,
+        schema_id="schema.actionable_intent.v1",
+        source="selector:default:fallback:actionable_intent",
+    )
+
+    assert list(base.model_dump(mode="json").keys()) == [
+        "name",
+        "score",
+        "about",
+        "schema_id",
+        "source",
+    ]
+    assert list(with_provenance.model_dump(mode="json").keys()) == [
+        "name",
+        "score",
+        "about",
+        "schema_id",
+        "source",
+    ]
+    assert base.model_dump_json() == (
+        '{"name":"actionable_intent","score":0.7,"about":null,'
+        '"schema_id":null,"source":null}'
+    )
+    assert with_provenance.model_dump_json() == (
+        '{"name":"actionable_intent","score":0.7,"about":null,'
+        '"schema_id":"schema.actionable_intent.v1",'
+        '"source":"selector:default:fallback:actionable_intent"}'
+    )
+
+
 def test_build_selector_context_normalizes_once_and_exposes_signals() -> None:
     ctx = build_selector_context("They're coming in ten", error=None)
 

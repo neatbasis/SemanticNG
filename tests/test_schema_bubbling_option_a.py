@@ -108,3 +108,47 @@ def test_schema_selection_artifact_does_not_leak_channel_specific_terms(
 
     assert "ha_" not in s
     assert "satellite_" not in s
+
+
+def test_schema_selection_artifact_preserves_ambiguity_contract_with_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+    make_episode: Callable[..., Episode],
+) -> None:
+    sel = SchemaSelection(
+        schemas=[
+            SchemaHit(
+                name="clarify.actor",
+                score=0.92,
+                schema_id="schema.clarify.actor.v1",
+                source="selector:default:ambiguity-disambiguation:vague_actor",
+            ),
+            SchemaHit(name="clarification_needed", score=0.75),
+        ],
+        ambiguities=[
+            Ambiguity(
+                status=AmbiguityStatus.UNRESOLVED,
+                about=AmbiguityAbout(kind=AboutKind.ENTITY, key="event.actor"),
+                type=AmbiguityType.UNDERSPECIFIED,
+                resolution_policy=ResolutionPolicy.ASK_USER,
+                ask=[ClarifyingQuestion(q="Who are they?", format=AskFormat.FREEFORM)],
+            )
+        ],
+    )
+
+    def fake_selector(user_text: str | None, *, error: CaptureOutcome | None) -> SchemaSelection:
+        return sel
+
+    monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
+
+    ep2, b2 = apply_schema_bubbling(make_episode(), BeliefState())
+
+    art = next(a for a in ep2.artifacts if a.get("kind") == "schema_selection")
+    schema_payloads = art["schemas"]
+
+    assert [payload.keys() for payload in schema_payloads] == [
+        {"name", "score", "about"},
+        {"name", "score", "about"},
+    ]
+    assert b2.ambiguity_state == AmbiguityStatus.UNRESOLVED
+    assert b2.pending_about is not None
+    assert b2.pending_about.get("key") == "event.actor"

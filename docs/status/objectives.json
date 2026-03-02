@@ -7,7 +7,16 @@
       "active": false,
       "summary": "Boundary gating and edge-case hardening remain the active objective.",
       "reason": "Sprint plan keeps this capability on a promotion path with explicit evidence requirements.",
-      "as_of": "2026-03-02"
+      "as_of": "2026-03-02",
+      "capability_ids": [
+        "capability_invocation_governance"
+      ],
+      "depends_on": [],
+      "milestone_id": "state-renorm-milestone",
+      "sprint_id": "sprint-5",
+      "dod_refs": [
+        "docs/dod_manifest.json#capability_groups/capability_invocation_governance"
+      ]
     },
     {
       "id": "repair_aware_projection_evolution",
@@ -16,7 +25,18 @@
       "active": false,
       "summary": "Objective remains queued behind governance boundary completion.",
       "reason": "Sequenced in sprint planning docs as a subsequent objective.",
-      "as_of": "2026-03-02"
+      "as_of": "2026-03-02",
+      "capability_ids": [
+        "repair_aware_projection_evolution"
+      ],
+      "depends_on": [
+        "capability_invocation_governance"
+      ],
+      "milestone_id": "core-rollout-readiness",
+      "sprint_id": "sprint-next",
+      "dod_refs": [
+        "docs/dod_manifest.json#capability_groups/repair_aware_projection_evolution"
+      ]
     }
   ]
 }

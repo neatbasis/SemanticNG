@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "id": "objective-a",
+      "name": "Objective A",
+      "status": "in_progress",
+      "active": true,
+      "summary": "Linked objective is not done",
+      "reason": "Fixture",
+      "as_of": "2026-01-01",
+      "capability_ids": ["capability_invocation_governance"],
+      "depends_on": [],
+      "milestone_id": "milestone-a",
+      "sprint_id": "sprint-a",
+      "dod_refs": []
+    }
+  ]
+}

@@ -7,7 +7,14 @@
       "active": false,
       "summary": "Sprint 5 handoff is documented with exit checks and carry-over risks.",
       "reason": "See docs/sprint_handoffs/sprint-5-handoff.md for closure evidence.",
-      "as_of": "2026-03-02"
+      "as_of": "2026-03-02",
+      "capability_ids": [],
+      "depends_on": [],
+      "milestone_id": "state-renorm-milestone",
+      "sprint_id": null,
+      "dod_refs": [
+        "docs/sprint_handoffs/sprint-5-handoff.md"
+      ]
     },
     {
       "id": "sprint-next",
@@ -16,7 +23,16 @@
       "active": true,
       "summary": "Planning and preload sequencing are active for the next objective slice.",
       "reason": "Current planning artifacts track pending objective transitions.",
-      "as_of": "2026-03-02"
+      "as_of": "2026-03-02",
+      "capability_ids": [],
+      "depends_on": [
+        "capability_invocation_governance"
+      ],
+      "milestone_id": "core-rollout-readiness",
+      "sprint_id": null,
+      "dod_refs": [
+        "docs/status/objectives.json#repair_aware_projection_evolution"
+      ]
     }
   ]
 }

@@ -1,0 +1,10 @@
+{
+  "id": "proj",
+  "name": "SemanticNG",
+  "status": "done",
+  "active": true,
+  "summary": "Stable",
+  "reason": "All checks green",
+  "as_of": "2026-01-01",
+  "analytics": []
+}

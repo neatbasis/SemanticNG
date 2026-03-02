@@ -60,10 +60,16 @@ def test_stage_definitions_are_loaded_from_manifest() -> None:
     assert set(stages) == set(manifest["stages"])
     for stage_name, stage_spec in manifest["stages"].items():
         expected = [
-            (command_spec["command"], int(command_spec["timeout_seconds"]))
+            (
+                command_spec["command"],
+                int(command_spec["timeout_seconds"]),
+                tuple(command_spec.get("run_if_paths", [])),
+            )
             for command_spec in stage_spec["commands"]
         ]
-        actual = [(spec.command, spec.timeout_seconds) for spec in stages[stage_name].commands]
+        actual = [
+            (spec.command, spec.timeout_seconds, tuple(spec.run_if_paths)) for spec in stages[stage_name].commands
+        ]
         assert actual == expected
 
 
@@ -103,3 +109,47 @@ def test_precommit_has_no_unmanaged_qa_stage_hooks() -> None:
     }
 
     assert configured_hook_ids == expected_hook_ids
+
+
+def test_select_commands_docs_only_diff() -> None:
+    stages = MODULE._load_stages()
+    selected = MODULE._select_commands(
+        "qa-commit",
+        stages["qa-commit"],
+        full_stage=False,
+        changed_files=("docs/DEVELOPMENT.md",),
+    )
+    assert selected == ()
+
+
+def test_select_commands_core_only_diff() -> None:
+    stages = MODULE._load_stages()
+    selected = MODULE._select_commands(
+        "qa-commit",
+        stages["qa-commit"],
+        full_stage=False,
+        changed_files=("src/core/engine.py",),
+    )
+    assert [spec.command for spec in selected] == [spec.command for spec in stages["qa-commit"].commands]
+
+
+def test_select_commands_mixed_diff() -> None:
+    stages = MODULE._load_stages()
+    selected = MODULE._select_commands(
+        "qa-commit",
+        stages["qa-commit"],
+        full_stage=False,
+        changed_files=("docs/DEVELOPMENT.md", "src/state_renormalization/model.py"),
+    )
+    assert [spec.command for spec in selected] == [spec.command for spec in stages["qa-commit"].commands]
+
+
+def test_select_commands_empty_staged_set_uses_full_stage() -> None:
+    stages = MODULE._load_stages()
+    selected = MODULE._select_commands(
+        "qa-commit",
+        stages["qa-commit"],
+        full_stage=False,
+        changed_files=(),
+    )
+    assert [spec.command for spec in selected] == [spec.command for spec in stages["qa-commit"].commands]

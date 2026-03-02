@@ -112,6 +112,13 @@ The pre-push gate must include all of the following checks:
 
 Each stage prints deterministic failure diagnostics: exact rerun command and the first failing file paths parsed from tool output.
 
+`qa-commit` also supports staged-path filtering to avoid expensive checks when staged changes are outside Tier-1 runtime paths:
+
+- The hook reads `git diff --cached --name-only --diff-filter=ACMR` and applies `run_if_paths` filters from `docs/process/quality_stage_commands.json`.
+- Docs-only staged changes skip Tier-1 lint/type/test commands.
+- Changes in `src/core` or `src/state_renormalization` (plus the deterministic smoke test files) run the same command set as before.
+- If no files are staged, or when `CI=1`/`true` (or `python scripts/ci/run_stage_checks.py <stage> --full-stage`), the full stage command list runs deterministically.
+
 ### Full-surface optional / CI scope (Tier 2 extended)
 
 Use this for full local confidence and CI parity coverage:

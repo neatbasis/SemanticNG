@@ -19,7 +19,7 @@ def test_inventory_includes_known_suppressions() -> None:
     )
 
     assert any(
-        row["module"] == "tests" and row["suppression"] == "strict = false"
+        row["module"] == "tests.*" and row["suppression"] == "strict = false"
         for row in rows
     )
 
@@ -39,6 +39,17 @@ def test_inventory_excludes_graduated_bdd_modules() -> None:
         "ontology_steps",
     }
     assert all(row["module"] not in graduated_modules for row in rows)
+
+
+def test_inventory_reflects_warn_return_any_burn_down() -> None:
+    rows = mypy_override_inventory._suppression_rows(
+        mypy_override_inventory._load_overrides(ROOT / "pyproject.toml")
+    )
+
+    assert not any(
+        row["module"] == "tests.*" and row["suppression"] == "warn_return_any = false"
+        for row in rows
+    )
 
 
 def test_json_output_is_valid() -> None:

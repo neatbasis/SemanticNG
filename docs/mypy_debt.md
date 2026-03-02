@@ -14,17 +14,21 @@ Temporary suppressions are tracked against a specific tier below.
 
 | File/module | Suppression/error code | Owner | Created date | Target removal sprint | Blocker |
 | --- | --- | --- | --- | --- | --- |
-| `tests` / `tests.*` | `strict = false` | Testing Infrastructure Maintainers | 2026-03-01 | Sprint 10 | Contract-sensitive tranche is strict-ready, but full test tree still has legacy fixture/fake typing gaps. |
-| `tests` / `tests.*` | `disallow_any_generics = false` | Testing Infrastructure Maintainers | 2026-03-01 | Sprint 10 | Tests still use generic runtime fixtures/fakes that require progressive annotation cleanup. |
-| `tests` / `tests.*` | `check_untyped_defs = false` | Testing Infrastructure Maintainers | 2026-03-01 | Sprint 10 | Test modules remain readability-first while helper/fake protocols are being formalized. |
-| `tests` / `tests.*` | `disallow_untyped_defs = false` | Testing Infrastructure Maintainers | 2026-03-01 | Sprint 10 | Test fixtures and helper factories need explicit signatures before strict re-enable. |
-| `tests` / `tests.*` | `warn_return_any = false` | Testing Infrastructure Maintainers | 2026-03-01 | Sprint 10 | Test factories currently expose transitional `Any` payloads in non-contract test modules. |
+| `tests.*` | `strict = false` | Testing Infrastructure Maintainers | 2026-03-01 | Sprint 10 | Contract-sensitive tranche is strict-ready, but full test tree still has legacy fixture/fake typing gaps. |
+| `tests.*` | `disallow_any_generics = false` | Testing Infrastructure Maintainers | 2026-03-01 | Sprint 10 | Tests still use generic runtime fixtures/fakes that require progressive annotation cleanup. |
+| `tests.*` | `check_untyped_defs = false` | Testing Infrastructure Maintainers | 2026-03-01 | Sprint 10 | Test modules remain readability-first while helper/fake protocols are being formalized. |
+| `tests.*` | `disallow_untyped_defs = false` | Testing Infrastructure Maintainers | 2026-03-01 | Sprint 10 | Test fixtures and helper factories need explicit signatures before strict re-enable. |
 
 ### Sprint 6 suppression burn-down update
 
 - ✅ Graduated BDD step modules (`features.steps.*`) to strict defaults by adding typed Behave context protocols and using typed decorator boundaries.
 - ✅ Graduated optional adapter boundaries (`semanticng.bdd_compat`, `semanticng.deeponto_compat`) to strict defaults by removing `warn_return_any = false` suppressions.
-- ▶️ Next lockstep target: promote additional Tier 2a test modules to strict readiness each sprint before reducing `tests.*` relaxations.
+
+### Sprint 7 suppression burn-down update
+
+- ✅ Added explicit non-suppressed override tracking for `src.features.steps.*`, `semanticng.bdd_compat`, and `semanticng.deeponto_compat` to keep adapter seam progress visible.
+- ✅ Reduced Tier-2b suppressions by removing `warn_return_any = false` from `tests.*`.
+- ▶️ Next lockstep target: harden Tier-2a contract-sensitive tests first, then continue shrinking remaining `tests.*` relaxations.
 
 Use the suppression inventory script to regenerate/review this table before release:
 

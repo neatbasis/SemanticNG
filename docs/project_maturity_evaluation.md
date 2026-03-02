@@ -39,6 +39,18 @@ Current bottleneck capability: **`none`** (all manifest capabilities are `done`)
 
 - Contract maturity labels and promotion protocol are tracked in the contract map (`prototype`, `operational`, `proven`).
 
+## 5S maturity posture
+
+Concise posture sourced from `docs/5s_mission_traceability.md` (principle-to-governance mapping) and the current metric snapshot in `docs/process/5s_metrics.json`.
+
+| 5S principle | Traceability posture (matrix-derived) | Current metric snapshot |
+| --- | --- | --- |
+| stability | Linked to predict-first and explainable-halt governance (`A2`, `A3`, `A8`) with CI/runtime gate enforcement. | `required-check-pass-rate`: `>= 98%`, mode `measure-only`. |
+| signal-health | Linked to executable-spec + evidence governance (`A9`, `A10`) with flaky-signal workflow classification and test anchors. | `flaky-test-count`: `<= 2 count`, mode `measure-only`. |
+| staleness | Linked to contract-boundary and governance freshness controls (`A5`, `A10`) with freshness/schema checks. | `stale-doc-freshness-days`: `<= 30 days`, mode `measure-only`. |
+| supply-chain | Linked to contract/evidence policy controls (`A5`, `A9`) with parity drift checks. | `dependency-drift-count`: `<= 0 count`, mode `measure-only`. |
+| specification | Linked to replay/audit and executable-governance controls (`A1`, `A7`, `A10`) with governance parity checks. | `contract-maturity-movement`: `>= 0 net-level`, mode `measure-only`. |
+
 ## Maturity conclusion
 
 **Current stage: Next-entry governance execution with one active promotion and one queued dependency**

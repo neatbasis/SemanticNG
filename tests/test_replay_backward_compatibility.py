@@ -25,3 +25,23 @@ def test_replay_accepts_legacy_prediction_and_repair_decision_event_kind(tmp_pat
     corrected = replay.projection_state.current_predictions["turn:1"]
     assert corrected.was_corrected is True
     assert corrected.correction_revision == 1
+
+
+def test_replay_accepts_extended_resolution_aliases_for_backward_compatibility(tmp_path: Path) -> None:
+    prediction_log = tmp_path / "legacy-resolution-aliases.jsonl"
+    prediction_log.write_text(
+        "\n".join(
+            [
+                '{"event_kind":"prediction","prediction_id":"pred:2","scope_key":"turn:2","filtration_id":"conversation:c1","target_variable":"user_response_present","target_horizon_iso":"2026-02-13T00:00:00+00:00","expectation":0.1,"issued_at_iso":"2026-02-13T00:00:00+00:00"}',
+                '{"event_kind":"repair_decision","repair_id":"repair:2","resolution":"accepted","resolved_at":"2026-02-13T00:00:02+00:00","lineage_ref":{"scope_key":"turn:2","prediction_id":"pred:2","correction_root_prediction_id":"pred:2"},"accepted_prediction_record":{"prediction_id":"pred:2","scope_key":"turn:2","filtration_id":"conversation:c1","target_variable":"user_response_present","target_horizon_iso":"2026-02-13T00:00:00+00:00","expectation":0.1,"observed_value":1.0,"prediction_error":0.9,"absolute_error":0.9,"was_corrected":true,"correction_parent_prediction_id":"pred:2","correction_root_prediction_id":"pred:2","correction_revision":1,"issued_at_iso":"2026-02-13T00:00:00+00:00","compared_at_iso":"2026-02-13T00:00:02+00:00","corrected_at_iso":"2026-02-13T00:00:02+00:00"}}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    replay = replay_projection_analytics(prediction_log)
+
+    assert replay.records_processed == 2
+    assert replay.analytics_snapshot.correction_count == 1
+    assert replay.projection_state.current_predictions["turn:2"].correction_revision == 1

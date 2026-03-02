@@ -45,3 +45,57 @@ def test_repair_acceptance_policy_can_reject_proposals(make_episode, make_ask_re
     assert resolution["decision"] == "rejected"
     assert resolution["accepted_prediction"] is None
     assert projection.current_predictions["turn:1"].correction_revision == 0
+
+
+def test_repair_acceptance_policy_supports_multiturn_mixed_decisions(
+    make_episode,
+    make_ask_result,
+    tmp_path: Path,
+) -> None:
+    prediction_log = tmp_path / "policy-multiturn.jsonl"
+    projection = _seed_projection()
+
+    decisions = iter([RepairResolution.REJECTED, RepairResolution.ACCEPTED])
+
+    def decide(_proposal: object) -> RepairResolution:
+        return next(decisions, RepairResolution.ACCEPTED)
+
+    first = make_episode(
+        conversation_id="conv:policy-multi",
+        turn_index=1,
+        ask=make_ask_result(status=AskStatus.OK, sentence="yes"),
+    )
+    _, belief, projection = run_mission_loop(
+        first,
+        BeliefState(),
+        projection,
+        pending_predictions=[],
+        prediction_log_path=prediction_log,
+        invariant_handling_mode=InvariantHandlingMode.REPAIR_EVENTS,
+        repair_acceptance_policy=decide,
+    )
+
+    second = make_episode(
+        conversation_id="conv:policy-multi",
+        turn_index=2,
+        ask=make_ask_result(status=AskStatus.NO_RESPONSE, sentence=None),
+    )
+    _, _, projection = run_mission_loop(
+        second,
+        belief,
+        projection,
+        pending_predictions=[],
+        prediction_log_path=prediction_log,
+        invariant_handling_mode=InvariantHandlingMode.REPAIR_EVENTS,
+        repair_acceptance_policy=decide,
+    )
+
+    rows = [json.loads(line) for line in prediction_log.read_text(encoding="utf-8").splitlines() if line.strip()]
+    resolutions = [row for row in rows if row.get("event_kind") == "repair_resolution"]
+
+    assert resolutions[0]["decision"] == "rejected"
+    assert any(row["decision"] == "accepted" for row in resolutions[1:])
+    assert resolutions[0]["accepted_prediction"] is None
+    accepted_rows = [row for row in resolutions if row["decision"] == "accepted"]
+    assert accepted_rows[0]["accepted_prediction"]["correction_revision"] == 1
+    assert projection.current_predictions["turn:2"].correction_revision == 1

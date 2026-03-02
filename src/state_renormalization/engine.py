@@ -1590,6 +1590,12 @@ def _apply_accepted_repair_event(
     )
 
 
+def _normalize_repair_resolution_row(raw: Mapping[str, object]) -> RepairResolutionEvent:
+    normalized = dict(raw)
+    normalized["event_kind"] = "repair_resolution"
+    return RepairResolutionEvent.model_validate(normalized)
+
+
 def _project_current_at(
     pred: PredictionRecord,
     projection_state: ProjectionState,
@@ -1653,9 +1659,7 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
             continue
 
         if kind in {"repair_resolution", "repair_decision"}:
-            normalized = dict(raw)
-            normalized["event_kind"] = "repair_resolution"
-            resolution = RepairResolutionEvent.model_validate(normalized)
+            resolution = _normalize_repair_resolution_row(raw)
             accepted = resolution.accepted_prediction
             if resolution.decision == RepairResolution.ACCEPTED and accepted is not None:
                 accepted_fingerprint = (
@@ -1749,9 +1753,7 @@ def derive_projection_analytics_from_lineage(
                 pred = PredictionRecord.model_validate(payload)
 
             elif kind in {"repair_resolution", "repair_decision"}:
-                normalized = dict(raw)
-                normalized["event_kind"] = "repair_resolution"
-                resolution = RepairResolutionEvent.model_validate(normalized)
+                resolution = _normalize_repair_resolution_row(raw)
                 if (
                     resolution.decision == RepairResolution.ACCEPTED
                     and resolution.accepted_prediction is not None

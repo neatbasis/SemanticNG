@@ -1022,18 +1022,22 @@ class RepairResolutionEvent(BaseModel):
         default="repair_proposal",
         validation_alias=AliasChoices("proposal_event_kind", "proposal_kind"),
     )
-    decision: RepairResolution
+    decision: RepairResolution = Field(
+        validation_alias=AliasChoices("decision", "resolution")
+    )
     resolved_at_iso: str = Field(
         validation_alias=AliasChoices("resolved_at_iso", "resolved_at")
     )
     lineage_ref: RepairLineageRef
     accepted_prediction: PredictionRecord | None = Field(
         default=None,
-        validation_alias=AliasChoices("accepted_prediction", "accepted_payload"),
+        validation_alias=AliasChoices(
+            "accepted_prediction", "accepted_payload", "accepted_prediction_record"
+        ),
     )
     rejection_reason: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("rejection_reason", "reason"),
+        validation_alias=AliasChoices("rejection_reason", "reason", "rejected_reason"),
     )
 
     @model_validator(mode="after")

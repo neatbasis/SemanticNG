@@ -5,6 +5,7 @@ This document defines **repository governance axioms**: project-level, cross-mod
 > Scope note: this file intentionally avoids restating module-local semantic axioms.
 > - Core irreducible/domain-agnostic axioms live in [`src/core/AXIOMS.md`](../src/core/AXIOMS.md).
 > - SemanticNG application-layer axioms for `PredictionRecord`/state transitions live in [`src/semanticng/AXIOMS.md`](../src/semanticng/AXIOMS.md).
+> - Related governance doctrine: [`docs/DOCTRINE_5S.md`](DOCTRINE_5S.md) provides complementary operating guidance (it does not override axioms or module-local invariants).
 
 ## Axiom list
 

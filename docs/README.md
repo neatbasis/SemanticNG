@@ -14,6 +14,7 @@ This file is the single entrypoint for repository documentation.
 - **Governance** — Policies, quality gates, and change-control rules that can block merges. **When to read this:** use before opening a PR that changes capability state, contracts, or quality policy.
   - [docs/release_checklist.md](release_checklist.md)
   - [docs/documentation_change_control.md](documentation_change_control.md)
+  - [docs/DOCTRINE_5S.md](DOCTRINE_5S.md)
   - [docs/definition_of_complete.md](definition_of_complete.md)
   - [docs/dod_manifest.json](dod_manifest.json)
   - [docs/no_regression_budget.json](no_regression_budget.json)

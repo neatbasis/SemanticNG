@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import argparse
 import ast
+import json
 import re
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 
@@ -18,6 +20,16 @@ class ScriptMetrics:
     loc: int
     complexity: int
     funcs: int
+
+
+@dataclass
+class ThresholdBreach:
+    metric: str
+    subject: str
+    actual: int
+    limit: int
+    waived: bool
+    waiver_reason: str | None = None
 
 
 SCOPE_HINTS: list[tuple[str, str]] = [
@@ -106,7 +118,83 @@ def collect_metrics() -> list[ScriptMetrics]:
     return metrics
 
 
-def render_report(metrics: list[ScriptMetrics]) -> str:
+def load_json(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding='utf-8'))
+
+
+def waiver_lookup(waivers: list[dict], metric: str, subject: str) -> tuple[bool, str | None]:
+    today = date.today()
+    for waiver in waivers:
+        waiver_metric = waiver.get('metric', '').strip()
+        waiver_subject = waiver.get('subject', '').strip()
+        if waiver_metric != metric or waiver_subject != subject:
+            continue
+        expires_on = waiver.get('expires_on', '').strip()
+        reason = waiver.get('reason', '').strip() or 'no reason provided'
+        try:
+            expiry = date.fromisoformat(expires_on)
+        except ValueError:
+            return False, f'invalid expiry format: {expires_on!r}'
+        if expiry < today:
+            return False, f'waiver expired on {expires_on}: {reason}'
+        return True, f'waived until {expires_on}: {reason}'
+    return False, None
+
+
+def evaluate_thresholds(
+    metrics: list[ScriptMetrics],
+    *,
+    baseline: dict,
+    waivers: list[dict],
+    max_script_complexity: int | None,
+    max_total_complexity_delta: int | None,
+) -> list[ThresholdBreach]:
+    breaches: list[ThresholdBreach] = []
+    for metric in metrics:
+        if max_script_complexity is None:
+            continue
+        if metric.complexity <= max_script_complexity:
+            continue
+        waived, waiver_reason = waiver_lookup(waivers, 'script-complexity', str(metric.path))
+        breaches.append(
+            ThresholdBreach(
+                metric='script-complexity',
+                subject=str(metric.path),
+                actual=metric.complexity,
+                limit=max_script_complexity,
+                waived=waived,
+                waiver_reason=waiver_reason,
+            )
+        )
+
+    baseline_total_complexity = int(baseline.get('total_complexity', 0))
+    total_complexity = sum(metric.complexity for metric in metrics)
+    total_delta = total_complexity - baseline_total_complexity
+    if max_total_complexity_delta is not None and total_delta > max_total_complexity_delta:
+        waived, waiver_reason = waiver_lookup(waivers, 'total-complexity-delta', 'all-scripts')
+        breaches.append(
+            ThresholdBreach(
+                metric='total-complexity-delta',
+                subject='all-scripts',
+                actual=total_delta,
+                limit=max_total_complexity_delta,
+                waived=waived,
+                waiver_reason=waiver_reason,
+            )
+        )
+    return breaches
+
+
+def render_report(
+    metrics: list[ScriptMetrics],
+    *,
+    baseline: dict,
+    max_script_complexity: int | None,
+    max_total_complexity_delta: int | None,
+    breaches: list[ThresholdBreach],
+) -> str:
     lines = [
         '# .github/scripts scope-alignment and complexity report',
         '',
@@ -128,24 +216,80 @@ def render_report(metrics: list[ScriptMetrics]) -> str:
         f'- Total non-empty LOC: **{total_loc}**',
         f'- Total approximate complexity: **{total_complexity}**',
     ])
+
+    baseline_total_complexity = int(baseline.get('total_complexity', 0))
+    total_delta = total_complexity - baseline_total_complexity
+    lines.extend([
+        f'- Baseline total complexity: **{baseline_total_complexity}**',
+        f'- Total complexity delta vs baseline: **{total_delta}**',
+    ])
+
+    lines.extend([
+        '',
+        '## Threshold evaluation',
+        f'- Max per-script complexity threshold: **{max_script_complexity if max_script_complexity is not None else "disabled"}**',
+        f'- Max total complexity delta threshold: **{max_total_complexity_delta if max_total_complexity_delta is not None else "disabled"}**',
+    ])
+    if not breaches:
+        lines.append('- Result: ✅ no threshold breaches detected.')
+    else:
+        lines.append('- Result: ❌ threshold breaches detected (waived breaches are informational).')
+        lines.extend([
+            '',
+            '| Metric | Subject | Actual | Limit | Status | Details |',
+            '| --- | --- | ---: | ---: | --- | --- |',
+        ])
+        for breach in breaches:
+            status = 'waived' if breach.waived else 'active breach'
+            detail = breach.waiver_reason or ''
+            lines.append(
+                f'| {breach.metric} | `{breach.subject}` | {breach.actual} | {breach.limit} | {status} | {detail} |'
+            )
     return '\n'.join(lines) + '\n'
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', default='artifacts/script_scope_complexity.md')
-    parser.add_argument('--check', action='store_true', help='fail if output differs from existing file')
+    parser.add_argument('--baseline-file', default='docs/process/script_scope_complexity_baseline.json')
+    parser.add_argument('--waiver-file', default='docs/process/script_scope_complexity_waivers.json')
+    parser.add_argument('--max-script-complexity', type=int, default=None)
+    parser.add_argument('--max-total-complexity-delta', type=int, default=None)
+    parser.add_argument('--check', action='store_true', help='fail if active threshold breaches are detected')
     args = parser.parse_args()
 
-    report = render_report(collect_metrics())
+    baseline = load_json(Path(args.baseline_file))
+    waivers = load_json(Path(args.waiver_file)).get('waivers', [])
+    metrics = collect_metrics()
+    breaches = evaluate_thresholds(
+        metrics,
+        baseline=baseline,
+        waivers=waivers,
+        max_script_complexity=args.max_script_complexity,
+        max_total_complexity_delta=args.max_total_complexity_delta,
+    )
+    report = render_report(
+        metrics,
+        baseline=baseline,
+        max_script_complexity=args.max_script_complexity,
+        max_total_complexity_delta=args.max_total_complexity_delta,
+        breaches=breaches,
+    )
     out = Path(args.output)
-    if args.check and out.exists() and out.read_text(encoding='utf-8') != report:
-        print(f'Report drift detected in {out}. Re-generate and commit updated report.')
-        return 1
 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(report, encoding='utf-8')
     print(f'Wrote {out}')
+    active_breaches = [breach for breach in breaches if not breach.waived]
+    if args.check and active_breaches:
+        print('Threshold breaches detected:')
+        for breach in active_breaches:
+            print(
+                f"- {breach.metric} on {breach.subject}: actual={breach.actual} limit={breach.limit}"
+            )
+            if breach.waiver_reason:
+                print(f'  details: {breach.waiver_reason}')
+        return 1
     return 0
 
 

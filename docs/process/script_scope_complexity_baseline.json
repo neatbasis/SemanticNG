@@ -1,0 +1,5 @@
+{
+  "generated_from": "docs/process/script_scope_complexity.md",
+  "total_complexity": 1096,
+  "notes": "Baseline total complexity used to enforce bounded growth in .github/scripts complexity."
+}

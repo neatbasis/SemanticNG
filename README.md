@@ -1,5 +1,9 @@
 # SemanticNG
 
+[![Quality Guardrails](https://github.com/neatbasis/SemanticNG/actions/workflows/quality-guardrails.yml/badge.svg)](https://github.com/neatbasis/SemanticNG/actions/workflows/quality-guardrails.yml)
+[![State Renormalization Milestone Gate](https://github.com/neatbasis/SemanticNG/actions/workflows/state-renorm-milestone-gate.yml/badge.svg)](https://github.com/neatbasis/SemanticNG/actions/workflows/state-renorm-milestone-gate.yml)
+[![Coverage Report (CI)](https://img.shields.io/badge/coverage-report%20in%20Quality%20Guardrails-blue)](https://github.com/neatbasis/SemanticNG/actions/workflows/quality-guardrails.yml)
+
 ## Refactoring focus (active)
 
 The current project-wide focus is the refactor program defined in `src/core/REFACTORING_METAPLAN.md`.
@@ -51,6 +55,16 @@ SemanticNG is a Python project focused on state renormalization, schema selectio
 Architecture and planning constraints are codified in `docs/AXIOMS.md` (normative axiom set and PR usage requirements).
 
 Guardrail classification guidance for contributors (invariants vs policies vs heuristics) is documented in `docs/guardrails_and_invariants.md`.
+
+## Quality Gates
+
+Before merge, required CI checks must be green for the pull request scope.
+
+- `Quality Guardrails` is the baseline required quality suite (pre-commit parity, pytest + coverage gate, and full-surface mypy).
+- `State Renormalization Milestone Gate` is additionally required when a PR touches milestone-governed paths (for example `src/state_renormalization/**` and milestone governance docs/workflows).
+- Coverage reporting is produced in CI by the `Quality Guardrails` workflow (`pytest --cov --cov-report=term-missing --cov-report=xml`).
+
+See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) for local commands to reach CI parity before opening or updating a PR.
 
 ## Requirements
 

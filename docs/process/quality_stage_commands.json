@@ -4,15 +4,48 @@
       "commands": [
         {
           "command": "ruff check --fix src/core src/state_renormalization",
-          "timeout_seconds": 20
+          "timeout_seconds": 20,
+          "run_if_paths": [
+            "src/core/*.py",
+            "src/core/**/*.py",
+            "src/core/*.pyi",
+            "src/core/**/*.pyi",
+            "src/state_renormalization/*.py",
+            "src/state_renormalization/**/*.py",
+            "src/state_renormalization/*.pyi",
+            "src/state_renormalization/**/*.pyi"
+          ]
         },
         {
           "command": "mypy --config-file=pyproject.toml src/state_renormalization src/core",
-          "timeout_seconds": 40
+          "timeout_seconds": 40,
+          "run_if_paths": [
+            "src/core/*.py",
+            "src/core/**/*.py",
+            "src/core/*.pyi",
+            "src/core/**/*.pyi",
+            "src/state_renormalization/*.py",
+            "src/state_renormalization/**/*.py",
+            "src/state_renormalization/*.pyi",
+            "src/state_renormalization/**/*.pyi"
+          ]
         },
         {
           "command": "pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py",
-          "timeout_seconds": 80
+          "timeout_seconds": 80,
+          "run_if_paths": [
+            "src/core/*.py",
+            "src/core/**/*.py",
+            "src/core/*.pyi",
+            "src/core/**/*.pyi",
+            "src/state_renormalization/*.py",
+            "src/state_renormalization/**/*.py",
+            "src/state_renormalization/*.pyi",
+            "src/state_renormalization/**/*.pyi",
+            "tests/test_engine_pending_obligation.py",
+            "tests/test_invariants.py",
+            "tests/test_contracts_decision_effect_shape.py"
+          ]
         }
       ],
       "precommit_hook": {

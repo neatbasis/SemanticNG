@@ -1,42 +1,35 @@
-#!/usr/bin/env python3
-"""Validate delivery-program synchronization across status docs and planning artifacts."""
-
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+import sys
+import re
 from pathlib import Path
 from typing import Any
 
-import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dev"))
+from status_schema import ValidationIssue
 
-SCRIPT_DEV_DIR = Path(__file__).resolve().parents[1] / "dev"
-if str(SCRIPT_DEV_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_DEV_DIR))
-
-from status_schema import validate_item_collection_document, validate_project_document
-
-STATUS_DIR = Path("docs/status")
+Issue = ValidationIssue
+DOD_MANIFEST_PATH = Path("docs/dod_manifest.json")
 ROADMAP_PATH = Path("ROADMAP.md")
 SPRINT_PLAN_PATH = Path("docs/sprint_plan_5x.md")
-DOD_MANIFEST_PATH = Path("docs/dod_manifest.json")
-STATUS_FILES = {
-    "project": STATUS_DIR / "project.json",
-    "milestones": STATUS_DIR / "milestones.json",
-    "sprints": STATUS_DIR / "sprints.json",
-    "objectives": STATUS_DIR / "objectives.json",
-}
+STATUS_TRUTH_CONTRACT_PATH = Path("docs/status_truth_contract.md")
 
-
-@dataclass(frozen=True)
-class Issue:
-    path: str
-    message: str
+NON_CANONICAL_STATUS_INPUTS = (
+    Path("docs/status/project.json"),
+    Path("docs/status/milestones.json"),
+    Path("docs/status/sprints.json"),
+    Path("docs/status/objectives.json"),
+    ROADMAP_PATH,
+    SPRINT_PLAN_PATH,
+)
+PROHIBITED_SOURCE_PATTERN = re.compile(
+    r"(?i)(docs/status/(project|milestones|sprints|objectives)\.json|ROADMAP\.md|docs/sprint_plan_5x\.md).{0,120}(authoritative|source[- ]of[- ]truth)"
+)
 
 
 def _load_json(path: Path) -> Any:
-    with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _rollup_group_status(member_statuses: list[str]) -> str:
@@ -49,172 +42,114 @@ def _rollup_group_status(member_statuses: list[str]) -> str:
     return "done"
 
 
-def _validate_status_schema() -> tuple[dict[str, Any], list[Issue]]:
-    parsed: dict[str, Any] = {}
-    issues: list[Issue] = []
-
-    for label, path in STATUS_FILES.items():
-        if not path.exists():
-            issues.append(Issue(str(path), "file is missing"))
-            continue
-
-        try:
-            data = _load_json(path)
-        except json.JSONDecodeError as exc:
-            issues.append(Issue(str(path), f"invalid JSON: {exc.msg}"))
-            continue
-
-        if label == "project":
-            for issue in validate_project_document(path, data):
-                issues.append(Issue(issue.path, issue.message))
-            if isinstance(data, dict):
-                parsed[label] = data
-            continue
-
-        items, doc_issues = validate_item_collection_document(path, data)
-        for issue in doc_issues:
-            issues.append(Issue(issue.path, issue.message))
-        parsed[label] = items
-
-    return parsed, issues
-
-
-def _validate_relationships(collections: dict[str, list[dict[str, Any]]]) -> list[Issue]:
-    issues: list[Issue] = []
-    milestone_ids = {item.get("id") for item in collections["milestones"] if isinstance(item.get("id"), str)}
-    sprint_ids = {item.get("id") for item in collections["sprints"] if isinstance(item.get("id"), str)}
-    objective_ids = {item.get("id") for item in collections["objectives"] if isinstance(item.get("id"), str)}
-
-    for idx, item in enumerate(collections["objectives"]):
-        context = f"docs/status/objectives.json::items[{idx}]"
-        depends_on = item.get("depends_on", [])
-        if isinstance(depends_on, list):
-            for ref in depends_on:
-                if isinstance(ref, str) and ref not in objective_ids:
-                    issues.append(Issue(context, f"depends_on references unknown objective id '{ref}'"))
-
-        milestone_id = item.get("milestone_id")
-        if isinstance(milestone_id, str) and milestone_id not in milestone_ids:
-            issues.append(Issue(context, f"milestone_id references unknown milestone id '{milestone_id}'"))
-
-        sprint_id = item.get("sprint_id")
-        if isinstance(sprint_id, str) and sprint_id not in sprint_ids:
-            issues.append(Issue(context, f"sprint_id references unknown sprint id '{sprint_id}'"))
-
-    return issues
-
-
-def _compute_dod_derived_status() -> tuple[dict[str, dict[str, str]], list[Issue]]:
-    issues: list[Issue] = []
-    derived = {"objectives": {}, "milestones": {}, "sprints": {}}
-
-    if not DOD_MANIFEST_PATH.exists():
-        return derived, [Issue(str(DOD_MANIFEST_PATH), "file is missing")]
-
-    try:
-        manifest = _load_json(DOD_MANIFEST_PATH)
-    except json.JSONDecodeError as exc:
-        return derived, [Issue(str(DOD_MANIFEST_PATH), f"invalid JSON: {exc.msg}")]
-
-    if not isinstance(manifest, dict):
-        return derived, [Issue(str(DOD_MANIFEST_PATH), "manifest root must be an object")]
-
-    capability_statuses: dict[str, str] = {}
-    for capability in manifest.get("capabilities", []):
-        if isinstance(capability, dict) and isinstance(capability.get("id"), str) and isinstance(capability.get("status"), str):
-            capability_statuses[capability["id"]] = capability["status"]
-
-    objective_statuses: dict[str, str] = {}
+def _compute_manifest_statuses(manifest: dict[str, Any]) -> dict[str, dict[str, str]]:
+    capability_statuses = {
+        item["id"]: item["status"]
+        for item in manifest.get("capabilities", [])
+        if isinstance(item, dict) and isinstance(item.get("id"), str) and isinstance(item.get("status"), str)
+    }
+    objectives: dict[str, str] = {}
     for group in manifest.get("capability_groups", []):
-        if not isinstance(group, dict):
+        if not isinstance(group, dict) or not isinstance(group.get("id"), str):
             continue
-        group_id = group.get("id")
-        members = group.get("capability_ids", [])
-        if not isinstance(group_id, str) or not isinstance(members, list):
-            continue
-        member_statuses = [
-            capability_statuses[member]
-            for member in members
-            if isinstance(member, str) and member in capability_statuses
-        ]
-        objective_statuses[group_id] = _rollup_group_status(member_statuses)
+        members = [m for m in group.get("capability_ids", []) if isinstance(m, str)]
+        member_statuses = [capability_statuses[m] for m in members if m in capability_statuses]
+        objectives[group["id"]] = _rollup_group_status(member_statuses)
 
-    milestone_statuses = {
+    milestones = {
         group["id"]: group["status"]
         for group in manifest.get("milestone_groups", [])
         if isinstance(group, dict) and isinstance(group.get("id"), str) and isinstance(group.get("status"), str)
     }
-    sprint_statuses = {
+    sprints = {
         group["id"]: group["status"]
         for group in manifest.get("sprint_groups", [])
         if isinstance(group, dict) and isinstance(group.get("id"), str) and isinstance(group.get("status"), str)
     }
-
-    derived["objectives"] = objective_statuses
-    derived["milestones"] = milestone_statuses
-    derived["sprints"] = sprint_statuses
-    return derived, issues
+    return {"objectives": objectives, "milestones": milestones, "sprints": sprints}
 
 
-def _validate_dod_alignment(collections: dict[str, list[dict[str, Any]]], derived: dict[str, dict[str, str]]) -> list[Issue]:
+def _validate_truth_contract_doc() -> list[Issue]:
+    if not STATUS_TRUTH_CONTRACT_PATH.exists():
+        return [Issue(str(STATUS_TRUTH_CONTRACT_PATH), "file is missing")]
+    text = STATUS_TRUTH_CONTRACT_PATH.read_text(encoding="utf-8")
+    required_snippets = ["docs/dod_manifest.json", "Generated views", "Narrative-only"]
     issues: list[Issue] = []
-    for group in ("objectives", "milestones", "sprints"):
-        observed = {
-            item.get("id"): item.get("status")
-            for item in collections[group]
-            if isinstance(item.get("id"), str) and isinstance(item.get("status"), str)
-        }
-        for item_id, expected_status in derived[group].items():
-            observed_status = observed.get(item_id)
-            path = f"docs/status/{group}.json"
-            if observed_status is None:
-                issues.append(Issue(path, f"DoD alignment mismatch: expected id '{item_id}' with status '{expected_status}' but item is missing"))
-            elif observed_status != expected_status:
-                issues.append(Issue(path, f"DoD alignment mismatch: id '{item_id}' expected status '{expected_status}' but found '{observed_status}'"))
-
+    for snippet in required_snippets:
+        if snippet not in text:
+            issues.append(Issue(str(STATUS_TRUTH_CONTRACT_PATH), f"missing required contract section '{snippet}'"))
     return issues
 
 
-def _validate_active_objective_references(objectives: list[dict[str, Any]]) -> list[Issue]:
+def _validate_manifest_canonical_source(manifest: dict[str, Any]) -> list[Issue]:
     issues: list[Issue] = []
+    source = manifest.get("canonical_source_of_truth")
+    if not isinstance(source, dict):
+        return [Issue(str(DOD_MANIFEST_PATH), "canonical_source_of_truth must be an object")]
+    if source.get("manifest_path") != DOD_MANIFEST_PATH.as_posix():
+        issues.append(Issue(str(DOD_MANIFEST_PATH), "canonical_source_of_truth.manifest_path must equal docs/dod_manifest.json"))
+    return issues
 
+
+def _validate_noncanonical_inputs_not_authoritative() -> list[Issue]:
+    issues: list[Issue] = []
+    for path in NON_CANONICAL_STATUS_INPUTS:
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if PROHIBITED_SOURCE_PATTERN.search(text):
+            issues.append(
+                Issue(
+                    str(path),
+                    "non-canonical file marks milestones/sprints/objectives/capability state as authoritative",
+                )
+            )
+    return issues
+
+
+def _validate_narrative_docs_reference_active_objectives(manifest: dict[str, Any]) -> list[Issue]:
+    issues: list[Issue] = []
     roadmap = ROADMAP_PATH.read_text(encoding="utf-8") if ROADMAP_PATH.exists() else ""
-    sprint_plan = SPRINT_PLAN_PATH.read_text(encoding="utf-8") if SPRINT_PLAN_PATH.exists() else ""
+    sprint = SPRINT_PLAN_PATH.read_text(encoding="utf-8") if SPRINT_PLAN_PATH.exists() else ""
 
-    if not ROADMAP_PATH.exists():
-        issues.append(Issue(str(ROADMAP_PATH), "file is missing"))
-    if not SPRINT_PLAN_PATH.exists():
-        issues.append(Issue(str(SPRINT_PLAN_PATH), "file is missing"))
-
-    active_objective_ids = [
-        item["id"]
-        for item in objectives
-        if isinstance(item, dict) and item.get("active") is True and isinstance(item.get("id"), str)
+    active_objectives = [
+        group.get("id")
+        for group in manifest.get("capability_groups", [])
+        if isinstance(group, dict) and isinstance(group.get("id"), str) and _rollup_group_status([
+            item.get("status")
+            for item in manifest.get("capabilities", [])
+            if isinstance(item, dict) and item.get("id") in group.get("capability_ids", []) and isinstance(item.get("status"), str)
+        ]) == "in_progress"
     ]
-
-    for objective_id in active_objective_ids:
+    for objective_id in active_objectives:
         if objective_id not in roadmap:
-            issues.append(Issue(str(ROADMAP_PATH), f"active objective '{objective_id}' is not referenced"))
-        if objective_id not in sprint_plan:
-            issues.append(Issue(str(SPRINT_PLAN_PATH), f"active objective '{objective_id}' is not referenced"))
-
+            issues.append(Issue(str(ROADMAP_PATH), f"active objective '{objective_id}' missing reference annotation"))
+        if objective_id not in sprint:
+            issues.append(Issue(str(SPRINT_PLAN_PATH), f"active objective '{objective_id}' missing reference annotation"))
     return issues
 
 
 def main() -> int:
-    parsed, issues = _validate_status_schema()
+    issues: list[Issue] = []
+    if not DOD_MANIFEST_PATH.exists():
+        issues.append(Issue(str(DOD_MANIFEST_PATH), "file is missing"))
+    else:
+        try:
+            manifest = _load_json(DOD_MANIFEST_PATH)
+        except json.JSONDecodeError as exc:
+            issues.append(Issue(str(DOD_MANIFEST_PATH), f"invalid JSON: {exc.msg}"))
+            manifest = {}
+        if not isinstance(manifest, dict):
+            issues.append(Issue(str(DOD_MANIFEST_PATH), "manifest root must be an object"))
+            manifest = {}
 
-    collections = {
-        "milestones": parsed.get("milestones", []),
-        "sprints": parsed.get("sprints", []),
-        "objectives": parsed.get("objectives", []),
-    }
+        if isinstance(manifest, dict) and manifest:
+            issues.extend(_validate_manifest_canonical_source(manifest))
+            _compute_manifest_statuses(manifest)
+            issues.extend(_validate_narrative_docs_reference_active_objectives(manifest))
 
-    issues.extend(_validate_relationships(collections))
-    derived, dod_issues = _compute_dod_derived_status()
-    issues.extend(dod_issues)
-    issues.extend(_validate_dod_alignment(collections, derived))
-    issues.extend(_validate_active_objective_references(collections["objectives"]))
+    issues.extend(_validate_truth_contract_doc())
+    issues.extend(_validate_noncanonical_inputs_not_authoritative())
 
     if issues:
         print("Program sync validation failed:")

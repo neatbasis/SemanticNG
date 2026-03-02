@@ -113,3 +113,23 @@ def test_transition_to_done_includes_done_commands_when_docs_present() -> None:
     )
 
     assert selected == ["pytest tests/test_alpha.py"]
+
+
+
+def test_pre_push_hooks_include_required_quality_gates() -> None:
+    config_path = Path(__file__).resolve().parents[1] / ".pre-commit-config.yaml"
+    config_text = config_path.read_text(encoding="utf-8")
+
+    assert "- id: ruff" in config_text
+    assert "args: [--fix]" in config_text
+    assert "stages: [pre-commit, pre-push]" in config_text
+
+    assert "- id: mypy" in config_text
+    assert (
+        'args: ["--config-file=pyproject.toml", "src/state_renormalization", "src/core"]'
+        in config_text
+    )
+
+    assert "- id: pytest-quick" in config_text
+    assert "entry: pytest -q" in config_text
+    assert "stages: [pre-push]" in config_text

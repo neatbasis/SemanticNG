@@ -47,6 +47,18 @@ Use Makefile targets as the single source of truth for local and CI quality comm
 
 `make qa-local` remains the fast local flow (bootstrap + local strict gates), while `make qa-ci-equivalent` is the canonical CI-equivalent command pack.
 
+
+## Authoritative tool pin locations
+
+Version pin authority for Python quality tooling is centralized as follows:
+
+- `mypy`: `pyproject.toml` `[project.optional-dependencies].test`
+- `ruff`: `pyproject.toml` `[project.optional-dependencies].test`
+- `black`: not currently pinned in-repo
+- `isort`: not currently pinned in-repo
+
+When adding new pins for these tools in other files, update this section and the parity checker (`scripts/ci/check_toolchain_parity.py`) in the same change.
+
 ## Drift controls
 
 - `.github/scripts/check_precommit_parity.py` enforces known parity invariants:
@@ -54,7 +66,8 @@ Use Makefile targets as the single source of truth for local and CI quality comm
   - `mypy` additional dependency constraints stay aligned with `pyproject.toml` dependency constraints.
   - `mypy`, `ruff`, and `ruff-format` pin `language_version` to `python3.10`.
   - Workflow Python versions used for parity-sensitive quality jobs stay aligned with the project Python baseline.
-- CI runs this parity check before `pre-commit run --all-files`.
+- `scripts/ci/check_toolchain_parity.py` enforces repository-wide parity for Python baseline, pre-commit `language_version`, workflow `actions/setup-python` versions, and authoritative tool-pin documentation.
+- CI runs these parity checks before `pre-commit run --all-files`.
 
 ## Ownership and review cadence
 

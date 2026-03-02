@@ -88,6 +88,9 @@ jobs:
       - name: Verify Python support policy sync
         run: python .github/scripts/check_python_support_policy.py
 
+      - name: Verify toolchain parity sync
+        run: python scripts/ci/check_toolchain_parity.py
+
       - name: Print environment provenance
         run: python .github/scripts/print_env_provenance.py
 

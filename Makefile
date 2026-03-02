@@ -1,4 +1,4 @@
-.PHONY: bootstrap-preflight setup-dev bootstrap verify-precommit-installed verify-dev-setup qa-commit qa-push qa-ci qa-baseline qa-hook-parity qa-hook-parity-diagnostics qa-local-fast qa-full-type qa-full-type-surface qa-test-cov qa-ci-equivalent qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
+.PHONY: bootstrap-preflight setup-dev bootstrap verify-precommit-installed verify-dev-setup qa-commit qa-push qa-ci qa-baseline qa-hook-parity qa-hook-parity-diagnostics qa-local-fast qa-full-type qa-full-type-surface qa-test-cov qa-ci-equivalent qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene status status-json status-check test test-cov
 
 bootstrap-preflight:
 	python scripts/dev/bootstrap_preflight.py
@@ -72,3 +72,13 @@ test:
 
 test-cov:
 	$(MAKE) qa-test-cov
+
+
+status:
+	python scripts/dev/status_report.py summary
+
+status-json:
+	python scripts/dev/status_report.py json
+
+status-check:
+	python scripts/dev/status_report.py check

@@ -41,7 +41,12 @@ jobs:
           echo "===== (end) ====="
       - name: Classify pre-commit output
         if: always()
-        run: python .github/scripts/classify_precommit_failures.py --log precommit.log >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          python .github/scripts/classify_precommit_failures.py \
+            --log precommit.log \
+            --json-out precommit_failure_classification.json \
+            --md-out precommit_failure_classification.md
+          cat precommit_failure_classification.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload pre-commit log artifact
         if: always()
@@ -49,6 +54,16 @@ jobs:
         with:
           name: precommit-log
           path: precommit.log
+          if-no-files-found: warn
+
+      - name: Upload pre-commit classification artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: precommit-classification
+          path: |
+            precommit_failure_classification.json
+            precommit_failure_classification.md
           if-no-files-found: warn
 
       - name: Fail job on hook parity errors

@@ -86,6 +86,31 @@ jobs:
         continue-on-error: true
         run: python .github/scripts/validate_script_docs_parity.py
 
+      - name: Generate unused-code scan artifacts (includes script surfaces)
+        run: python scripts/ci/scan_unused_code.py
+
+      - name: Check script-surface unused-code budget (phase 1: measurement-only)
+        continue-on-error: true
+        run: |
+          python .github/scripts/check_no_regression_budget.py \
+            --skip-quality-metrics \
+            --check-script-surfaces \
+            --script-enforcement-phase measure-only
+
+      - name: Check script-surface unused-code budget (phase 2a: block scripts/ci)
+        run: |
+          python .github/scripts/check_no_regression_budget.py \
+            --skip-quality-metrics \
+            --check-script-surfaces \
+            --script-enforcement-phase block-ci-scripts
+
+      - name: Check script-surface unused-code budget (phase 2b: block .github/scripts)
+        run: |
+          python .github/scripts/check_no_regression_budget.py \
+            --skip-quality-metrics \
+            --check-script-surfaces \
+            --script-enforcement-phase block-ci-and-github-scripts
+
   no-regression-budget:
     runs-on: ubuntu-latest
     steps:

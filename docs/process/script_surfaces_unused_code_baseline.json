@@ -1,0 +1,38 @@
+{
+  "spec_version": "1.0.0",
+  "generated_from": "artifacts/unused_code/summary.json",
+  "stabilization_window": {
+    "measurement_only_started_on": "2026-03-02",
+    "phase_2_ci_scripts_blocking_on": "2026-03-16",
+    "phase_2_github_scripts_blocking_on": "2026-03-30",
+    "dev_scripts_waiver_status": "non_blocking_optional",
+    "notes": "scripts/dev remains measure-only during developer ergonomics waiver period; promote to blocking by follow-up policy review."
+  },
+  "blocking_surfaces_by_phase": {
+    "measure-only": [],
+    "block-ci-scripts": [
+      "ci_scripts"
+    ],
+    "block-ci-and-github-scripts": [
+      "ci_scripts",
+      "github_scripts"
+    ]
+  },
+  "surfaces": {
+    "ci_scripts": {
+      "path": "scripts/ci",
+      "baseline_diagnostic_count": 0,
+      "allowed_regression": 0
+    },
+    "github_scripts": {
+      "path": ".github/scripts",
+      "baseline_diagnostic_count": 1,
+      "allowed_regression": 0
+    },
+    "dev_scripts": {
+      "path": "scripts/dev",
+      "baseline_diagnostic_count": 0,
+      "allowed_regression": 0
+    }
+  }
+}

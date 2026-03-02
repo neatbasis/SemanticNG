@@ -201,7 +201,6 @@ def main() -> int:
     policy = _load_policy()
 
     python_version = str(policy["python_version"])
-    required_hook_language_version = str(policy["hook_language_version"])
     policy_tier1 = list(policy["mypy"]["tier1_scope"])
     policy_tier2 = list(policy["mypy"]["tier2_scope"])
     canonical_make_targets = list(policy["canonical_make_targets"])
@@ -274,10 +273,7 @@ def main() -> int:
     for hook_id in ("mypy", "ruff", "ruff-format"):
         hook_block = _extract_hook_block(config_lines, hook_id)
         language_version = _extract_hook_language_version(hook_block, hook_id)
-        if (
-            language_version != expected_hook_language_version
-            or language_version != required_hook_language_version
-        ):
+        if language_version != expected_hook_language_version:
             _report_drift(
                 ".pre-commit-config.yaml",
                 f"hooks.{hook_id}.language_version",

@@ -17,18 +17,21 @@ STATUS_DIR = Path("docs/status")
 Issue = ValidationIssue
 
 
-def _load_json(path: Path) -> Any:
-    with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
-
-
-def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]:
-    issues: list[Issue] = []
-    required_files = {
-        label: STATUS_DIR / f"{label}.json" for label in STATUS_FILE_CONTRACTS
+def _default_project_payload() -> dict[str, Any]:
+    return {
+        "id": "unknown",
+        "name": "unknown",
+        "status": "unknown",
+        "active": True,
+        "summary": "unknown",
+        "reason": "project.json is missing or invalid",
+        "as_of": "unknown",
+        "analytics": [],
     }
 
-    payload: dict[str, Any] = {
+
+def _base_payload(status_show: str, required_files: dict[str, Path]) -> dict[str, Any]:
+    return {
         "meta": {
             "generator": "scripts/dev/status_report.py",
             "deterministic": True,
@@ -40,53 +43,80 @@ def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]
                     STATUS_FILE_CONTRACTS["project"]["properties"]["status"]["enum"]
                 ),
                 "required_keys": list(STATUS_FILE_CONTRACTS["project"]["required"]),
-                "files": {
-                    label: str(path)
-                    for label, path in required_files.items()
-                },
+                "files": {label: str(path) for label, path in required_files.items()},
             },
         },
-        "project": {
-            "id": "unknown",
-            "name": "unknown",
-            "status": "unknown",
-            "active": True,
-            "summary": "unknown",
-            "reason": "project.json is missing or invalid",
-            "as_of": "unknown",
-            "analytics": [],
-        },
+        "project": _default_project_payload(),
         "milestones": [],
         "sprints": [],
         "objectives": [],
     }
 
+
+def _load_json(path: Path) -> Any:
+    with path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def _load_status_file(path: Path) -> tuple[Any | None, list[Issue]]:
+    if not path.exists():
+        return None, [Issue(str(path), "file is missing")]
+
+    try:
+        return _load_json(path), []
+    except json.JSONDecodeError as exc:
+        return None, [Issue(str(path), f"invalid JSON: {exc.msg}")]
+
+
+def _validate_item(
+    label: str,
+    path: Path,
+    data: Any,
+) -> tuple[dict[str, Any] | list[dict[str, Any]] | None, list[Issue]]:
+    if label == "project":
+        issues = validate_project_document(path, data)
+        if isinstance(data, dict):
+            normalized = {
+                **_default_project_payload(),
+                **{k: v for k, v in data.items() if k != "analytics"},
+                "analytics": data.get("analytics", []),
+            }
+            return normalized, issues
+        return None, issues
+
+    return validate_item_collection_document(path, data)
+
+
+def _filter_items(items: list[dict[str, Any]], status_show: str) -> list[dict[str, Any]]:
+    if status_show == "all":
+        return items
+    return [item for item in items if item.get("active")]
+
+
+def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]:
+    issues: list[Issue] = []
+    required_files = {
+        label: STATUS_DIR / f"{label}.json" for label in STATUS_FILE_CONTRACTS
+    }
+
+    payload = _base_payload(status_show=status_show, required_files=required_files)
+
     for label, path in required_files.items():
-        if not path.exists():
-            issues.append(Issue(str(path), "file is missing"))
+        data, load_issues = _load_status_file(path)
+        issues.extend(load_issues)
+        if data is None:
             continue
 
-        try:
-            data = _load_json(path)
-        except json.JSONDecodeError as exc:
-            issues.append(Issue(str(path), f"invalid JSON: {exc.msg}"))
-            continue
+        validated, validation_issues = _validate_item(label=label, path=path, data=data)
+        issues.extend(validation_issues)
 
         if label == "project":
-            issues.extend(validate_project_document(path, data))
-            if isinstance(data, dict):
-                payload["project"] = {
-                    **payload["project"],
-                    **{k: v for k, v in data.items() if k != "analytics"},
-                    "analytics": data.get("analytics", []),
-                }
+            if isinstance(validated, dict):
+                payload["project"] = validated
             continue
 
-        items, item_issues = validate_item_collection_document(path, data)
-        issues.extend(item_issues)
-        if status_show != "all":
-            items = [item for item in items if item.get("active")]
-        payload[label] = items
+        if isinstance(validated, list):
+            payload[label] = _filter_items(validated, status_show=status_show)
 
     return payload, issues
 
@@ -131,6 +161,14 @@ def emit_human_summary(payload: dict[str, Any], validation_issues: list[Issue]) 
             print(f"- {issue.path}: {issue.message}")
 
 
+def emit_json_payload(payload: dict[str, Any]) -> None:
+    print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def emit_check_issues(validation_issues: list[Issue]) -> None:
+    print(json.dumps({"issues": [issue.__dict__ for issue in validation_issues]}, indent=2, sort_keys=True))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Deterministic offline status reporting")
     parser.add_argument("mode", choices=["summary", "json", "check"])
@@ -144,10 +182,10 @@ def main() -> int:
         return 0
 
     if args.mode == "json":
-        print(json.dumps(payload, indent=2, sort_keys=True))
+        emit_json_payload(payload)
         return 0
 
-    print(json.dumps({"issues": [issue.__dict__ for issue in issues]}, indent=2, sort_keys=True))
+    emit_check_issues(issues)
     return 1 if issues else 0
 
 

@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 POLICY_PATH = Path("docs/toolchain_parity_policy.json")
+STAGE_MANIFEST_PATH = Path("docs/process/quality_stage_commands.json")
 REQUIRED_MYPY_PACKAGES = (
     "pydantic",
     "pytest",
@@ -23,6 +24,10 @@ class ParityError(RuntimeError):
 
 def _load_policy() -> dict[str, object]:
     return json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+
+
+def _load_stage_manifest() -> dict[str, object]:
+    return json.loads(STAGE_MANIFEST_PATH.read_text(encoding="utf-8"))
 
 
 def _report_drift(file_path: Path | str, key: str, expected: object, found: object) -> None:
@@ -71,6 +76,38 @@ def _extract_hook_language_version(hook_block: list[str], hook_id: str) -> str:
             return stripped.split(":", maxsplit=1)[1].strip()
     raise ParityError(f"Hook '{hook_id}' is missing 'language_version'.")
 
+
+
+
+def _extract_hook_entry(hook_block: list[str], hook_id: str) -> str:
+    for line in hook_block:
+        stripped = line.strip()
+        if stripped.startswith("entry:"):
+            return stripped.split(":", maxsplit=1)[1].strip()
+    raise ParityError(f"Hook '{hook_id}' is missing 'entry'.")
+
+
+def _extract_inline_list(value: str) -> list[str]:
+    bracketed = value.strip()
+    if not (bracketed.startswith("[") and bracketed.endswith("]")):
+        raise ParityError(f"Expected inline list syntax, found: {value}")
+    body = bracketed[1:-1].strip()
+    if not body:
+        return []
+    items: list[str] = []
+    for part in body.split(","):
+        item = part.strip().strip("\"'")
+        if item:
+            items.append(item)
+    return items
+
+
+def _extract_hook_stages(hook_block: list[str], hook_id: str) -> list[str]:
+    for line in hook_block:
+        stripped = line.strip()
+        if stripped.startswith("stages:"):
+            return _extract_inline_list(stripped.split(":", maxsplit=1)[1].strip())
+    raise ParityError(f"Hook '{hook_id}' is missing 'stages'.")
 
 def _extract_hook_args(hook_block: list[str], hook_id: str) -> list[str]:
     for line in hook_block:
@@ -194,11 +231,36 @@ def _ensure_command_parity_strings(canonical_make_targets: list[str], parity_doc
             raise ParityError("Documentation command parity strings are out of sync.")
 
 
+
+
+def _ensure_stage_hook_parity(config_lines: list[str], stage_manifest: dict[str, object]) -> None:
+    manifest_stages = stage_manifest["stages"]
+    for _, stage_spec in manifest_stages.items():
+        hook_spec = stage_spec.get("precommit_hook")
+        if not isinstance(hook_spec, dict):
+            continue
+
+        hook_id = str(hook_spec["id"])
+        expected_entry = str(hook_spec["entry"])
+        expected_stages = [str(stage) for stage in hook_spec["stages"]]
+
+        hook_block = _extract_hook_block(config_lines, hook_id)
+        actual_entry = _extract_hook_entry(hook_block, hook_id)
+        if actual_entry != expected_entry:
+            _report_drift(".pre-commit-config.yaml", f"hooks.{hook_id}.entry", expected_entry, actual_entry)
+            raise ParityError("Stage hook entry is out of sync with canonical stage manifest.")
+
+        actual_stages = _extract_hook_stages(hook_block, hook_id)
+        if actual_stages != expected_stages:
+            _report_drift(".pre-commit-config.yaml", f"hooks.{hook_id}.stages", expected_stages, actual_stages)
+            raise ParityError("Stage hook stages are out of sync with canonical stage manifest.")
+
 def main() -> int:
     config_lines = Path(".pre-commit-config.yaml").read_text(encoding="utf-8").splitlines()
     pyproject_path = Path("pyproject.toml")
     pyproject_text = pyproject_path.read_text(encoding="utf-8")
     policy = _load_policy()
+    stage_manifest = _load_stage_manifest()
 
     python_version = str(policy["python_version"])
     policy_tier1 = list(policy["mypy"]["tier1_scope"])
@@ -231,6 +293,7 @@ def main() -> int:
 
     _ensure_docs_match_mypy_scope(mypy_files, expected_mypy_hook_args, parity_docs)
     _ensure_command_parity_strings(canonical_make_targets, parity_docs)
+    _ensure_stage_hook_parity(config_lines, stage_manifest)
 
     mypy_dep_specs = _extract_additional_dependencies(mypy_block)
     mypy_constraints = {

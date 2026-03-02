@@ -12,9 +12,7 @@
     ]
   },
   "canonical_make_targets": [
-    "make qa-hook-parity",
-    "make qa-test-cov",
-    "make qa-full-type-surface"
+    "make qa-ci-equivalent"
   ],
   "parity_sensitive_workflows": [
     ".github/workflows/quality-guardrails.yml",

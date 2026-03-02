@@ -46,3 +46,19 @@ def test_docs_include_generated_parity_policy_block() -> None:
         assert "<!-- PARITY_POLICY:START -->" in text
         assert "<!-- PARITY_POLICY:END -->" in text
         assert f"- Python baseline: `{policy['python_version']}`" in text
+
+
+def test_makefile_qa_ci_equivalent_target_runs_canonical_sequence() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+
+    assert "qa-ci-equivalent:" in makefile
+    assert "	python .github/scripts/check_no_regression_budget.py" in makefile
+    assert "	$(MAKE) qa-hook-parity" in makefile
+    assert "	$(MAKE) qa-test-cov" in makefile
+    assert "	$(MAKE) qa-full-type-surface" in makefile
+
+
+def test_makefile_qa_local_remains_fast_dev_flow() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+
+    assert "qa-local: bootstrap qa-hook-parity qa-test-cov qa-full-type-surface" in makefile

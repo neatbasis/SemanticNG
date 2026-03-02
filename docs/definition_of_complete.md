@@ -108,6 +108,28 @@ Minimum evidence baseline:
 - `tests/test_engine_projection_mission_loop.py`
 - Replay analytics suites that verify lineage recovery.
 
+
+## Promotion synchronization + handoff protocol
+
+Capability status/maturity promotions are only complete when the governance triplet and progress artifact are updated together in one PR:
+
+- `docs/dod_manifest.json`
+- `docs/system_contract_map.md`
+- `ROADMAP.md` and at least one active progress document (`docs/sprint_plan_5x.md` or sprint handoff)
+
+Required command:
+
+```bash
+make promotion-check
+```
+
+Explicit handoff ownership:
+
+1. **Capability owner** proposes status transition + command/evidence updates in `docs/dod_manifest.json`.
+2. **Contract owner** applies matching maturity/changelog updates in `docs/system_contract_map.md`.
+3. **Program/roadmap owner** mirrors transition status in roadmap/progress docs.
+4. **Release/governance owner** executes `make promotion-check` and records a pass before merge.
+
 ## Usage notes
 
 - `docs/dod_manifest.json` remains the machine-readable source of capability status and test commands.

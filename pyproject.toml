@@ -109,26 +109,6 @@ show_error_codes = true
 ignore_missing_imports = false
 
 [[tool.mypy.overrides]]
-module = ["semanticng.bdd_compat", "semanticng.deeponto_compat"]
-# Optional third-party adapters are isolated here. Any importlib-dynamic edges stay
-# at this boundary so step modules can remain fully typed.
-warn_return_any = false
-
-[[tool.mypy.overrides]]
-module = [
-  "src.features.steps.*",
-  "steps",
-  "index_steps",
-  "ontology_steps",
-]
-# BDD step glue is legacy/dynamic integration code (behave context + optional deps).
-# Keep relaxations tightly bounded to this namespace so strict typing remains the
-# default for production modules.
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-disallow_untyped_decorators = false
-warn_return_any = false
-[[tool.mypy.overrides]]
 module = ["tests", "tests.*"]
 # Tests prioritize readability and controlled fakes over full annotation coverage.
 # Relax only the noisiest strict rules needed for this tier while preserving basic

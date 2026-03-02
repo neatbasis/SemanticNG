@@ -2,6 +2,7 @@
 
 import os
 
+from features.steps._typing import BehaveContext
 from semanticng.bdd_compat import given, then
 from semanticng.deeponto_compat import OntologyLike, create_ontology
 from semanticng.step_state import get_ontology_step_state
@@ -10,7 +11,7 @@ RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
 
 
 @given('an ontology file "{path}"')
-def step_load_ontology(context, path):
+def step_load_ontology(context: BehaveContext, path: str) -> None:
     basename = os.path.basename(path)
     print(basename)
     state = get_ontology_step_state(context)
@@ -38,7 +39,7 @@ def _resolve_class_iri(onto: OntologyLike, cls: str) -> str | None:
 
 
 @then('class "{cls}" should exist')
-def step_check_class(context, cls):
+def step_check_class(context: BehaveContext, cls: str) -> None:
     state = get_ontology_step_state(context)
     assert state.onto is not None, "Ontology must be loaded before lookup"
     iri = _resolve_class_iri(state.onto, cls)

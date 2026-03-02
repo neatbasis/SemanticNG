@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
-from typing import Any, Callable, TypeVar, cast
+from collections.abc import Callable
+from typing import Any, TypeVar, cast
 
 StepFunc = TypeVar("StepFunc", bound=Callable[..., Any])
 

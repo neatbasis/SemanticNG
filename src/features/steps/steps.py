@@ -6,14 +6,14 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from gherkin.parser import Parser  # type: ignore[import-not-found]
-from gherkin.token_scanner import TokenScanner  # type: ignore[import-not-found]
+from gherkin.parser import Parser
+from gherkin.token_scanner import TokenScanner
 
+from features.steps._typing import BehaveContext
 from semanticng.bdd_compat import given, then, when
 from semanticng.step_state import get_resource_step_state
-
 from state_renormalization.gherkin_document import GherkinDocument
 from state_renormalization.stable_ids import derive_stable_ids
 
@@ -121,7 +121,7 @@ def build_resource(
     return resource
 
 
-def _derive_context_stable_ids(context) -> dict[str, str]:
+def _derive_context_stable_ids(context: BehaveContext) -> dict[str, str]:
     feature_path = getattr(getattr(context, "feature", None), "filename", None)
     scenario = getattr(context, "scenario", None)
     step = getattr(context, "step", None)
@@ -167,12 +167,12 @@ def _derive_context_stable_ids(context) -> dict[str, str]:
     return out
 
 
-def _set_meta_field(context, key: str, value: str) -> None:
+def _set_meta_field(context: BehaveContext, key: str, value: str) -> None:
     state = get_resource_step_state(context)
     state.meta[key] = value
 
 
-def _build_and_store_resource(context) -> None:
+def _build_and_store_resource(context: BehaveContext) -> None:
     state = get_resource_step_state(context)
     stable_ids = _derive_context_stable_ids(context)
     if stable_ids:
@@ -184,10 +184,11 @@ def _build_and_store_resource(context) -> None:
     context.store.put(state.resource)
 
 
-def _resource_for_validation(context) -> dict[str, Any]:
+def _resource_for_validation(context: BehaveContext) -> dict[str, Any]:
     state = get_resource_step_state(context)
     assert state.resource is not None, "Resource must be built before validation"
-    return json.loads(canonical_json(state.resource))
+    resource_copy = json.loads(canonical_json(state.resource))
+    return cast(dict[str, Any], resource_copy)
 
 
 # ----------------------------
@@ -196,42 +197,42 @@ def _resource_for_validation(context) -> dict[str, Any]:
 
 
 @given("a canonical JSON serializer for Resources")
-def step_given_canonical_serializer(context) -> None:
+def step_given_canonical_serializer(context: BehaveContext) -> None:
     context.canonical_json = canonical_json
 
 
 @given("a sha256 content hash function")
-def step_given_sha256(context) -> None:
+def step_given_sha256(context: BehaveContext) -> None:
     context.sha256_hex = sha256_hex
 
 
 @given("a Resource store that is append-only")
-def step_given_store(context) -> None:
+def step_given_store(context: BehaveContext) -> None:
     context.store = AppendOnlyStore()
 
 
 @when('I create a Resource with dc:type "{dc_type}"')
-def step_when_create_resource_type(context, dc_type: str) -> None:
+def step_when_create_resource_type(context: BehaveContext, dc_type: str) -> None:
     _set_meta_field(context, "dc:type", dc_type)
 
 
 @when('with dc:created "{created}"')
-def step_when_set_created(context, created: str) -> None:
+def step_when_set_created(context: BehaveContext, created: str) -> None:
     _set_meta_field(context, "dc:created", created)
 
 
 @when('with dc:source "{source}"')
-def step_when_set_source(context, source: str) -> None:
+def step_when_set_source(context: BehaveContext, source: str) -> None:
     _set_meta_field(context, "dc:source", source)
 
 
 @when('with dc:creator "{creator}"')
-def step_when_set_creator(context, creator: str) -> None:
+def step_when_set_creator(context: BehaveContext, creator: str) -> None:
     _set_meta_field(context, "dc:creator", creator)
 
 
 @when("I create a Resource with:")
-def step_when_create_resource_table(context) -> None:
+def step_when_create_resource_table(context: BehaveContext) -> None:
     """
     Table example:
       | dc:identifier | (auto) |
@@ -263,7 +264,7 @@ def step_when_create_resource_table(context) -> None:
 
 
 @when("with payload:")
-def step_when_set_payload(context) -> None:
+def step_when_set_payload(context: BehaveContext) -> None:
     raw = context.text.strip()
     try:
         payload = json.loads(raw)
@@ -275,19 +276,19 @@ def step_when_set_payload(context) -> None:
 
 
 @when("I create a Resource with extensions:")
-def step_when_set_extensions(context) -> None:
+def step_when_set_extensions(context: BehaveContext) -> None:
     raw = context.text.strip()
     state = get_resource_step_state(context)
     state.extensions = json.loads(raw)
 
 
 @when("I build the Resource")
-def step_when_build_resource(context) -> None:
+def step_when_build_resource(context: BehaveContext) -> None:
     _build_and_store_resource(context)
 
 
 @then("the Resource MUST contain meta, payload, integrity")
-def step_then_must_contain_core_fields(context) -> None:
+def step_then_must_contain_core_fields(context: BehaveContext) -> None:
     state = get_resource_step_state(context)
     assert state.resource is not None, "Resource not built"
     r = state.resource
@@ -297,14 +298,14 @@ def step_then_must_contain_core_fields(context) -> None:
 
 
 @then('meta.dc:type MUST equal "{expected}"')
-def step_then_dc_type_equals(context, expected: str) -> None:
+def step_then_dc_type_equals(context: BehaveContext, expected: str) -> None:
     state = get_resource_step_state(context)
     assert state.resource is not None, "Resource not built"
     assert state.resource["meta"]["dc:type"] == expected
 
 
 @then("integrity.content_hash MUST be a sha256 of canonical content")
-def step_then_hash_matches(context) -> None:
+def step_then_hash_matches(context: BehaveContext) -> None:
     state = get_resource_step_state(context)
     assert state.resource is not None, "Resource not built"
     r = state.resource
@@ -323,7 +324,7 @@ def step_then_hash_matches(context) -> None:
 
 
 @then("meta.dc:identifier MUST be a content-addressed identifier derived from the content hash")
-def step_then_identifier_matches_hash(context) -> None:
+def step_then_identifier_matches_hash(context: BehaveContext) -> None:
     state = get_resource_step_state(context)
     assert state.resource is not None, "Resource not built"
     r = state.resource
@@ -332,14 +333,14 @@ def step_then_identifier_matches_hash(context) -> None:
 
 
 @then('the Resource MUST contain "{field}"')
-def step_then_contains_field(context, field: str) -> None:
+def step_then_contains_field(context: BehaveContext, field: str) -> None:
     state = get_resource_step_state(context)
     assert state.resource is not None, "Resource not built"
     assert field in state.resource, f"Missing field {field}"
 
 
 @then('every extension key MUST match the pattern "{pattern}"')
-def step_then_extension_key_pattern(context, pattern: str) -> None:
+def step_then_extension_key_pattern(context: BehaveContext, pattern: str) -> None:
     # This allows the feature to specify the regex; we enforce it here.
     rx = re.compile(pattern)
     state = get_resource_step_state(context)
@@ -350,7 +351,7 @@ def step_then_extension_key_pattern(context, pattern: str) -> None:
 
 
 @then('the kernel validator MUST pass even if "extensions" is removed')
-def step_then_kernel_validator_pass_without_extensions(context) -> None:
+def step_then_kernel_validator_pass_without_extensions(context: BehaveContext) -> None:
     r = _resource_for_validation(context)
     r.pop("extensions", None)
     res = kernel_validate(r)
@@ -358,7 +359,7 @@ def step_then_kernel_validator_pass_without_extensions(context) -> None:
 
 
 @given('a Resource exists with meta.dc:type equal to "{dc_type}"')
-def step_given_resource_exists_with_type(context, dc_type: str) -> None:
+def step_given_resource_exists_with_type(context: BehaveContext, dc_type: str) -> None:
     state = get_resource_step_state(context)
     state.meta = {"dc:type": dc_type, "dc:created": "2026-02-14T00:00:00Z", "dc:source": "test"}
     state.payload = {"ok": True}
@@ -368,7 +369,7 @@ def step_given_resource_exists_with_type(context, dc_type: str) -> None:
 
 
 @when('I add an extension that attempts to set "meta.dc:type" to "{new_type}"')
-def step_when_extension_attempts_override_dc_type(context, new_type: str) -> None:
+def step_when_extension_attempts_override_dc_type(context: BehaveContext, new_type: str) -> None:
     # This simulates a forbidden “redefine kernel field” attempt.
     # In practice, you’d forbid this by validator rules.
     state = get_resource_step_state(context)
@@ -376,7 +377,7 @@ def step_when_extension_attempts_override_dc_type(context, new_type: str) -> Non
 
 
 @then('validation MUST fail with code "{code}"')
-def step_then_validation_fails_with_code(context, code: str) -> None:
+def step_then_validation_fails_with_code(context: BehaveContext, code: str) -> None:
     state = get_resource_step_state(context)
     r = _resource_for_validation(context)
     # Apply the bad extension for this validation attempt

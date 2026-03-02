@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Audit branch protection/rulesets against critical workflow checks.
+"""Audit branch protection/rulesets against required checks policy.
 
-The script derives expected check contexts from workflow YAML files by collecting jobs
-that run on pull_request and merge_group events, then compares them to:
+Expected required checks are sourced from `.github/required-checks-main.json`
+(the canonical always-on branch-protection list), then validated against both:
   1) required status checks on the protected branch (direct PR merge path), and
   2) required status checks in merge-queue rulesets (merge queue path).
 """
@@ -138,24 +138,25 @@ def main() -> int:
         print("ERROR: GH_TOKEN or GITHUB_TOKEN must be set", file=sys.stderr)
         return 2
 
+    policy = json.loads(Path(".github/required-checks-main.json").read_text(encoding="utf-8"))
+    expected_critical = set(policy.get("required_checks", []))
+
     workflows = args.workflow or [
         ".github/workflows/quality-guardrails.yml",
         ".github/workflows/state-renorm-milestone-gate.yml",
     ]
+    available_from_workflows: set[str] = set()
+    for workflow in workflows:
+        available_from_workflows.update(_parse_workflow(Path(workflow)).check_contexts)
 
-    parsed = [_parse_workflow(Path(path)) for path in workflows]
+    undefined = sorted(expected_critical - available_from_workflows)
+    if undefined:
+        print("ERROR: required checks configured in .github/required-checks-main.json are missing from workflow definitions:", file=sys.stderr)
+        for item in undefined:
+            print(f"  - {item}", file=sys.stderr)
+        return 1
 
-    expected_pull_request: set[str] = set()
-    expected_merge_group: set[str] = set()
-    for item in parsed:
-        if item.has_pull_request:
-            expected_pull_request.update(item.check_contexts)
-        if item.has_merge_group:
-            expected_merge_group.update(item.check_contexts)
-
-    expected_critical = expected_pull_request | expected_merge_group
-
-    print("Expected critical checks (from workflow YAML):")
+    print("Expected always-on required checks (from .github/required-checks-main.json):")
     for check in sorted(expected_critical):
         print(f"  - {check}")
 

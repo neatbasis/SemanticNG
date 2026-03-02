@@ -74,6 +74,9 @@ Tier 1 mypy scope is intentionally narrow and enforced by the hook (derived from
 
 Tier 1 commit-time checks now also include the `promotion-governance-pokayoke` hook (`.github/scripts/run_promotion_checks.sh`) so policy-surface violations fail fast with explicit remediation commands before commit.
 
+**Explicit enforcement split:** poka-yoke blockers are always-on `Quality Guardrails` blocking jobs plus milestone-path `State Renormalization Milestone Gate` and scoped `promotion-governance-pokayoke`; measurement-only telemetry is `Quality Guardrails / policy-measurement` and milestone promotion-check measurement output.
+
+
 If `pre-commit` reformats files, stage and rerun until clean:
 
 ```bash

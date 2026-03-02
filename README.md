@@ -60,8 +60,10 @@ Guardrail classification guidance for contributors (invariants vs policies vs he
 
 Before merge, required CI checks must be green for the pull request scope.
 
+**Enforcement model (explicit):** poka-yoke blockers are `Quality Guardrails` blocking jobs globally plus `State Renormalization Milestone Gate` only on milestone-governed paths; measurement-only telemetry is `Quality Guardrails / policy-measurement` and the milestone workflow promotion-check measurement note.
+
 - `Quality Guardrails` is the baseline required quality suite (pre-commit parity, pytest + coverage gate, and full-surface mypy).
-- `State Renormalization Milestone Gate` is additionally required when a PR touches milestone-governed paths (for example `src/state_renormalization/**` and milestone governance docs/workflows).
+- `State Renormalization Milestone Gate` is a **conditional blocker** only for milestone-governed path changes (for example `src/state_renormalization/**` and milestone governance docs/workflows).
 - Coverage reporting is produced in CI by the `Quality Guardrails` workflow (`pytest --cov --cov-report=term-missing --cov-report=xml`).
 
 ### How this is enforced
@@ -69,7 +71,7 @@ Before merge, required CI checks must be green for the pull request scope.
 Quality gate policy is only authoritative when repository settings enforce it.
 
 - Branch protection on `main` must require successful completion of `Quality Guardrails`.
-- Branch protection must also require `State Renormalization Milestone Gate` for milestone-governed changes.
+- Branch protection required-check list is the always-on `Quality Guardrails` blocking jobs; milestone gate blocking remains path-conditioned in workflow triggers.
 - Merges should be blocked for failing or pending required checks (merge queue recommended).
 
 If repository settings do not enforce these controls, treat this section as a governance defect and open an issue using `.github/ISSUE_TEMPLATE/01-enforce-no-merge-on-red.md`.
@@ -77,7 +79,7 @@ If repository settings do not enforce these controls, treat this section as a go
 ### Branch protection verification checklist (required)
 
 - [ ] Required status checks include `Quality Guardrails`.
-- [ ] Required status checks include `State Renormalization Milestone Gate`.
+- [ ] Required status checks include only always-on `Quality Guardrails` blocking jobs.
 - [ ] Required checks are configured as blocking (no merge when failing or pending).
 - [ ] Merge queue is enabled for `main`.
 - [ ] Merge queue requires rerun of required checks on `merge_group` commits.

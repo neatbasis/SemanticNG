@@ -94,6 +94,14 @@
           "timeout_seconds": 20
         },
         {
+          "command": "python scripts/ci/validate_5s_metrics.py",
+          "timeout_seconds": 20
+        },
+        {
+          "command": "python scripts/ci/scan_unused_code.py",
+          "timeout_seconds": 60
+        },
+        {
           "command": "pre-commit run --all-files",
           "timeout_seconds": 180
         },

@@ -9,7 +9,7 @@ Canonical parity constants are sourced from `docs/toolchain_parity_policy.json`.
 - Tier 1 mypy hook args: `['--config-file=pyproject.toml', 'src/state_renormalization', 'src/core']`
 - Tier 2 mypy scope: `['src', 'tests']`
 - Canonical Make targets:
-  - `make qa-ci-equivalent`
+  - `make qa-ci`
 <!-- PARITY_POLICY:END -->
 
 ## One-time setup
@@ -67,7 +67,7 @@ See [`docs/editor_setup.md`](editor_setup.md) for the minimal editor setup.
 Run this before every commit/push:
 
 ```bash
-pre-commit run --all-files
+make qa-commit
 ```
 
 Tier 1 mypy scope is intentionally narrow and enforced by the hook (derived from `docs/toolchain_parity_policy.json`).
@@ -86,14 +86,23 @@ pre-commit run --all-files
 Run this before every push (or rely on the installed `pre-push` hook):
 
 ```bash
-pre-commit run --hook-stage pre-push
+make qa-push
 ```
 
 The pre-push gate must include all of the following checks:
 
-- `ruff` with `--fix`
+- `ruff check --fix src tests`
+- `ruff format --check src tests`
 - `mypy --config-file=pyproject.toml src/state_renormalization src/core`
-- Fast deterministic pytest smoke subset (`pytest-quick`)
+- Fast deterministic pytest smoke subset (`pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py`)
+
+### Stage timeout/performance budgets
+
+- `qa-commit`: <= 60s total budget (`ruff` 20s + tier-1 `mypy` 40s).
+- `qa-push`: <= 220s total budget (`ruff` 45s + `ruff format --check` 35s + tier-1 `mypy` 60s + targeted pytest 80s).
+- `qa-ci`: <= 680s total budget (`no-regression` 20s + `pre-commit --all-files` 180s + `pytest --cov` 240s + full-surface `mypy` 240s).
+
+Each stage prints deterministic failure diagnostics: exact rerun command and the first failing file paths parsed from tool output.
 
 ### Full-surface optional / CI scope (Tier 2 extended)
 
@@ -121,7 +130,7 @@ pytest -m contract_sensitive
 Canonical Makefile command pack (used by CI jobs):
 
 ```bash
-make qa-ci-equivalent    # No-regression budget + hook parity diagnostics + coverage + full mypy surface
+make qa-ci              # No-regression budget + hook parity + coverage + full mypy surface
 
 # Optional local command to run bootstrap + strict local gates:
 make qa-local
@@ -188,7 +197,7 @@ When an automated dependency PR fails:
    - Split group impact by temporarily narrowing update scope.
    - Add upstream issue link when blocked externally.
 3. Re-run local parity checks before merge decision:
-   - `make qa-ci-equivalent`
+   - `make qa-ci`
    - `make qa-full-type-surface` (or Tier 2a focused scope for contract-boundary drift triage)
 4. If not fixable within the update window, close/snooze with rationale and open a tracked follow-up issue that includes blocker owner and retry target date.
 

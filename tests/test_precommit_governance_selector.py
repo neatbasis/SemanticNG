@@ -120,16 +120,14 @@ def test_pre_push_hooks_include_required_quality_gates() -> None:
     config_path = Path(__file__).resolve().parents[1] / ".pre-commit-config.yaml"
     config_text = config_path.read_text(encoding="utf-8")
 
+    assert "- id: qa-commit-stage" in config_text
+    assert "entry: python scripts/ci/run_stage_checks.py qa-commit" in config_text
+    assert "stages: [pre-commit]" in config_text
+
+    assert "- id: qa-push-stage" in config_text
+    assert "entry: python scripts/ci/run_stage_checks.py qa-push" in config_text
+    assert "stages: [pre-push]" in config_text
+
     assert "- id: ruff" in config_text
     assert "args: [--fix]" in config_text
-    assert "stages: [pre-commit, pre-push]" in config_text
-
-    assert "- id: mypy" in config_text
-    assert (
-        'args: ["--config-file=pyproject.toml", "src/state_renormalization", "src/core"]'
-        in config_text
-    )
-
-    assert "- id: pytest-quick" in config_text
-    assert "entry: pytest -q" in config_text
-    assert "stages: [pre-push]" in config_text
+    assert "stages: [manual]" in config_text

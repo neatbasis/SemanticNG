@@ -16,9 +16,10 @@ repos:
       - id: ruff
         language_version: python3.10
         args: [--fix]
-        stages: [pre-commit, pre-push]
+        stages: [manual]
       - id: ruff-format
         language_version: python3.10
+        stages: [manual]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.19.1
@@ -27,7 +28,7 @@ repos:
         language_version: python3.10
         args: ["--config-file=pyproject.toml", "src/state_renormalization", "src/core"]
         pass_filenames: false
-        stages: [pre-commit, pre-push]
+        stages: [manual]
         additional_dependencies:
           - pydantic>=2.6,<3
           - pytest>=8,<10
@@ -36,9 +37,15 @@ repos:
 
   - repo: local
     hooks:
-      - id: pytest-quick
-        name: pytest (quick)
-        entry: pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py
+      - id: qa-commit-stage
+        name: qa-commit stage checks
+        entry: python scripts/ci/run_stage_checks.py qa-commit
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+      - id: qa-push-stage
+        name: qa-push stage checks
+        entry: python scripts/ci/run_stage_checks.py qa-push
         language: system
         pass_filenames: false
         stages: [pre-push]

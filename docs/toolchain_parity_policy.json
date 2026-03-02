@@ -12,7 +12,7 @@
     ]
   },
   "canonical_make_targets": [
-    "make qa-ci-equivalent"
+    "make qa-ci"
   ],
   "parity_sensitive_workflows": [
     ".github/workflows/quality-guardrails.yml",

@@ -20,7 +20,7 @@ Policy source of truth: `docs/toolchain_parity_policy.json`.
 - Tier 1 mypy hook args: `['--config-file=pyproject.toml', 'src/state_renormalization', 'src/core']`
 - Tier 2 mypy scope: `['src', 'tests']`
 - Canonical Make targets:
-  - `make qa-ci-equivalent`
+  - `make qa-ci`
 <!-- PARITY_POLICY:END -->
 
 ## Hook dependency map
@@ -30,7 +30,8 @@ Policy source of truth: `docs/toolchain_parity_policy.json`.
 | `mypy` | Derived from parity policy JSON (Tier 1 scope + hook args) | `pydantic`, `pytest`, `gherkin`, `typing_extensions` | Hook `additional_dependencies` in `.pre-commit-config.yaml` (isolated env) |
 | `ruff` | `src`, `tests` (from `[tool.ruff].src`) | None beyond Ruff itself for static analysis | Project tooling dependency from `pyproject.toml` `test` extra (`ruff`) |
 | `ruff-format` | `src`, `tests` (from `[tool.ruff].src`) | None beyond Ruff itself for static analysis | Project tooling dependency from `pyproject.toml` `test` extra (`ruff`) |
-| `pytest-quick` (local hook) | `tests/test_engine_pending_obligation.py`, `tests/test_invariants.py` | `pytest` | Project tooling dependency from `pyproject.toml` `test` extra (`pytest`) |
+| `qa-commit-stage` (local hook) | Make target equivalence: `ruff --fix` + tier-1 `mypy` | `ruff`, `mypy` | Project tooling dependencies from `pyproject.toml` test extra |
+| `qa-push-stage` (local hook) | Make target equivalence: baseline lint/type + deterministic targeted tests | `ruff`, `mypy`, `pytest` | Project tooling dependencies from `pyproject.toml` test extra |
 
 ## Mypy scope tiers (canonical)
 
@@ -45,7 +46,7 @@ Use Makefile targets as the single source of truth for local and CI quality comm
 
 - Canonical targets are generated from `docs/toolchain_parity_policy.json` (see parity block above).
 
-`make qa-local` remains the fast local flow (bootstrap + local strict gates), while `make qa-ci-equivalent` is the canonical CI-equivalent command pack.
+`make qa-local` remains the fast local flow (bootstrap + local strict gates), while `make qa-ci` is the canonical CI-equivalent command pack (`qa-ci-equivalent` remains a compatibility alias).
 
 
 ## Authoritative tool pin locations

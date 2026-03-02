@@ -79,6 +79,8 @@ jobs:
 
           status_file="precommit_status.txt"
           git status --porcelain > "$status_file"
+          changed_file_count="$(wc -l < "$status_file" | tr -d '[:space:]')"
+          echo "changed_file_count=$changed_file_count" >> "$GITHUB_OUTPUT"
 
           if [[ -s "$status_file" ]]; then
             echo "dirty=true" >> "$GITHUB_OUTPUT"
@@ -86,6 +88,8 @@ jobs:
               echo "### Hook parity left uncommitted changes"
               echo
               echo "Run \`pre-commit run --all-files\` locally and commit the resulting changes before pushing."
+              echo
+              echo "Changed file count: $changed_file_count"
               echo
               echo "Touched paths:"
               sed 's/^/- `/' "$status_file" | sed 's/$/`/'
@@ -138,6 +142,45 @@ jobs:
             precommit_failure_classification.md
           if-no-files-found: warn
 
+      - name: Add pre-commit remediation summary
+        if: always()
+        run: |
+          set -euo pipefail
+
+          failing_hooks="$(python - <<'PY'
+import json
+from pathlib import Path
+
+path = Path('precommit_failure_classification.json')
+if not path.exists():
+    print('none detected (classification artifact missing)')
+else:
+    data = json.loads(path.read_text(encoding='utf-8'))
+    names = [item.get('name', '').strip() for item in data.get('failing_hooks', []) if item.get('name')]
+    print(', '.join(names) if names else 'none detected')
+PY
+          )"
+
+          changed_count="${{ steps.precommit_dirty.outputs.changed_file_count || '0' }}"
+
+          {
+            echo
+            echo "### Pre-commit remediation summary"
+            echo
+            echo "- Failing hooks: $failing_hooks"
+            echo "- Changed files: $changed_count"
+            echo "- Local fix command: \`pre-commit run --all-files && git add -A && git commit -m \"Apply pre-commit fixes\"\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail job on pre-commit autofix changes
+        if: always() && steps.precommit_dirty.outputs.dirty == 'true'
+        run: |
+          {
+            echo
+            echo "❌ pre-commit modified files. Apply the autofix patch artifact or run \`pre-commit run --all-files\` locally, then commit the changes."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
       - name: Fail job on hook parity errors
         if: steps.hook_parity.outcome == 'failure'
         run: |
@@ -167,6 +210,9 @@ jobs:
 
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
+
+      - name: Run `pre-commit run --all-files`
+        run: pre-commit run --all-files
 
       # Failing job command (verbatim): make qa-full-type
       - name: Run `make qa-full-type`

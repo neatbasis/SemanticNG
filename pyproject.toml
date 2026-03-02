@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "semanticng"
 dynamic = ["version"]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
   "pydantic>=2.6,<3",
   "typing-extensions>=4.7,<5",

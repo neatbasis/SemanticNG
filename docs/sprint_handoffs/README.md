@@ -4,6 +4,7 @@ Canonical location: `docs/sprint_handoffs/`.
 
 Additional planning artifact:
 
+- `script-analytics-5-sprint-plan.md` — five-sprint script analytics planning artifact with machine-refreshed governance status table.
 - `mypy-debt-5-sprint-timeline.md` — explicit 5-sprint exit criteria for mypy suppression burn-down governance.
 
 ## Naming

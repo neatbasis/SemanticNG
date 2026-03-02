@@ -13,10 +13,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 HANDOFF_DIR = ROOT / "docs" / "sprint_handoffs"
 HANDOFF_PATTERN = "sprint-*-handoff.md"
+SCRIPT_ANALYTICS_HANDOFF = HANDOFF_DIR / "script-analytics-5-sprint-plan.md"
 REQUIRED_HEADINGS = (
     "## Exit criteria pass/fail matrix",
     "## Open risk register with owners/dates",
     "## Next-sprint preload mapped to capability IDs",
+)
+SCRIPT_ANALYTICS_HEADING = "## Script analytics status table (governance reference)"
+SCRIPT_ANALYTICS_STATUS_COLUMNS = (
+    "| Snapshot generated (UTC) |",
+    "| Inventory artifact |",
+    "| Unused-code summary |",
+    "| Docs parity validator output |",
+    "| Coverage % |",
+    "| Undocumented count |",
+    "| Diagnostics trend |",
 )
 
 GOVERNANCE_INPUTS = {
@@ -155,6 +166,29 @@ def _validate_handoff_file(path: Path, capability_ids: set[str]) -> list[str]:
     return mismatches
 
 
+def _validate_script_analytics_handoff(path: Path) -> list[str]:
+    mismatches: list[str] = []
+    if not path.exists():
+        return [
+            f"Missing required script analytics handoff: {path.relative_to(ROOT)}."
+        ]
+
+    text = path.read_text(encoding="utf-8")
+    if SCRIPT_ANALYTICS_HEADING not in text:
+        mismatches.append(f"{path}: missing heading '{SCRIPT_ANALYTICS_HEADING}'.")
+
+    if "<!-- script-analytics-status-table:start -->" not in text or "<!-- script-analytics-status-table:end -->" not in text:
+        mismatches.append(f"{path}: missing required script analytics status table markers.")
+
+    for required_fragment in SCRIPT_ANALYTICS_STATUS_COLUMNS:
+        if required_fragment not in text:
+            mismatches.append(
+                f"{path}: script analytics status table missing required column fragment '{required_fragment}'."
+            )
+
+    return mismatches
+
+
 def _load_capability_ids() -> set[str]:
     manifest = json.loads((ROOT / "docs" / "dod_manifest.json").read_text(encoding="utf-8"))
     return {
@@ -196,6 +230,7 @@ def main() -> int:
     mismatches: list[str] = []
     for handoff in handoff_files:
         mismatches.extend(_validate_handoff_file(handoff, capability_ids))
+    mismatches.extend(_validate_script_analytics_handoff(SCRIPT_ANALYTICS_HANDOFF))
 
     if mismatches:
         print("Sprint handoff validation failed:")

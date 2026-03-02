@@ -9,7 +9,11 @@ from state_renormalization.contracts import (
     PredictionRecord,
     ProjectionState,
 )
-from state_renormalization.engine import append_prediction_record
+from state_renormalization.engine import (
+    _capability_invocation_policy_decision,
+    _persist_policy_denial,
+    append_prediction_record,
+)
 
 
 def _prediction(prediction_id: str, scope_key: str) -> PredictionRecord:
@@ -93,3 +97,56 @@ def test_capability_invocation_denial_persists_explainable_halt_and_skips_side_e
     halt_rows = [row for _, row in read_jsonl(halt_path)]
     assert len(halt_rows) == 1
     assert halt_rows[0]["invariant_id"] == "capability.invocation.policy.v1"
+
+
+def test_capability_invocation_denial_requires_current_prediction_context(
+    make_episode,
+) -> None:
+    ep = make_episode()
+    projection = ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:00:00+00:00")
+
+    log_path = Path("artifacts/test-capability-current-prediction-required.jsonl")
+    halt_path = Path("artifacts/test-capability-current-prediction-required-halts.jsonl")
+    for p in (log_path, halt_path):
+        if p.exists():
+            p.unlink()
+
+    policy_decision = _capability_invocation_policy_decision(
+        observer=ep.observer,
+        projection_state=projection,
+        scope_key="scope:missing",
+        prediction_key="scope:missing",
+        explicit_gate_pass_present=True,
+        action="append_prediction_record_event",
+        capability="prediction.persistence",
+        required_capability="baseline.invariant_evaluation",
+        stage="capability-invocation",
+    )
+    assert not policy_decision.allowed
+    assert policy_decision.denial_code is not None
+    assert policy_decision.denial_code.value == "current_prediction_required"
+
+    result = _persist_policy_denial(ep=ep, decision=policy_decision, halt_log_path=halt_path)
+
+    assert isinstance(result, HaltRecord)
+    assert result.invariant_id == "capability.invocation.policy.v1"
+    assert result.details["policy_code"] == "current_prediction_required"
+    assert not log_path.exists()
+
+    halt_rows = list(read_jsonl(halt_path))
+    assert len(halt_rows) == 1
+    meta, persisted = halt_rows[0]
+    assert persisted["invariant_id"] == "capability.invocation.policy.v1"
+    assert persisted["details"]["policy_code"] == "current_prediction_required"
+    assert persisted["details"]["attempt"]["current_prediction_available"] is False
+    assert persisted["evidence"] == [
+        {"kind": "capability", "ref": "prediction.persistence"},
+        {"kind": "action", "ref": "append_prediction_record_event"},
+        {"kind": "policy_code", "ref": "current_prediction_required"},
+    ]
+
+    expected_ref = {"kind": "jsonl", "ref": f"{halt_path.name}@{meta['lineno']}"}
+    denial_artifact = next(a for a in ep.artifacts if a.get("artifact_kind") == "capability_policy_denial")
+    halt_observation = next(a for a in ep.artifacts if a.get("artifact_kind") == "halt_observation")
+    assert denial_artifact["halt_evidence_ref"] == expected_ref
+    assert halt_observation["halt_evidence_ref"] == expected_ref

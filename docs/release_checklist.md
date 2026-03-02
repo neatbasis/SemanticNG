@@ -29,6 +29,15 @@ DMAIC change-type routing (required files, validators, evidence locations, and m
 - [ ] **Python version-contract drift blocked:** `pyproject.toml` `[project].requires-python`, README requirements text, and CI workflow `setup-python` versions must match in the same PR; any drift is a merge blocker for infra/docs changes.
 - [ ] **Tooling/config PR parity evidence attached:** For any tooling or CI/configuration change, include a checked PR checklist entry for **"pre-commit parity verified"** and paste command evidence from `python .github/scripts/check_precommit_parity.py` and `pre-commit run --all-files -v`.
 
+### Operational audit checklist (quarterly branch-protection verification)
+
+Run this audit once per quarter and attach evidence in the release/governance review artifact.
+
+- [ ] **Protected-branch required checks include both gates:** For each protected branch, required status checks include `Quality Guardrails` and `State Renormalization Milestone Gate`.
+- [ ] **Merge queue parity on merge groups verified:** Merge queue configuration requires the same required checks, and both gates run on `merge_group` commits.
+- [ ] **No-merge-on-red policy verified operationally:** Test with a failing PR confirms merges are blocked while required checks are failing/pending.
+- [ ] **Quarterly exception tracking complete:** Any temporary exception/waiver is tracked via `.github/ISSUE_TEMPLATE/01-enforce-no-merge-on-red.md` and includes owner + closure date.
+
 ## Toolchain parity KPI tracking (release governance)
 
 Track these KPIs for each release window and summarize trend direction in release notes or governance review artifacts:
@@ -267,4 +276,4 @@ Use this template:
 
 If conflict reconciliation drops or defers any behavior, do not merge immediately: open follow-up patch PR(s) in the same integration cycle and link them under the affected checklist entry.
 
-_Last regenerated from manifest: 2026-03-01T19:10:00Z (UTC)._
+_Last regenerated from manifest: 2026-03-02T00:00:00Z (UTC)._

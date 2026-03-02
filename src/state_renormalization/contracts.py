@@ -201,14 +201,26 @@ class Ambiguity(BaseModel):
 
 
 class SchemaHit(BaseModel):
+    """
+    Ranked schema candidate emitted by selection.
+
+    Provenance fields are optional to preserve backward compatibility while allowing
+    callers to attach stable identifiers:
+
+    - ``schema_id``: canonical schema catalog identifier (stable across renames).
+    - ``source``: origin for the hit (for example selector/rule/catalog namespace).
+
+    When omitted, consumers must treat provenance as unknown and should rely on
+    ``name`` + ``about`` semantics as before.
+    """
+
     model_config = _CONTRACT_CONFIG
 
     name: str
     score: float
     about: AmbiguityAbout | None = None
-    # TODO: add these when it's time
-    # schema_id: Optional[str] = None
-    # source: Optional[str] = None
+    schema_id: str | None = None
+    source: str | None = None
 
 
 class SchemaSelection(BaseModel):

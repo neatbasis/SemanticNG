@@ -14,7 +14,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Protocol, TypeAlias
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from state_renormalization._compat import UTC
 from state_renormalization.adapters.ask_outbox import AskOutboxAdapter
@@ -2281,7 +2281,10 @@ def _validated_selection(raw_selection: object) -> SchemaSelection:
     if isinstance(raw_selection, SchemaSelection):
         return raw_selection
     if isinstance(raw_selection, Mapping):
-        return SchemaSelection.model_validate(raw_selection)
+        try:
+            return SchemaSelection.model_validate(raw_selection)
+        except ValidationError as exc:
+            raise TypeError("naive_schema_selector must return SchemaSelection") from exc
 
     raise TypeError(
         f"naive_schema_selector must return SchemaSelection or Mapping; got {type(raw_selection).__name__}"

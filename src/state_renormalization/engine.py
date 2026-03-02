@@ -602,7 +602,7 @@ def _persist_policy_denial(
         raise HaltPayloadValidationError("policy denial must provide halt payload")
 
     halt = HaltRecord.from_payload(decision.halt_payload.model_dump(mode="json"))
-    halt_evidence_ref = append_halt_record(
+    halt_evidence_ref = _persist_halt_and_get_evidence_ref(
         halt,
         halt_log_path=halt_log_path,
         stable_ids=_episode_stable_ids(ep) if ep is not None else None,
@@ -1268,7 +1268,7 @@ def evaluate_invariant_gates(
 
     stable_ids = _episode_stable_ids(ep) if ep is not None else {}
     if isinstance(result, HaltRecord):
-        halt_evidence_ref = append_halt_record(
+        halt_evidence_ref = _persist_halt_and_get_evidence_ref(
             result,
             halt_log_path=halt_log_path,
             stable_ids=stable_ids,
@@ -1322,7 +1322,7 @@ def evaluate_invariant_gates(
                 "kind": result_kind,
                 "prediction": _to_dict(result.artifact) if isinstance(result, Success) else None,
                 "halt": _halt_payload(result) if isinstance(result, HaltRecord) else None,
-                "halt_evidence_ref": halt_evidence_ref,  # TODO: verify sanity. Changed this from: auth_halt_evidence_ref to halt_evidence_ref just to get precommit tests pass
+                "halt_evidence_ref": halt_evidence_ref,
             },
         )
 
@@ -1384,6 +1384,26 @@ def _halt_payload_with_stable_ids(
     if stable_ids:
         return {**dict(stable_ids), **payload}
     return payload
+
+
+def _persist_halt_and_get_evidence_ref(
+    halt: HaltRecord,
+    *,
+    halt_log_path: str | Path,
+    stable_ids: Mapping[str, str] | None = None,
+    adapter_gate: CapabilityAdapterGate | None = None,
+) -> dict[str, str]:
+    # Canonical provenance invariant for emitted halt artifacts:
+    # authorization halts (authorization.scope.v1), invariant halts (gate STOP outcomes),
+    # and policy denial halts (capability.invocation.policy.v1) must all source
+    # halt_evidence_ref from the persisted halt row written by append_halt(...).
+    # Read path: _turn_halt_summary consumes halt_observation.halt_evidence_ref.
+    return append_halt_record(
+        halt,
+        halt_log_path=halt_log_path,
+        stable_ids=stable_ids,
+        adapter_gate=adapter_gate,
+    )
 
 
 def append_prediction_record(

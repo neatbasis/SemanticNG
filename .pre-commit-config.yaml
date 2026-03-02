@@ -37,9 +37,17 @@ repos:
 
   - repo: local
     hooks:
+      # Keep qa-commit-stage first so broad stage checks fail fast before governance-selector
+      # computes targeted capability tests for in-progress work.
       - id: qa-commit-stage
         name: qa-commit stage checks
         entry: python scripts/ci/run_stage_checks.py qa-commit
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+      - id: precommit-governance-selector
+        name: pre-commit governance selector
+        entry: .github/scripts/run_precommit_governance_checks.py
         language: system
         pass_filenames: false
         stages: [pre-commit]

@@ -97,6 +97,13 @@ def _build_project(manifest: dict[str, Any], objectives: dict[str, Any], as_of: 
         "summary": str(template.get("summary", "")),
         "reason": str(template.get("reason", "")),
         "as_of": as_of,
+        "waste_metrics": {
+            "duplicate_logic_count": int(template.get("waste_metrics", {}).get("duplicate_logic_count", 0)),
+            "unused_code_delta": int(template.get("waste_metrics", {}).get("unused_code_delta", 0)),
+            "stale_doc_count": int(template.get("waste_metrics", {}).get("stale_doc_count", 0)),
+            "mypy_debt_delta": int(template.get("waste_metrics", {}).get("mypy_debt_delta", 0)),
+            "flaky_test_count": int(template.get("waste_metrics", {}).get("flaky_test_count", 0)),
+        },
         "generated_at": generated_at,
         "manifest_commit": _git_head_commit(),
         "generated_from": str(MANIFEST_PATH.relative_to(ROOT)),

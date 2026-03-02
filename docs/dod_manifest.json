@@ -333,14 +333,38 @@
         "name": "5S mission metrics",
         "entrypoint": "python scripts/ci/validate_5s_metrics.py",
         "source": "docs/process/5s_metrics.json",
-        "status": "ready"
+        "status": "ready",
+        "metric_sources": [
+          {
+            "metric": "duplicate_logic_count",
+            "source": "scripts/ci/scan_unused_code.py"
+          },
+          {
+            "metric": "unused_code_delta",
+            "source": "docs/process/script_surfaces_unused_code_baseline.json"
+          },
+          {
+            "metric": "stale_doc_count",
+            "source": "docs/doc_freshness_slo.json"
+          },
+          {
+            "metric": "flaky_test_count",
+            "source": "docs/process/5s_metrics.json"
+          }
+        ]
       },
       {
         "id": "milestone_doc_parity",
         "name": "Milestone documentation parity",
         "entrypoint": "python .github/scripts/validate_milestone_docs.py",
         "source": "docs/dod_manifest.json",
-        "status": "ready"
+        "status": "ready",
+        "metric_sources": [
+          {
+            "metric": "stale_doc_count",
+            "source": "python .github/scripts/validate_milestone_docs.py"
+          }
+        ]
       },
       {
         "id": "no_regression_budget",
@@ -348,8 +372,21 @@
         "entrypoint": "python .github/scripts/validate_no_regression_budget.py",
         "source": "docs/no_regression_budget.json",
         "status": "unknown",
-        "reason": "Entrypoint expected by policy docs; confirm script availability before execution."
+        "reason": "Entrypoint expected by policy docs; confirm script availability before execution.",
+        "metric_sources": [
+          {
+            "metric": "mypy_debt_delta",
+            "source": "docs/mypy_debt.md"
+          }
+        ]
       }
-    ]
+    ],
+    "waste_metrics": {
+      "duplicate_logic_count": 0,
+      "unused_code_delta": 0,
+      "stale_doc_count": 0,
+      "mypy_debt_delta": 0,
+      "flaky_test_count": 0
+    }
   }
 }

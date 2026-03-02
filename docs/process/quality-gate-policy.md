@@ -70,3 +70,15 @@ To prevent "green commit / red push" loops, local hooks enforce a split policy:
 - CI remains the final authority via `baseline-test-cov` (`make qa-test-cov`) and `full-type-surface`.
 
 This means pytest execution is required before both commit and push for baseline smoke coverage.
+
+## Waste metrics interpretation thresholds
+
+`docs/status/project.json` must include a `waste_metrics` block and keep these thresholds for weekly review:
+
+- `duplicate_logic_count`: target `0`; warning at `>= 1`.
+- `unused_code_delta`: target `<= 0` (no net new unused code); warning at `> 0`.
+- `stale_doc_count`: target `0`; warning at `>= 1`.
+- `mypy_debt_delta`: target `<= 0` (no net new debt); warning at `> 0`.
+- `flaky_test_count`: target `0`; warning at `>= 1`.
+
+Any warning-state metric requires a follow-up issue or explicit rationale in the next main-health review notes.

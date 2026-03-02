@@ -1,6 +1,11 @@
 {
   "meta": {
     "deterministic": true,
+    "generated_from": {
+      "generated_at": "unknown",
+      "manifest": "unknown",
+      "manifest_commit": "unknown"
+    },
     "generator": "scripts/dev/status_report.py",
     "offline": true,
     "schema_contract": {
@@ -24,16 +29,12 @@
         "active",
         "summary",
         "reason",
-        "as_of"
+        "as_of",
+        "waste_metrics"
       ]
     },
     "status_show": "active",
-    "unknown_policy": "Print unknown with reason when data is missing or unresolved.",
-    "generated_from": {
-      "manifest": "unknown",
-      "manifest_commit": "unknown",
-      "generated_at": "unknown"
-    }
+    "unknown_policy": "Print unknown with reason when data is missing or unresolved."
   },
   "milestones": [
     {
@@ -55,7 +56,14 @@
     "name": "SemanticNG",
     "reason": "Roadmap execution",
     "status": "in_progress",
-    "summary": "Working"
+    "summary": "Working",
+    "waste_metrics": {
+      "duplicate_logic_count": 0,
+      "flaky_test_count": 0,
+      "mypy_debt_delta": 0,
+      "stale_doc_count": 0,
+      "unused_code_delta": 0
+    }
   },
   "sprints": []
 }

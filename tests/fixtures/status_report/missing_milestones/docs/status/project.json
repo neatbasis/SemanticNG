@@ -6,5 +6,12 @@
   "summary": "Planned",
   "reason": "Planning",
   "as_of": "2026-01-01",
-  "analytics": []
+  "analytics": [],
+  "waste_metrics": {
+    "duplicate_logic_count": 0,
+    "unused_code_delta": 0,
+    "stale_doc_count": 0,
+    "mypy_debt_delta": 0,
+    "flaky_test_count": 0
+  }
 }

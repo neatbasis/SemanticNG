@@ -28,6 +28,38 @@ jobs:
       - name: Shared Python setup
         uses: ./.github/actions/python-test-setup
 
+      - name: Validate 5S metrics spec (non-blocking during stabilization)
+        continue-on-error: true
+        run: |
+          python scripts/ci/validate_5s_metrics.py \
+            --spec docs/process/5s_metrics.json \
+            --report-md artifacts/5s_metrics_validation.md \
+            --report-json artifacts/5s_metrics_validation.json \
+            --enforce-mode measure-only
+
+      - name: Publish 5S metrics summary
+        if: always()
+        run: |
+          cat artifacts/5s_metrics_validation.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Promote 5S metrics validation to blocking after stabilization window
+        run: |
+          python scripts/ci/validate_5s_metrics.py \
+            --spec docs/process/5s_metrics.json \
+            --report-md artifacts/5s_metrics_validation.md \
+            --report-json artifacts/5s_metrics_validation.json \
+            --enforce-mode auto
+
+      - name: Upload 5S metrics validation artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: 5s-metrics-validation
+          path: |
+            artifacts/5s_metrics_validation.md
+            artifacts/5s_metrics_validation.json
+          if-no-files-found: error
+
       - name: Measure .github/scripts scope alignment and complexity
         run: |
           python .github/scripts/analyze_script_scope_complexity.py \

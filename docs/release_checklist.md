@@ -37,6 +37,7 @@ Run this audit once per quarter and attach evidence in the release/governance re
 - [ ] **Merge queue parity on merge groups verified:** Merge queue configuration requires the same required checks, and both gates run on `merge_group` commits.
 - [ ] **No-merge-on-red policy verified operationally:** Test with a failing PR confirms merges are blocked while required checks are failing/pending.
 - [ ] **Quarterly exception tracking complete:** Any temporary exception/waiver is tracked via `.github/ISSUE_TEMPLATE/01-enforce-no-merge-on-red.md` and includes owner + closure date.
+- [ ] **Automated drift audit reviewed:** Latest `Branch Protection Audit` workflow run is green (or an approved incident documents remediation), and owner/escalation details in `docs/branch_protection_audit.md` are up to date.
 
 ## Toolchain parity KPI tracking (release governance)
 

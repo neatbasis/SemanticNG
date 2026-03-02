@@ -26,7 +26,9 @@ Maturity levels:
 
 `capability_invocation_governance` is tracked as `in_progress` in `docs/dod_manifest.json` with the canonical acceptance command pack (`pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_predictions_contracts_and_gates.py`).
 
-No new contract rows are promoted in this milestone yet; active maturity remains anchored to Milestone `Now` until capability completion criteria are met.
+`repair_aware_projection_evolution` remains `planned` but with a shipped baseline already covered by tests: `tests/test_repair_mode_projection.py`, `tests/test_repair_events_auditability.py`, `tests/test_replay_projection_determinism.py`, and `tests/test_replay_projection_restart_contracts.py` demonstrate repair proposal/resolution auditability, deterministic replay, and no silent prediction-record mutation.
+
+No new contract rows are promoted in this milestone yet; active maturity remains anchored to Milestone `Now` until capability completion criteria are met. Missing acceptance gates for repair-aware projection completion are explicitly tracked in `docs/dod_manifest.json` (`status_semantics.missing_acceptance_gates`) and must be backed by CI evidence before any status promotion.
 
 ## Maturity update protocol (apply each milestone review)
 
@@ -47,6 +49,7 @@ Reference convention:
 ### Changelog
 
 - 2026-03-02 (Next): capability_id=capability_invocation_governance; Channel-agnostic decision/effect contract operational -> operational; capability promoted to `in_progress` with policy-guard command-pack evidence, while maturity remains unchanged until `done` criteria are met. https://github.com/neatbasis/SemanticNG/actions/runs/19027411847
+- 2026-03-02 (Later): capability_id=repair_aware_projection_evolution; Replay projection analytics contract operational -> operational; baseline repair-event behavior is test-backed and shipped, but completion remains `planned` pending additional acceptance gates and dependency closure. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
 
 - 2026-02-28 (Now): capability_id=replay_projection_analytics; Replay projection analytics contract in_progress -> operational; replay reconstruction/determinism/restart and append-only replay suites now serve as the baseline evidence set, aligned with manifest transition to `done`. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
 - 2026-02-28 (Now): capability_id=observer_authorization_contract; Observer authorization contract prototype -> operational; authorization scope gating and invariant allowlist behavior are validated in default runtime contract and gate suites, and milestone posture is locked to `Now` as completed dependency coverage. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201

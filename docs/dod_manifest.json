@@ -215,6 +215,15 @@
       "title": "Evolution path toward repair-aware projection (without silent mutation)",
       "status": "planned",
       "roadmap_section": "Later",
+      "status_semantics": {
+        "baseline_shipped": "Repair-event projection baseline is already shipped and test-backed: mission loop emits proposal/resolution records, replay applies accepted repairs deterministically, and prediction records stay append-only without silent mutation.",
+        "full_completion_scope": "Promotion to done still requires broader contract evolution and sequencing dependencies (notably capability invocation governance completion and deferred field/back-compat hardening).",
+        "missing_acceptance_gates": [
+          "pytest tests/test_schema_contract_evolution.py tests/test_replay_backward_compatibility.py",
+          "pytest tests/test_repair_mode_projection_multiturn.py tests/test_repair_acceptance_policy.py"
+        ],
+        "evidence_policy": "Keep status as planned until missing acceptance gates have CI links and dependency `capability_invocation_governance` is marked done in this manifest."
+      },
       "code_paths": [
         "src/state_renormalization/invariants.py",
         "src/state_renormalization/engine.py",

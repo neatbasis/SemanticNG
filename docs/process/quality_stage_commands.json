@@ -71,6 +71,10 @@
           "timeout_seconds": 60
         },
         {
+          "command": "python scripts/ci/validate_program_sync.py",
+          "timeout_seconds": 20
+        },
+        {
           "command": "pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py",
           "timeout_seconds": 80
         }

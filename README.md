@@ -119,11 +119,19 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[test]"
 ```
 
-After installation, validate your local bootstrap state (Python/pip, editable import path, and key tool versions) with:
+After installation, run deterministic bootstrap preflight checks (Python lower-bound compatibility, `pre-commit` availability, and editable `semanticng` import):
+
+```bash
+make bootstrap-preflight
+```
+
+Then validate your full local bootstrap state (hook install + provenance prints):
 
 ```bash
 make bootstrap
 ```
+
+If preflight fails, each error includes a one-line remediation command (for example `python -m pip install -e ".[test]"`).
 
 If CI and local behavior diverge, print provenance details explicitly:
 

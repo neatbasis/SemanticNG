@@ -11,7 +11,7 @@ SPEC.loader.exec_module(MODULE)
 
 
 def test_taxonomy_keys_are_stable() -> None:
-    assert MODULE.TAXONOMY_KEYS == ("ruff", "mypy", "pytest", "infra_setup")
+    assert MODULE.TAXONOMY_KEYS == ("ruff", "mypy", "pytest", "autofix_drift", "infra_setup")
 
 
 def test_output_schema_is_stable() -> None:
@@ -32,3 +32,17 @@ def test_output_schema_is_stable() -> None:
         "mypy_codes",
         "pytest_failure_detected",
     }
+
+
+def test_autofix_drift_classified_separately_from_infra_setup() -> None:
+    result = MODULE.classify("ruff.................................................Failed\n- files were modified by this hook")
+
+    assert "autofix_drift" in result["classes_detected"]
+    assert "infra_setup" not in result["classes_detected"]
+
+
+def test_missing_dependency_remains_in_infra_setup() -> None:
+    result = MODULE.classify("error: Cannot find implementation or library stub for module named x [import-not-found]")
+
+    assert "infra_setup" in result["classes_detected"]
+    assert "autofix_drift" not in result["classes_detected"]

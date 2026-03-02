@@ -19,7 +19,7 @@ PYTEST_ERROR_PATTERN = re.compile(
 )
 PATH_PATTERN = re.compile(r"\b(?P<path>(?:src|tests|docs|\.github)/[\w./-]+\.[A-Za-z0-9]+)")
 
-TAXONOMY_KEYS: tuple[str, ...] = ("ruff", "mypy", "pytest", "infra_setup")
+TAXONOMY_KEYS: tuple[str, ...] = ("ruff", "mypy", "pytest", "autofix_drift", "infra_setup")
 SCHEMA_VERSION = "1.0"
 
 
@@ -48,7 +48,9 @@ def classify(log_text: str) -> dict[str, Any]:
         classes.add("mypy")
     if PYTEST_ERROR_PATTERN.search(log_text):
         classes.add("pytest")
-    if auto_fix_required or missing_dependency:
+    if auto_fix_required:
+        classes.add("autofix_drift")
+    if missing_dependency:
         classes.add("infra_setup")
 
     return {
@@ -80,7 +82,7 @@ def render_summary(classification: dict[str, Any]) -> str:
 
     if signals["auto_fix_required"]:
         lines.append(
-            "- **Auto-fix required** (`files were modified`): run `pre-commit run --all-files`, review changes, and commit updates."
+            "- **Auto-fix drift** (`files were modified`): run `pre-commit run --all-files`, review changes, and commit updates."
         )
 
     if signals["missing_dependency"]:

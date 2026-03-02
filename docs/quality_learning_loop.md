@@ -9,7 +9,10 @@ Each pre-commit run is classified into one or more stable keys:
 - `ruff`
 - `mypy`
 - `pytest`
+- `autofix_drift` (hooks changed files and require a follow-up commit)
 - `infra_setup`
+
+`infra_setup` is reserved for environment/setup indicators (for example `import-not-found` from missing dependencies/interpreter configuration).
 
 ## Required response SLA
 

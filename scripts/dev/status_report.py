@@ -8,9 +8,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from status_schema import STATUS_FILE_CONTRACTS, ValidationIssue, validate_item_collection_document, validate_project_document
+from status_schema import (
+    STATUS_FILE_CONTRACTS,
+    ValidationIssue,
+    validate_item_collection_document,
+    validate_project_document,
+)
 
 DOD_MANIFEST_PATH = Path("docs/dod_manifest.json")
+GOVERNED_PATHS_KEY = "governed_paths"
 Issue = ValidationIssue
 
 
@@ -55,6 +61,7 @@ def _base_payload(status_show: str) -> dict[str, Any]:
                     "generated_views": "docs/status/*.json",
                     "narrative_only": ["ROADMAP.md", "docs/sprint_plan_5x.md", "docs/sprint_handoffs/*.md"],
                 },
+                "governed_paths": {"src": [], "ci_triggers": []},
             },
         },
         "project": _default_project_payload(),
@@ -63,6 +70,16 @@ def _base_payload(status_show: str) -> dict[str, Any]:
         "objectives": [],
     }
 
+
+
+
+def _manifest_governed_paths(manifest: dict[str, Any]) -> dict[str, list[str]]:
+    governed = manifest.get(GOVERNED_PATHS_KEY, {})
+    if not isinstance(governed, dict):
+        return {"src": [], "ci_triggers": []}
+    src = [item for item in governed.get("src", []) if isinstance(item, str)]
+    ci_triggers = [item for item in governed.get("ci_triggers", []) if isinstance(item, str)]
+    return {"src": src, "ci_triggers": ci_triggers}
 
 def _load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -250,6 +267,7 @@ def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]
     }
 
     project, collections, collection_issues = _manifest_collections(manifest, as_of)
+    payload["meta"]["schema_contract"]["governed_paths"] = _manifest_governed_paths(manifest)
     issues.extend(collection_issues)
     payload["project"] = project
     payload["dod"] = _build_dod_summary(manifest)
@@ -273,6 +291,9 @@ def emit_human_summary(payload: dict[str, Any], validation_issues: list[Issue]) 
     print(f"Project: {project['name']} ({project['status']})")
     print(f"Summary: {project['summary']}")
     print(f"Reason: {project['reason']}")
+    governed_src = payload.get("meta", {}).get("schema_contract", {}).get("governed_paths", {}).get("src", [])
+    if governed_src:
+        print(f"Governed source scope: {', '.join(governed_src)}")
     for group in ("milestones", "sprints", "objectives"):
         print(f"\n{group.title()}:")
         rows = payload[group]

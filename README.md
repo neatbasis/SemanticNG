@@ -66,10 +66,12 @@ Guardrail classification guidance for contributors (invariants vs policies vs he
 
 Before merge, required CI checks must be green for the pull request scope.
 
+Governed source scope (canonical): src/core/**, src/state_renormalization/** (source: `docs/dod_manifest.json#governed_paths.src`).
+
 **Enforcement model (explicit):** poka-yoke blockers are `Quality Guardrails` blocking jobs globally plus `State Renormalization Milestone Gate` only on milestone-governed paths; measurement-only telemetry is `Quality Guardrails / policy-measurement` and the milestone workflow promotion-check measurement note.
 
 - `Quality Guardrails` is the baseline required quality suite (pre-commit parity, pytest + coverage gate, and full-surface mypy).
-- `State Renormalization Milestone Gate` is a **conditional blocker** only for milestone-governed path changes (for example `src/state_renormalization/**` and milestone governance docs/workflows).
+- `State Renormalization Milestone Gate` is a **conditional blocker** only for milestone-governed path changes (for example `src/core/**, src/state_renormalization/**` and milestone governance docs/workflows).
 - Coverage reporting is produced in CI by the `Quality Guardrails` workflow (`pytest --cov --cov-report=term-missing --cov-report=xml`).
 
 ### How this is enforced
@@ -180,11 +182,11 @@ Validate this inventory in tests:
 pytest tests/test_dod_manifest.py
 ```
 
-### Contributor milestone policy for `src/state_renormalization/` PRs
+### Contributor milestone policy for governed runtime-scope PRs
 
 `docs/dod_manifest.json` is the source of truth for capability status, ownership paths, and milestone pytest commands.
 
-When your PR touches `src/state_renormalization/` or changes capability status in `docs/dod_manifest.json`, CI selects and runs the manifest-listed `pytest_commands` for relevant capabilities automatically.
+When your PR touches any canonical governed source path from `docs/dod_manifest.json#governed_paths.src` or changes capability status in `docs/dod_manifest.json`, CI selects and runs the manifest-listed `pytest_commands` for relevant capabilities automatically.
 
 ### Merge expectations for milestone and maturity updates
 
@@ -194,7 +196,7 @@ PRs that change capability status in `docs/dod_manifest.json` or contract maturi
 - `docs/dod_manifest.json` remains internally consistent and is the canonical source for capability details.
 - `State Renormalization Milestone Gate` runs the manifest-selected pytest commands for the branch diff.
 
-CI enforces these milestone rules for PRs and merge queues that touch `src/state_renormalization/`, `docs/dod_manifest.json`, or the milestone gate workflow. Other docs can be generated from the manifest as needed.
+CI enforces these milestone rules for PRs and merge queues that touch the canonical governed source scope, `docs/dod_manifest.json`, or the milestone gate workflow. Other docs can be generated from the manifest as needed.
 
 Canonical DMAIC documentation update paths (Define/Measure/Analyze/Improve/Control) and merge-blocking evidence expectations are defined in [`docs/documentation_change_control.md`](docs/documentation_change_control.md).
 

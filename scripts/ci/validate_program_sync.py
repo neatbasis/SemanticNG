@@ -1,19 +1,124 @@
 from __future__ import annotations
 
+import fnmatch
 import json
-import sys
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dev"))
-from status_schema import ValidationIssue
+from status_schema import ValidationIssue  # noqa: E402
 
 Issue = ValidationIssue
 DOD_MANIFEST_PATH = Path("docs/dod_manifest.json")
 ROADMAP_PATH = Path("ROADMAP.md")
 SPRINT_PLAN_PATH = Path("docs/sprint_plan_5x.md")
 STATUS_TRUTH_CONTRACT_PATH = Path("docs/status_truth_contract.md")
+README_PATH = ROOT / "README.md"
+DEVELOPMENT_PATH = ROOT / "docs" / "DEVELOPMENT.md"
+MILESTONE_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "state-renorm-milestone-gate.yml"
+
+
+def _extract_manifest_governed_paths(manifest: dict[str, Any]) -> dict[str, list[str]]:
+    governed = manifest.get("governed_paths")
+    if not isinstance(governed, dict):
+        return {"src": [], "ci_triggers": []}
+    src = [item for item in governed.get("src", []) if isinstance(item, str)]
+    ci_triggers = [item for item in governed.get("ci_triggers", []) if isinstance(item, str)]
+    return {"src": src, "ci_triggers": ci_triggers}
+
+
+def _extract_workflow_paths(workflow_text: str) -> list[list[str]]:
+    blocks: list[list[str]] = []
+    lines = workflow_text.splitlines()
+    idx = 0
+    while idx < len(lines):
+        line = lines[idx]
+        stripped = line.strip()
+        if stripped != "paths:":
+            idx += 1
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        idx += 1
+        values: list[str] = []
+        while idx < len(lines):
+            candidate = lines[idx]
+            cstrip = candidate.strip()
+            cindent = len(candidate) - len(candidate.lstrip(" "))
+            if not cstrip:
+                idx += 1
+                continue
+            if cindent <= indent:
+                break
+            if cstrip.startswith("- "):
+                value = cstrip[2:].strip().strip("'").strip('"')
+                values.append(value)
+                idx += 1
+                continue
+            break
+        blocks.append(values)
+    return blocks
+
+
+
+
+def _validate_status_report_governed_paths(manifest: dict[str, Any]) -> list[Issue]:
+    governed = _extract_manifest_governed_paths(manifest)
+    result = subprocess.run(
+        [sys.executable, "scripts/dev/status_report.py", "status-json"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return [Issue("scripts/dev/status_report.py", f"status-json failed during sync check: {result.stderr.strip() or result.stdout.strip()}")]
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        return [Issue("scripts/dev/status_report.py", f"status-json emitted invalid JSON: {exc.msg}")]
+
+    status_governed = (
+        payload.get("meta", {})
+        .get("schema_contract", {})
+        .get("governed_paths", {})
+    )
+    if status_governed != governed:
+        return [Issue("scripts/dev/status_report.py", "status-report governed_paths differs from docs/dod_manifest.json governed_paths")]
+    return []
+
+def _validate_governed_paths_sync(manifest: dict[str, Any]) -> list[Issue]:
+    issues: list[Issue] = []
+    governed = _extract_manifest_governed_paths(manifest)
+    src_globs = governed["src"]
+    ci_paths = governed["ci_triggers"]
+
+    if not src_globs:
+        issues.append(Issue(str(DOD_MANIFEST_PATH), "governed_paths.src must list governed src globs"))
+    if not any(fnmatch.fnmatch("src/core/example.py", pattern) for pattern in src_globs):
+        issues.append(Issue(str(DOD_MANIFEST_PATH), "governed_paths.src must include src/core/**"))
+
+    expected_src_sentence = f"Governed source scope (canonical): {', '.join(src_globs)}"
+    for doc_path in (README_PATH, DEVELOPMENT_PATH):
+        if not doc_path.exists():
+            issues.append(Issue(str(doc_path), "file is missing"))
+            continue
+        text = doc_path.read_text(encoding="utf-8")
+        if expected_src_sentence not in text:
+            issues.append(Issue(str(doc_path), f"missing governed scope sentence '{expected_src_sentence}'"))
+
+    if not MILESTONE_WORKFLOW_PATH.exists():
+        issues.append(Issue(str(MILESTONE_WORKFLOW_PATH), "file is missing"))
+    else:
+        workflow_text = MILESTONE_WORKFLOW_PATH.read_text(encoding="utf-8")
+        for index, path_block in enumerate(_extract_workflow_paths(workflow_text), start=1):
+            if path_block != ci_paths:
+                issues.append(Issue(str(MILESTONE_WORKFLOW_PATH), f"paths block #{index} does not match docs/dod_manifest.json governed_paths.ci_triggers"))
+
+    return issues
 
 NON_CANONICAL_STATUS_INPUTS = (
     Path("docs/status/project.json"),
@@ -147,6 +252,8 @@ def main() -> int:
             issues.extend(_validate_manifest_canonical_source(manifest))
             _compute_manifest_statuses(manifest)
             issues.extend(_validate_narrative_docs_reference_active_objectives(manifest))
+            issues.extend(_validate_governed_paths_sync(manifest))
+            issues.extend(_validate_status_report_governed_paths(manifest))
 
     issues.extend(_validate_truth_contract_doc())
     issues.extend(_validate_noncanonical_inputs_not_authoritative())

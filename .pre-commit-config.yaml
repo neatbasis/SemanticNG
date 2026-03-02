@@ -30,8 +30,8 @@ repos:
         stages: [pre-commit, pre-push]
         additional_dependencies:
           - pydantic>=2.6,<3
-          - pytest>=8,<9
-          - gherkin-official>=30,<31
+          - pytest>=8,<10
+          - gherkin-official>=30,<40
           - typing-extensions>=4.7,<5
 
   - repo: local

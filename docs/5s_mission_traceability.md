@@ -1,0 +1,11 @@
+# 5S Mission Traceability Matrix
+
+This matrix ties each 5S principle to mission principles, governing axioms/invariants, and executable enforcement signals.
+
+| 5S principle | Mission principle(s) | Governing axioms/invariants | Enforcing tests/checks/workflows | Metric IDs (`docs/process/5s_metrics.json`) | Owner + review cadence |
+| --- | --- | --- | --- | --- | --- |
+| stability | Prediction precedes action; Decisions must be explainable post-hoc | `A2`, `A3`, `A8`; `prediction_availability.v1`, `explainable_halt_payload.v1` | `tests/test_predictions_contracts_and_gates.py`; `tests/test_engine_projection_mission_loop.py`; `scripts/ci/run_stage_checks.py`; workflow:`quality-guardrails` | `required-check-pass-rate` | Engine + Invariants (weekly governance review) |
+| signal-health | Behavior is defined by executable specification; Evidence anchors every claim | `A9`, `A10`; `evidence_link_completeness.v1` | `tests/test_invariants.py`; `tests/test_precommit_failure_taxonomy_governance.py`; `.github/scripts/classify_precommit_failures.py`; workflow:`precommit-learning-loop-weekly` | `flaky-test-count` | Quality Systems (weekly triage) |
+| staleness | Contracts define capability boundaries; Behavior is defined by executable specification | `A5`, `A10`; `authorization.scope.v1` | `tests/test_doc_freshness_slo.py`; `.github/scripts/validate_doc_freshness_slo.py`; `.github/scripts/validate_governance_docs_schema.py`; workflow:`quality-guardrails` | `stale-doc-freshness-days` | Docs Governance (weekly; monthly audit) |
+| supply-chain | Contracts define capability boundaries; Evidence anchors every claim | `A5`, `A9`; `prediction_availability.v1` | `tests/test_ci_toolchain_parity_script.py`; `tests/test_toolchain_parity_policy.py`; `scripts/ci/check_toolchain_parity.py`; workflow:`toolchain-parity-weekly` | `dependency-drift-count` | DevEx + CI (weekly) |
+| specification | Behavior is defined by executable specification; Decisions must be explainable post-hoc | `A1`, `A7`, `A10`; `prediction_outcome_binding.v1`, `explainable_halt_payload.v1` | `tests/test_governance_doc_parity.py`; `tests/test_validate_milestone_docs.py`; `.github/scripts/validate_governance_sync.py`; workflow:`state-renorm-milestone-gate` | `contract-maturity-movement` | Architecture + Governance (per-release, plus weekly check-in) |

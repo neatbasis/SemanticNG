@@ -90,6 +90,10 @@
           "timeout_seconds": 20
         },
         {
+          "command": "python scripts/ci/validate_5s_mission_traceability.py",
+          "timeout_seconds": 20
+        },
+        {
           "command": "pre-commit run --all-files",
           "timeout_seconds": 180
         },

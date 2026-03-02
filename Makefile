@@ -1,4 +1,4 @@
-.PHONY: bootstrap qa-hook-parity qa-local-fast qa-full-type-surface qa-test-cov qa-local promotion-check promotion-checks scratch-hygiene test test-cov
+.PHONY: bootstrap qa-hook-parity qa-local-fast qa-full-type-surface qa-test-cov qa-local promotion-governance-check promotion-check promotion-checks scratch-hygiene test test-cov
 
 bootstrap:
 	@python --version
@@ -25,10 +25,12 @@ qa-local: bootstrap qa-hook-parity qa-test-cov qa-full-type-surface
 scratch-hygiene:
 	python .github/scripts/check_root_scratch_files.py
 
-promotion-check:
+promotion-governance-check:
 	.github/scripts/run_promotion_checks.sh
 
-promotion-checks: promotion-check
+promotion-check: promotion-governance-check
+
+promotion-checks: promotion-governance-check
 
 test:
 	pytest

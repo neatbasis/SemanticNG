@@ -84,17 +84,17 @@ python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness
 Run one command before requesting review or merging governance/documentation promotions:
 
 ```bash
-make promotion-check
+make promotion-governance-check
 ```
 
-This unified gate runs parity and governance validations together (milestone parity, roadmap/progress synchronization suggestions, sprint-handoff checks, freshness SLO validation, and governance-doc schema checks).
+This unified one-command gate runs parity and governance validations together (milestone parity, roadmap/progress synchronization suggestions, sprint-handoff checks, freshness SLO validation, and governance-doc schema checks).
 
 ### Owner handoff steps (explicit)
 
 1. **Feature/implementation owner** updates evidence-linked capability state in `docs/dod_manifest.json`.
 2. **Governance owner** mirrors the same promotion in `docs/system_contract_map.md` and records maturity/changelog evidence links.
 3. **Roadmap/progress owner** updates `ROADMAP.md` plus sprint progress artifact (`docs/sprint_plan_5x.md` or active sprint handoff doc) in the same PR.
-4. **Release owner** runs `make promotion-check`, attaches output in PR context, and blocks merge until green.
+4. **Release owner** runs `make promotion-governance-check`, attaches output in PR context, and blocks merge until green.
 5. **On-call reviewer** confirms the PR includes all three synchronized surfaces (manifest, contract map, roadmap/progress) before approval.
 
 ## Freshness validator remediation playbook

@@ -1,5 +1,9 @@
 # Contributing
 
+## Documentation index
+
+Before making governance, architecture, or process doc updates, start from [`docs/README.md`](docs/README.md), the single repository documentation entrypoint.
+
 ## Mandatory hook installation
 
 Local development requires both Git hooks installed via `pre-commit` (`pre-commit` and `pre-push`).

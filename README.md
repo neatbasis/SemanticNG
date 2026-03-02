@@ -4,6 +4,10 @@
 [![State Renormalization Milestone Gate](https://github.com/neatbasis/SemanticNG/actions/workflows/state-renorm-milestone-gate.yml/badge.svg)](https://github.com/neatbasis/SemanticNG/actions/workflows/state-renorm-milestone-gate.yml)
 [![Coverage Report (CI)](https://img.shields.io/badge/coverage-report%20in%20Quality%20Guardrails-blue)](https://github.com/neatbasis/SemanticNG/actions/workflows/quality-guardrails.yml)
 
+## Documentation
+
+Use [`docs/README.md`](docs/README.md) as the single entrypoint for repository documentation and source-of-truth links.
+
 ## Refactoring focus (active)
 
 The current project-wide focus is the refactor program defined in `src/core/REFACTORING_METAPLAN.md`.

@@ -66,6 +66,44 @@ make qa-local
 
 ## CI failure triage
 
+## Automated dependency update policy
+
+Repository dependency update automation is defined in `.github/dependabot.yml` and follows governance defaults from release and quality-gate policy.
+
+### Cadence and grouping
+
+- Weekly update window: **Monday 09:00 UTC**.
+- Covered ecosystems:
+  - GitHub Actions dependencies from `.github/workflows/**` and `.github/actions/**`.
+  - Python dependencies resolved from repository `pip` manifests (`pyproject.toml`, `requirements.txt`).
+- Grouped PR policy:
+  - `dev-test-tooling`: `ruff`, `mypy`, `pytest`, `pre-commit`, and related helper packages (for example `pytest-*`, `types-*`).
+  - `runtime-dependencies`: all other Python runtime packages.
+
+### Merge expectations
+
+- Dependabot PRs are labeled for governance routing (`dependencies` + ecosystem-specific labels + `governance`).
+- Default reviewer routing follows repository governance ownership expectations (maintainer review for CI/governance impact and quality-gate owner acknowledgement when tooling behavior changes).
+- Merge only after required checks pass (at minimum `pre-commit` parity, `pytest`, and applicable `mypy` scope when dependency surface impacts typing).
+
+### Failed dependency PR triage
+
+When an automated dependency PR fails:
+
+1. Classify failure source:
+   - CI/config breakage (workflow/action changes).
+   - Runtime/test regression (pytest failures).
+   - Static analysis/type drift (mypy/ruff/pre-commit failures).
+2. Apply the smallest safe remediation in the PR branch:
+   - Pin/exclude problematic transitive version.
+   - Split group impact by temporarily narrowing update scope.
+   - Add upstream issue link when blocked externally.
+3. Re-run local parity checks before merge decision:
+   - `pre-commit run --all-files`
+   - `pytest`
+   - `mypy --config-file=pyproject.toml src tests` (or Tier 2a focused scope for contract-boundary drift triage)
+4. If not fixable within the update window, close/snooze with rationale and open a tracked follow-up issue that includes blocker owner and retry target date.
+
 ### `baseline-lint-type` failing
 
 ```bash

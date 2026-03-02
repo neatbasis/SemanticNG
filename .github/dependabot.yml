@@ -1,0 +1,48 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "UTC"
+    labels:
+      - dependencies
+      - github-actions
+      - governance
+    reviewers:
+      - neatbasis
+
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "UTC"
+    labels:
+      - dependencies
+      - python
+      - governance
+    reviewers:
+      - neatbasis
+    groups:
+      dev-test-tooling:
+        patterns:
+          - ruff
+          - mypy
+          - pytest
+          - pytest-*
+          - pre-commit
+          - types-*
+      runtime-dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - ruff
+          - mypy
+          - pytest
+          - pytest-*
+          - pre-commit
+          - types-*

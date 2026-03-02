@@ -275,7 +275,7 @@ The repository hook set is defined in `.pre-commit-config.yaml` and includes:
 - hygiene checks (`pre-commit-hooks`)
 - `ruff` lint + format
 - `mypy` Tier 1 strict checks for core/application paths (`src/state_renormalization` + `src/core`)
-- a fast `pytest` smoke hook on `pre-push`
+- a fast `pytest` smoke hook on both `pre-commit` and `pre-push`
 
 ### First-failure triage (pre-commit)
 

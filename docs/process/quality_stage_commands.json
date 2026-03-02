@@ -9,6 +9,10 @@
         {
           "command": "mypy --config-file=pyproject.toml src/state_renormalization src/core",
           "timeout_seconds": 40
+        },
+        {
+          "command": "pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py",
+          "timeout_seconds": 80
         }
       ],
       "precommit_hook": {

@@ -72,7 +72,9 @@ make qa-commit
 
 Tier 1 mypy scope is intentionally narrow and enforced by the hook (derived from `docs/toolchain_parity_policy.json`).
 
-Tier 1 commit-time checks now also include the `promotion-governance-pokayoke` hook (`.github/scripts/run_promotion_checks.sh`) so policy-surface violations fail fast with explicit remediation commands before commit.
+Commit-time checks now include a deterministic pytest smoke subset (`pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py`) so basic runtime regressions are caught before commit, not only before push.
+
+Tier 1 commit-time checks also include the `promotion-governance-pokayoke` hook (`.github/scripts/run_promotion_checks.sh`) so policy-surface violations fail fast with explicit remediation commands before commit.
 
 **Explicit enforcement split:** poka-yoke blockers are always-on `Quality Guardrails` blocking jobs plus milestone-path `State Renormalization Milestone Gate` and scoped `promotion-governance-pokayoke`; measurement-only telemetry is `Quality Guardrails / policy-measurement` and milestone promotion-check measurement output.
 
@@ -103,7 +105,7 @@ The pre-push gate must include all of the following checks:
 
 ### Stage timeout/performance budgets
 
-- `qa-commit`: <= 60s total budget (`ruff` 20s + tier-1 `mypy` 40s).
+- `qa-commit`: <= 140s total budget (`ruff` 20s + tier-1 `mypy` 40s + targeted pytest 80s).
 - `qa-push`: <= 220s total budget (`ruff` 45s + `ruff format --check` 35s + tier-1 `mypy` 60s + targeted pytest 80s).
 - `qa-ci`: <= 680s total budget (`no-regression` 20s + `pre-commit --all-files` 180s + `pytest --cov` 240s + full-surface `mypy` 240s).
 

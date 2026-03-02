@@ -189,8 +189,8 @@
     {
       "id": "capability_invocation_governance",
       "title": "Capability-invocation governance (policy-aware external actions)",
-      "status": "planned",
-      "roadmap_section": "Later",
+      "status": "in_progress",
+      "roadmap_section": "Next",
       "code_paths": [
         "src/state_renormalization/engine.py",
         "src/state_renormalization/contracts.py",
@@ -206,7 +206,7 @@
       "ci_evidence_links": [
         {
           "command": "pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_predictions_contracts_and_gates.py",
-          "evidence": "https://github.com/neatbasis/SemanticNG/actions/runs/18994531201"
+          "evidence": "https://github.com/neatbasis/SemanticNG/actions/runs/19027411847"
         }
       ]
     },

@@ -46,6 +46,21 @@
             "tests/test_invariants.py",
             "tests/test_contracts_decision_effect_shape.py"
           ]
+        },
+        {
+          "command": "python scripts/ci/check_core_isolation_protocol.py",
+          "timeout_seconds": 20,
+          "run_if_paths": [
+            "src/core/*.py",
+            "src/core/**/*.py",
+            "src/core/*.md",
+            "src/core/**/*.md",
+            "scripts/ci/check_core_isolation_protocol.py",
+            "src/state_renormalization/*.py",
+            "src/state_renormalization/**/*.py",
+            "src/state_renormalization/*.pyi",
+            "src/state_renormalization/**/*.pyi"
+          ]
         }
       ],
       "precommit_hook": {
@@ -73,6 +88,10 @@
         {
           "command": "pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py",
           "timeout_seconds": 80
+        },
+        {
+          "command": "python scripts/ci/check_core_isolation_protocol.py",
+          "timeout_seconds": 20
         }
       ],
       "precommit_hook": {

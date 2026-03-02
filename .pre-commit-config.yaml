@@ -42,13 +42,17 @@ repos:
       - id: qa-commit-stage
         name: qa-commit stage checks
         entry: python scripts/ci/run_stage_checks.py qa-commit
-        language: system
+        language: python
+        additional_dependencies:
+          - .[test]
         pass_filenames: false
         stages: [pre-commit]
       - id: precommit-governance-selector
         name: pre-commit governance selector
         entry: .github/scripts/run_precommit_governance_checks.py
-        language: system
+        language: python
+        additional_dependencies:
+          - .[test]
         pass_filenames: false
         stages: [pre-commit]
       - id: promotion-governance-pokayoke
@@ -60,6 +64,8 @@ repos:
       - id: qa-push-stage
         name: qa-push stage checks
         entry: python scripts/ci/run_stage_checks.py qa-push
-        language: system
+        language: python
+        additional_dependencies:
+          - .[test]
         pass_filenames: false
         stages: [pre-push]

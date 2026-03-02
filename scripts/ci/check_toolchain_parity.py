@@ -16,6 +16,10 @@ TOOLCHAIN_DOC = ROOT / "docs" / "dev_toolchain_parity.md"
 
 TARGET_HOOKS = ("ruff", "ruff-format", "mypy")
 TOOL_PINS = ("mypy", "ruff", "black", "isort")
+LOCAL_PYTHON_HOOKS = ("qa-commit-stage", "qa-push-stage", "precommit-governance-selector")
+SYSTEM_HOOK_RUNTIME_ASSUMPTIONS = {
+    "promotion-governance-pokayoke": ("bash", "git", "python"),
+}
 
 
 class ToolchainParityError(RuntimeError):
@@ -77,6 +81,37 @@ def _hook_language_version(block: list[str], hook_id: str) -> str:
     raise ToolchainParityError(f"Hook '{hook_id}' is missing language_version.")
 
 
+def _hook_field(block: list[str], key: str) -> str | None:
+    for line in block:
+        stripped = line.strip()
+        if stripped.startswith(f"{key}:"):
+            return stripped.split(":", maxsplit=1)[1].strip()
+    return None
+
+
+def _hook_list_field(block: list[str], key: str) -> list[str]:
+    values: list[str] = []
+    in_field = False
+    field_indent = 0
+    for line in block:
+        if not in_field:
+            match = re.match(rf"^(\s*){re.escape(key)}:\s*$", line)
+            if match:
+                in_field = True
+                field_indent = len(match.group(1))
+            continue
+
+        line_indent = len(line) - len(line.lstrip(" "))
+        stripped = line.strip()
+        if stripped and line_indent <= field_indent:
+            break
+        item = re.match(r"^\s*-\s*(.+?)\s*$", line)
+        if item:
+            values.append(item.group(1))
+
+    return values
+
+
 def _read_workflow_python_versions(path: Path) -> list[str]:
     versions: list[str] = []
     lines = _read_text(path).splitlines()
@@ -125,6 +160,29 @@ def main() -> int:
                 f"'{expected_hook_language}' but found '{found}'."
             )
 
+    for hook_id in LOCAL_PYTHON_HOOKS:
+        block = _extract_hook_block(precommit_lines, hook_id)
+        language = _hook_field(block, "language")
+        if language != "python":
+            return _fail(f"Local quality hook '{hook_id}' must use language: python.")
+        deps = _hook_list_field(block, "additional_dependencies")
+        if ".[test]" not in deps:
+            return _fail(
+                f"Local quality hook '{hook_id}' must pin dependencies via additional_dependencies including '.[test]'."
+            )
+
+    doc_text = _read_text(TOOLCHAIN_DOC)
+    for hook_id, required_tools in SYSTEM_HOOK_RUNTIME_ASSUMPTIONS.items():
+        block = _extract_hook_block(precommit_lines, hook_id)
+        language = _hook_field(block, "language")
+        if language != "system":
+            return _fail(f"Hook '{hook_id}' must remain language: system with documented runtime assumptions.")
+        for tool in required_tools:
+            if f"- `{tool}`" not in doc_text:
+                return _fail(
+                    f"docs/dev_toolchain_parity.md must document runtime assumption '{tool}' for system hook '{hook_id}'."
+                )
+
     action_default_match = re.search(
         r"inputs:\n(?:.|\n)*?python-version:\n(?:.|\n)*?default:\s*['\"]([0-9]+\.[0-9]+)['\"]",
         _read_text(ACTION_SETUP),
@@ -152,7 +210,6 @@ def main() -> int:
         "- `black`: not currently pinned in-repo",
         "- `isort`: not currently pinned in-repo",
     }
-    doc_text = _read_text(TOOLCHAIN_DOC)
     missing = [line for line in documented_lines if line not in doc_text]
     if missing:
         return _fail(

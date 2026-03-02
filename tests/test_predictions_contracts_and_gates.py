@@ -61,7 +61,7 @@ def _fixed_prediction_record() -> PredictionRecord:
 
 
 def _make_episode_with_artifacts() -> Episode:
-    return Episode(
+    return Episode.model_construct(
         episode_id="ep:test",
         conversation_id="conv:test",
         turn_index=0,
@@ -189,13 +189,19 @@ def _build_allow_context_for_explainable_halt_payload() -> Any:
     )
 
 
+
+
+def _construct_invariant_outcome(**kwargs: Any) -> InvariantOutcome:
+    return InvariantOutcome(**kwargs)
+
+
 def _build_stop_context_for_explainable_halt_payload() -> Any:
     return default_check_context(
         scope="scope:test",
         prediction_key="scope:test",
         current_predictions={"scope:test": "pred:test"},
         prediction_log_available=True,
-        halt_candidate=InvariantOutcome.model_construct(
+        halt_candidate=_construct_invariant_outcome(
             invariant_id=InvariantId.PREDICTION_AVAILABILITY,
             passed=False,
             reason="Action selection requires at least one projected current prediction.",
@@ -755,6 +761,133 @@ def test_registry_guard_requires_matrix_coverage_for_each_invariant(
     )
 
 
+@pytest.mark.parametrize(
+    "invariant_id,context,expected_code,expected_flow",
+    [
+        pytest.param(
+            InvariantId.PREDICTION_AVAILABILITY,
+            default_check_context(
+                scope="scope:test",
+                prediction_key="",
+                current_predictions={"scope:test": "pred:test"},
+                prediction_log_available=True,
+            ),
+            "availability_not_keyed",
+            Flow.CONTINUE,
+            id="prediction_availability.v1:availability_not_keyed",
+        ),
+        pytest.param(
+            InvariantId.PREDICTION_AVAILABILITY,
+            default_check_context(
+                scope="scope:test",
+                prediction_key="scope:other",
+                current_predictions={"scope:test": "pred:test"},
+                prediction_log_available=True,
+            ),
+            "no_current_prediction",
+            Flow.STOP,
+            id="prediction_availability.v1:no_current_prediction",
+        ),
+        pytest.param(
+            InvariantId.EVIDENCE_LINK_COMPLETENESS,
+            default_check_context(
+                scope="scope:test",
+                prediction_key="scope:test",
+                current_predictions={"scope:test": "pred:test"},
+                prediction_log_available=True,
+                just_written_prediction=None,
+            ),
+            "evidence_check_not_applicable",
+            Flow.CONTINUE,
+            id="evidence_link_completeness.v1:evidence_check_not_applicable",
+        ),
+        pytest.param(
+            InvariantId.EVIDENCE_LINK_COMPLETENESS,
+            default_check_context(
+                scope="scope:test",
+                prediction_key="scope:test",
+                current_predictions={"scope:test": "pred:test"},
+                prediction_log_available=False,
+                just_written_prediction={
+                    "key": "scope:test",
+                    "evidence_refs": [{"kind": "jsonl", "ref": "predictions.jsonl@1"}],
+                },
+            ),
+            "prediction_log_unavailable",
+            Flow.STOP,
+            id="evidence_link_completeness.v1:prediction_log_unavailable",
+        ),
+        pytest.param(
+            InvariantId.EVIDENCE_LINK_COMPLETENESS,
+            default_check_context(
+                scope="scope:test",
+                prediction_key="scope:test",
+                current_predictions={},
+                prediction_log_available=True,
+                just_written_prediction={
+                    "key": "scope:test",
+                    "evidence_refs": [{"kind": "jsonl", "ref": "predictions.jsonl@1"}],
+                },
+            ),
+            "write_before_use_violation",
+            Flow.STOP,
+            id="evidence_link_completeness.v1:write_before_use_violation",
+        ),
+        pytest.param(
+            InvariantId.PREDICTION_OUTCOME_BINDING,
+            default_check_context(
+                scope="scope:test",
+                prediction_key="scope:test",
+                current_predictions={"scope:test": "pred:test"},
+                prediction_log_available=True,
+                prediction_outcome=None,
+            ),
+            "outcome_binding_not_applicable",
+            Flow.CONTINUE,
+            id="prediction_outcome_binding.v1:outcome_binding_not_applicable",
+        ),
+        pytest.param(
+            InvariantId.PREDICTION_OUTCOME_BINDING,
+            default_check_context(
+                scope="scope:test",
+                prediction_key="scope:test",
+                current_predictions={"scope:test": "pred:test"},
+                prediction_log_available=True,
+                prediction_outcome={"prediction_id": "pred:test", "error_metric": "0.1"},
+            ),
+            "non_numeric_error_metric",
+            Flow.STOP,
+            id="prediction_outcome_binding.v1:non_numeric_error_metric",
+        ),
+        pytest.param(
+            InvariantId.EXPLAINABLE_HALT_PAYLOAD,
+            default_check_context(
+                scope="scope:test",
+                prediction_key="scope:test",
+                current_predictions={"scope:test": "pred:test"},
+                prediction_log_available=True,
+                halt_candidate=None,
+            ),
+            "halt_check_not_applicable",
+            Flow.CONTINUE,
+            id="explainable_halt_payload.v1:halt_check_not_applicable",
+        ),
+    ],
+)
+def test_invariant_audit_missing_branch_codes_are_explicitly_covered(
+    invariant_id: InvariantId,
+    context: Any,
+    expected_code: str,
+    expected_flow: Flow,
+) -> None:
+    outcome = REGISTRY[invariant_id](context)
+
+    assert outcome.invariant_id == invariant_id
+    assert outcome.code == expected_code
+    assert outcome.flow == expected_flow
+    assert outcome.passed is (expected_flow == Flow.CONTINUE)
+
+
 def test_post_write_gate_passes_when_evidence_and_projection_current() -> None:
     pred = _fixed_prediction_record()
     projected = project_current(
@@ -1098,7 +1231,7 @@ def test_gate_flow_parity_continue_and_stop_payloads(tmp_path: Path) -> None:
 def test_evaluate_invariant_gates_rejects_malformed_halt_outcome_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    malformed = InvariantOutcome.model_construct(
+    malformed = _construct_invariant_outcome(
         invariant_id=InvariantId.PREDICTION_AVAILABILITY,
         passed=False,
         reason="malformed",

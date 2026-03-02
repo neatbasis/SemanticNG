@@ -1,0 +1,22 @@
+{
+  "editor.formatOnSave": true,
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+  "ruff.enable": true,
+  "ruff.lint.enable": true,
+  "ruff.format.enable": true,
+  "ruff.organizeImports": true,
+  "mypy-type-checker.enabled": true,
+  "mypy-type-checker.importStrategy": "fromEnvironment",
+  "mypy-type-checker.reportingScope": "workspace",
+  "mypy-type-checker.args": [
+    "--config-file=pyproject.toml",
+    "src/state_renormalization",
+    "src/core"
+  ]
+}

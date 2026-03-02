@@ -38,3 +38,19 @@ Every metric entry in the JSON spec contains:
 - Current mode: canonical Sort metrics for `core` and `state_renormalization` run in `blocking`; feature-surface Sort tracking remains `measure-only` (warning-level output) until promotion.
 - Promotion window: non-blocking until `2026-04-15` (from JSON `stabilization_window.non_blocking_until`).
 - Promotion action: CI validation step promotes remaining `measure-only` metrics to blocking after the stabilization window (or sooner by policy update).
+
+## Unused-code analytics readiness (sort metrics)
+
+Current maintainers' assessment: **partially ready** for strict governance use.
+
+### Ready now
+
+- The scanner is deterministic: `scripts/ci/scan_unused_code.py` defines explicit surfaces, sorts diagnostics for stable output, and emits per-surface plus summary JSON artifacts under `artifacts/unused_code/`.
+- Governance wiring is in place: `qa-ci` includes `python scripts/ci/scan_unused_code.py` in `docs/process/quality_stage_commands.json`.
+- Policy split is explicit by surface: `core` and `state_renormalization` are blocking; `features` remains warning/non-blocking until promotion.
+
+### Gaps to close before treating this as fully mature
+
+- Signal scope is currently narrow (`Ruff F401,F841`), which covers unused imports and locals but not broad dead-symbol classes (e.g., unused functions/classes/modules).
+- Some policy text in governance docs references baseline/allowlist diffs; current scanner implementation enforces from direct current findings, so policy and implementation should be aligned.
+- Add dedicated scanner contract tests (`tests/test_scan_unused_code.py`) for deterministic ordering, artifact schema, surface-level blocking behavior, and Ruff error-path handling.

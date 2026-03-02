@@ -10,7 +10,7 @@ OPTIONAL_LINKAGE_KEYS = ("capability_ids", "depends_on", "milestone_id", "sprint
 
 PROJECT_SCHEMA_CONTRACT: dict[str, Any] = {
     "type": "object",
-    "required": list(REQUIRED_ITEM_KEYS),
+    "required": [*REQUIRED_ITEM_KEYS, "waste_metrics"],
     "properties": {
         "id": {"type": "string"},
         "name": {"type": "string"},
@@ -19,6 +19,23 @@ PROJECT_SCHEMA_CONTRACT: dict[str, Any] = {
         "summary": {"type": "string"},
         "reason": {"type": "string"},
         "as_of": {"type": "string"},
+        "waste_metrics": {
+            "type": "object",
+            "required": [
+                "duplicate_logic_count",
+                "unused_code_delta",
+                "stale_doc_count",
+                "mypy_debt_delta",
+                "flaky_test_count",
+            ],
+            "properties": {
+                "duplicate_logic_count": {"type": "integer"},
+                "unused_code_delta": {"type": "integer"},
+                "stale_doc_count": {"type": "integer"},
+                "mypy_debt_delta": {"type": "integer"},
+                "flaky_test_count": {"type": "integer"},
+            },
+        },
         "analytics": {"type": "array"},
     },
 }
@@ -95,7 +112,28 @@ def validate_status_item(item: dict[str, Any], context: str) -> list[ValidationI
 def validate_project_document(path: Path, data: Any) -> list[ValidationIssue]:
     if not isinstance(data, dict):
         return [ValidationIssue(str(path), "project must be an object")]
-    return validate_status_item(data, str(path))
+    issues = validate_status_item(data, str(path))
+
+    waste_metrics = data.get("waste_metrics")
+    required_metric_keys = (
+        "duplicate_logic_count",
+        "unused_code_delta",
+        "stale_doc_count",
+        "mypy_debt_delta",
+        "flaky_test_count",
+    )
+    if not isinstance(waste_metrics, dict):
+        issues.append(ValidationIssue(str(path), "'waste_metrics' must be an object"))
+        return issues
+
+    for key in required_metric_keys:
+        if key not in waste_metrics:
+            issues.append(ValidationIssue(str(path), f"waste_metrics missing required key '{key}'"))
+            continue
+        if not isinstance(waste_metrics[key], int):
+            issues.append(ValidationIssue(str(path), f"waste_metrics['{key}'] must be integer"))
+
+    return issues
 
 
 def validate_item_collection_document(path: Path, data: Any) -> tuple[list[dict[str, Any]], list[ValidationIssue]]:

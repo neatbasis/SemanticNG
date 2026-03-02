@@ -26,6 +26,13 @@ def _default_project_payload() -> dict[str, Any]:
         "summary": "unknown",
         "reason": "project.json is missing or invalid",
         "as_of": "unknown",
+        "waste_metrics": {
+            "duplicate_logic_count": 0,
+            "unused_code_delta": 0,
+            "stale_doc_count": 0,
+            "mypy_debt_delta": 0,
+            "flaky_test_count": 0,
+        },
         "analytics": [],
     }
 
@@ -271,6 +278,20 @@ def emit_human_summary(payload: dict[str, Any], validation_issues: list[Issue]) 
             print(f"- {detail}")
             if reason:
                 print(f"  reason: {reason}")
+
+    metrics = project.get("waste_metrics", {})
+    print("")
+    print("Waste metrics:")
+    print(
+        "- dup={duplicate_logic_count} | unusedΔ={unused_code_delta} | stale_docs={stale_doc_count} "
+        "| mypyΔ={mypy_debt_delta} | flaky={flaky_test_count}".format(
+            duplicate_logic_count=metrics.get("duplicate_logic_count", "unknown"),
+            unused_code_delta=metrics.get("unused_code_delta", "unknown"),
+            stale_doc_count=metrics.get("stale_doc_count", "unknown"),
+            mypy_debt_delta=metrics.get("mypy_debt_delta", "unknown"),
+            flaky_test_count=metrics.get("flaky_test_count", "unknown"),
+        )
+    )
 
     if validation_issues:
         print("")

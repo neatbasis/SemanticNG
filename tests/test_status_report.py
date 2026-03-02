@@ -74,6 +74,23 @@ def test_invalid_status_value_is_reported(tmp_path: Path) -> None:
     } in payload["issues"]
 
 
+def test_missing_waste_metrics_is_reported(tmp_path: Path) -> None:
+    run_dir = _stage_scenario(tmp_path, "valid")
+    project_path = run_dir / "docs" / "status" / "project.json"
+    project = _load_json(project_path)
+    project.pop("waste_metrics", None)
+    project_path.write_text(json.dumps(project, indent=2) + "\n", encoding="utf-8")
+
+    result = _run_status("check", run_dir)
+
+    assert result.returncode == 1
+    payload = json.loads(result.stdout)
+    assert {
+        "path": "docs/status/project.json",
+        "message": "'waste_metrics' must be an object",
+    } in payload["issues"]
+
+
 def test_json_mode_filters_active_by_default_and_shows_all_when_requested(tmp_path: Path) -> None:
     run_dir = _stage_scenario(tmp_path, "mixed_activity")
 
@@ -142,6 +159,16 @@ def test_status_report_json_surfaces_generated_from_provenance() -> None:
     assert generated_from["manifest"] == "docs/dod_manifest.json"
     assert isinstance(generated_from["manifest_commit"], str) and len(generated_from["manifest_commit"]) == 40
     assert generated_from["generated_at"].endswith("Z")
+
+
+def test_summary_mode_prints_compact_waste_metrics_block(tmp_path: Path) -> None:
+    run_dir = _stage_scenario(tmp_path, "valid")
+
+    result = _run_status("summary", run_dir)
+
+    assert result.returncode == 0
+    assert "Waste metrics:" in result.stdout
+    assert "dup=0 | unusedΔ=0 | stale_docs=0 | mypyΔ=0 | flaky=0" in result.stdout
 
 
 def test_generated_status_files_are_manifest_synchronized() -> None:

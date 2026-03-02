@@ -1,74 +1,54 @@
-# Repository state evaluation: mission, invariants, and milestone targets
+# Repository state evaluation: invariant registry and halt-evidence provenance
 
-Date: 2026-03-02
+Date: 2026-03-02 (updated to current source snapshot)
 
 ## Scope
 
-This assessment compares current repository posture against:
+This update is based on the current implementations and tests in:
 
-- Mission principles (`MISSION.md`).
-- Governance axioms (`docs/AXIOMS.md`).
-- Invariant implementation and gate behavior (`src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py`).
-- Milestone and completion sources of truth (`docs/dod_manifest.json`, `ROADMAP.md`, `docs/system_contract_map.md`, `docs/definition_of_complete.md`).
+- `src/state_renormalization/invariants.py` (specifically `InvariantId.AUTHORIZATION_SCOPE` and `check_authorization_scope`).
+- `tests/test_invariants.py`.
+- `tests/test_predictions_contracts_and_gates.py` (halt evidence reference assertions).
 
 ## Executive summary
 
-The repository demonstrates strong alignment on prediction-first gating, explainable halt shape, and replay-oriented architecture. However, four governance-relevant drifts remain:
+The previously reported gaps around authorization registry coverage and `halt_evidence_ref` provenance are no longer present in the current codebase.
 
-1. **Capability-completion drift:** `invariant_matrix_coverage` is marked `done`, but branch-coverage audit still reports partial coverage with missing branch codes.
-2. **Contract-boundary inconsistency:** `authorization.scope.v1` is treated as invariant-class governance in docs and runtime halts, but is not part of canonical invariant registry/checker lifecycle.
-3. **Milestone metadata drift:** `docs/system_contract_map.md` changelog labels `invariant_matrix_coverage` transition as `(Next)` while current canonical status is `Now/done`.
-4. **Explainability boundary ambiguity:** a TODO marker in engine halt artifact emission indicates unresolved provenance semantics for `halt_evidence_ref`.
+1. **Authorization scope is now first-class in the invariant system.** `authorization.scope.v1` is defined in `InvariantId`, implemented via `check_authorization_scope`, and included in both `REGISTRY` and branch-behavior metadata.
+2. **Authorization pass/stop behavior is covered by invariant tests.** Unit tests assert deterministic pass/fail shape and normalized output for `check_authorization_scope`.
+3. **Halt evidence provenance is explicitly codified and verified.** Engine behavior documents canonical provenance, and integration tests assert that emitted `halt_evidence_ref` values match the persisted halt row for invariant halts, authorization halts, and policy denials.
 
-## Detailed findings
+## Current findings
 
-### 1) Capability completion drift: invariant matrix coverage marked done while audit says partial
+### 1) Authorization invariant registry alignment is resolved
 
-- `docs/dod_manifest.json` lists `invariant_matrix_coverage` as `done` in roadmap section `Now`.
-- `docs/definition_of_complete.md` defines this capability as providing exhaustive branch assertions and non-applicable markers.
-- `docs/invariant_gate_coverage_audit.md` still reports partial pass/stop status and missing branch codes across invariants.
+- `InvariantId` includes `AUTHORIZATION_SCOPE = "authorization.scope.v1"`.
+- `check_authorization_scope` is implemented with three explicit paths:
+  - non-applicable (`authorization_allowed is None`) → continue,
+  - authorized → continue,
+  - unauthorized → stop with evidence and remediation hint.
+- `REGISTRY` registers `InvariantId.AUTHORIZATION_SCOPE`.
+- `REGISTERED_INVARIANT_BRANCH_BEHAVIORS` includes explicit continue/stop contracts for authorization scope.
 
-**Impact:** Completion claims are stronger than current evidence, weakening mission principle that behavior is defined by executable specification and governance parity.
+**Assessment:** No active remediation required for authorization-registry absence; this issue is closed.
 
-**Recommended remediation:** Either complete missing branch tests and refresh audit to full status, or downgrade capability status until coverage is complete.
+### 2) Halt evidence reference semantics are implemented and test-backed
 
-### 2) Invariant contract-boundary inconsistency for authorization scope
+- Engine helper `_persist_halt_and_get_evidence_ref(...)` now includes a canonical provenance contract comment stating that authorization halts, invariant halts, and policy-denial halts source `halt_evidence_ref` from the persisted halt row.
+- Tests verify this behavior end-to-end:
+  - `test_halt_artifact_includes_halt_evidence_ref_and_invariant_context`
+  - `test_invariant_halt_evidence_ref_matches_persisted_halt_row`
+  - `test_authorization_halt_evidence_ref_matches_persisted_halt_row`
+  - `test_policy_denial_halt_evidence_ref_matches_persisted_halt_row`
 
-- Governance map and contract map treat authorization scope (`authorization.scope.v1`) as invariant-bearing gate policy.
-- Runtime emits authorization halts with `invariant_id="authorization.scope.v1"` in `engine.py`.
-- Canonical invariant registry in `invariants.py` only includes four IDs and excludes `authorization.scope.v1`.
+**Assessment:** The prior TODO-style concern around unresolved `halt_evidence_ref` semantics is no longer accurate; behavior is now specified and enforced by assertions.
 
-**Impact:** Authorization stop semantics bypass the shared checker registry lifecycle, making invariant coverage and branch-behavior guarantees less uniform.
+## Recommendations (current-state based)
 
-**Recommended remediation:** Promote authorization scope into `InvariantId`, add registered checker + branch-behavior metadata, and route authorization gate outcomes through the same normalization/test harness used by other invariants.
+1. **Keep the existing coverage guardrails in place.** Continue treating authorization and halt provenance checks as release-gating regression tests.
+2. **Optionally add a focused non-applicable authorization test.** Current tests cover pass/stop explicitly; adding a dedicated `authorization_allowed=None` assertion in `tests/test_invariants.py` would make all three authorization branches explicit at the unit level.
+3. **Maintain comment-to-test parity.** If `_persist_halt_and_get_evidence_ref` provenance rules change, update the related halt evidence tests in the same change set.
 
-### 3) Milestone/changelog metadata drift in contract-map evidence
+## Conclusion
 
-- Current status sources align `invariant_matrix_coverage` with `Now` and `done`.
-- `docs/system_contract_map.md` changelog records the transition entry under `(Next)`.
-
-**Impact:** Documentation parity controls are undermined; milestone traceability becomes ambiguous across governance docs.
-
-**Recommended remediation:** Update changelog milestone label and wording so it mirrors canonical manifest/roadmap status.
-
-### 4) Incomplete explainability boundary around `halt_evidence_ref`
-
-- `engine.py` contains a temporary TODO note in invariant artifact emission: `halt_evidence_ref` wiring was changed to pass precommit.
-
-**Impact:** Indicates unresolved ownership/provenance semantics for halt evidence references; this conflicts with strict explainability and replay-grade auditability expectations.
-
-**Recommended remediation:** Define canonical provenance rules per halt pathway (authorization, invariant gate stop, policy denial), remove temporary workaround comment, and add deterministic assertions in mission-loop/gate tests.
-
-## Positive alignment noted
-
-- Mission and axioms emphasize prediction-before-consequence, explainable halt payloads, deterministic replay, and contract-shape-first flow.
-- Current invariant system enforces deterministic continue/stop structure and explicit branch behavior metadata.
-- Manifest, roadmap, and sprint plan broadly align on `done` vs `planned` capabilities and dependency sequencing.
-
-## Suggested follow-up task list
-
-1. Add missing invariant branch tests identified by `docs/invariant_gate_coverage_audit.md` and re-evaluate `invariant_matrix_coverage` status.
-2. Add first-class `authorization.scope.v1` checker to invariant registry and unify gate path handling.
-3. Correct contract-map changelog milestone label for `invariant_matrix_coverage`.
-4. Resolve and test canonical `halt_evidence_ref` provenance semantics.
-
+The sections that previously described (a) authorization invariant registry absence and (b) unresolved engine TODO semantics around `halt_evidence_ref` should be considered superseded by current code and tests.

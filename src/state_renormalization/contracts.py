@@ -892,6 +892,7 @@ class CapabilityInvocationPolicyCode(StrEnum):
     CURRENT_PREDICTION_REQUIRED = "current_prediction_required"
     EXPLICIT_GATE_PASS_REQUIRED = "explicit_gate_pass_required"
     OBSERVER_SCOPE_DENIED = "observer_scope_denied"
+    ADAPTER_FAILURE = "adapter_failure"
 
 
 class CapabilityInvocationAttempt(BaseModel):

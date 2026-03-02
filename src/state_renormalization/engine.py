@@ -632,6 +632,48 @@ def _persist_policy_denial(
     return halt
 
 
+def _capability_adapter_failure_decision(
+    *,
+    base_attempt: CapabilityInvocationAttempt,
+    failed_action: str,
+    error: Exception,
+) -> CapabilityInvocationPolicyDecision:
+    code = CapabilityInvocationPolicyCode.ADAPTER_FAILURE
+    reason = f"capability invocation denied: adapter failure during {failed_action}"
+    details = {
+        "policy_code": code.value,
+        "attempt": base_attempt.model_dump(mode="json"),
+        "failed_action": failed_action,
+        "error_type": type(error).__name__,
+        "error_message": str(error),
+    }
+    halt_payload = CapabilityPolicyHaltPayload(
+        halt_id=(
+            "halt:"
+            f"{sha1_text(f'{base_attempt.stage}|capability.invocation.policy.v1|{code.value}|{base_attempt.invocation_id}|{failed_action}')}"
+        ),
+        stage=base_attempt.stage,
+        invariant_id="capability.invocation.policy.v1",
+        reason=reason,
+        details=details,
+        evidence=[
+            EvidenceRef(kind="capability", ref=base_attempt.capability),
+            EvidenceRef(kind="action", ref=base_attempt.action),
+            EvidenceRef(kind="policy_code", ref=code.value),
+            EvidenceRef(kind="failed_action", ref=failed_action),
+        ],
+        retryability=True,
+        timestamp=_now_iso(),
+    )
+    return CapabilityInvocationPolicyDecision(
+        attempt=base_attempt,
+        allowed=False,
+        denial_code=code,
+        denial_reason=reason,
+        halt_payload=halt_payload,
+    )
+
+
 def _evaluate_invariant_gate_pipeline(
     *,
     observer: ObserverFrame | None,
@@ -1446,30 +1488,42 @@ def append_prediction_record(
         invocation_id=policy_decision.attempt.invocation_id, allowed=True
     )
 
-    prediction_payload = _prediction_payload_with_stable_ids(pred, stable_ids=stable_ids)
-    prediction_ref = append_prediction_event(
-        prediction_payload,
-        adapter_gate=adapter_gate,
-        path=prediction_log_path,
-        episode_id=getattr(episode, "episode_id", None),
-        conversation_id=getattr(episode, "conversation_id", None),
-        turn_index=getattr(episode, "turn_index", None),
-    )
+    try:
+        prediction_payload = _prediction_payload_with_stable_ids(pred, stable_ids=stable_ids)
+        prediction_ref = append_prediction_event(
+            prediction_payload,
+            adapter_gate=adapter_gate,
+            path=prediction_log_path,
+            episode_id=getattr(episode, "episode_id", None),
+            conversation_id=getattr(episode, "conversation_id", None),
+            turn_index=getattr(episode, "turn_index", None),
+        )
 
-    payload = _prediction_record_event_payload(
-        pred,
-        prediction_ref=prediction_ref,
-        stable_ids=stable_ids,
-    )
+        payload = _prediction_record_event_payload(
+            pred,
+            prediction_ref=prediction_ref,
+            stable_ids=stable_ids,
+        )
 
-    return append_prediction_record_event(
-        payload,
-        adapter_gate=adapter_gate,
-        path=prediction_log_path,
-        episode_id=getattr(episode, "episode_id", None),
-        conversation_id=getattr(episode, "conversation_id", None),
-        turn_index=getattr(episode, "turn_index", None),
-    )
+        return append_prediction_record_event(
+            payload,
+            adapter_gate=adapter_gate,
+            path=prediction_log_path,
+            episode_id=getattr(episode, "episode_id", None),
+            conversation_id=getattr(episode, "conversation_id", None),
+            turn_index=getattr(episode, "turn_index", None),
+        )
+    except Exception as exc:
+        failure_decision = _capability_adapter_failure_decision(
+            base_attempt=policy_decision.attempt,
+            failed_action="append_prediction_record_event",
+            error=exc,
+        )
+        return _persist_policy_denial(
+            ep=episode,
+            decision=failure_decision,
+            halt_log_path=halt_log_path,
+        )
 
 
 def append_halt_record(

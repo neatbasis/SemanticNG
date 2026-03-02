@@ -150,3 +150,43 @@ def test_capability_invocation_denial_requires_current_prediction_context(
     halt_observation = next(a for a in ep.artifacts if a.get("artifact_kind") == "halt_observation")
     assert denial_artifact["halt_evidence_ref"] == expected_ref
     assert halt_observation["halt_evidence_ref"] == expected_ref
+
+
+def test_capability_invocation_adapter_failure_persists_halt(monkeypatch, make_episode) -> None:
+    pred = _prediction("pred:adapter-failure", "scope:adapter-failure")
+    projection = ProjectionState(
+        current_predictions={pred.scope_key: pred}, updated_at_iso="2026-02-13T00:00:00+00:00"
+    )
+    ep = make_episode()
+
+    log_path = Path("artifacts/test-capability-adapter-failure.jsonl")
+    halt_path = Path("artifacts/test-capability-adapter-failure-halts.jsonl")
+    for p in (log_path, halt_path):
+        if p.exists():
+            p.unlink()
+
+    def _raise(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(
+        "state_renormalization.engine.append_prediction_record_event",
+        _raise,
+    )
+
+    result = append_prediction_record(
+        pred,
+        prediction_log_path=log_path,
+        halt_log_path=halt_path,
+        projection_state=projection,
+        explicit_gate_pass_present=True,
+        episode=ep,
+    )
+
+    assert isinstance(result, HaltRecord)
+    assert result.details["policy_code"] == "adapter_failure"
+    assert result.details["error_type"] == "OSError"
+    assert result.details["failed_action"] == "append_prediction_record_event"
+
+    halt_rows = [row for _, row in read_jsonl(halt_path)]
+    assert len(halt_rows) == 1
+    assert halt_rows[0]["details"]["policy_code"] == "adapter_failure"

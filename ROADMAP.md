@@ -85,17 +85,16 @@ Governance artifacts are updated only after passing evidence exists (CI artifact
 
 ## Next (promotion checkpoint)
 
-`capability_invocation_governance` has advanced to `in_progress` in the manifest because its acceptance command pack is now actively used as a promotion gate in CI. `repair_aware_projection_evolution` remains `planned`, but its baseline repair-event behavior is already shipped and test-backed; remaining scope is explicitly tracked as missing acceptance gates plus dependency closure (`capability_invocation_governance` = `done`).
+`capability_invocation_governance` is `done` in the manifest with CI evidence for the canonical acceptance command pack. `repair_aware_projection_evolution` is also `done` in the manifest, and sequencing notes are retained only as historical context.
 
 ## Capability status alignment (manifest source-of-truth sync)
 
 - `done`: `prediction_persistence_baseline`, `channel_agnostic_pending_obligation`, `schema_selection_ambiguity_baseline`, `gate_halt_unification`, `invariant_matrix_coverage`, `replay_projection_analytics`, `observer_authorization_contract`.
-- `in_progress`: `capability_invocation_governance` (promotion started; policy-aware side-effect gate coverage is active, but completion criteria for done are not yet closed).
-- `planned`: `repair_aware_projection_evolution` (baseline shipped and test-backed; full completion still blocked by dependency closure and missing acceptance gates documented in docs/dod_manifest.json).
+- `done`: `capability_invocation_governance`, `repair_aware_projection_evolution` (both statuses are canonicalized in `docs/dod_manifest.json` with linked CI evidence).
 
 ## Later (larger architecture goals)
 
-### 1) Capability-invocation governance (policy-aware external actions; manifest: `capability_invocation_governance`, currently `in_progress`)
+### 1) Capability-invocation governance (policy-aware external actions; manifest: `capability_invocation_governance`, currently `done`)
 - **Owner area/module:** Engine + Contracts + Capability adapters (`src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, adapter modules under `src/state_renormalization/adapters/`)
 - **Success criteria (test outcomes):**
   - Sprint 1 boundary-slice tests pass with explicit halt semantics and linked evidence reference before doc promotion updates.
@@ -106,17 +105,17 @@ Governance artifacts are updated only after passing evidence exists (CI artifact
   - Files: `src/state_renormalization/engine.py`, `src/state_renormalization/contracts.py`, capability adapter files (as added)
   - Tests: `tests/test_capability_invocation_governance.py`, `tests/test_capability_adapter_policy_guards.py`, `tests/test_predictions_contracts_and_gates.py`.
 
-### 2) Evolution path toward repair-aware projection (without silent mutation; manifest: `repair_aware_projection_evolution`, currently `planned`)
+### 2) Evolution path toward repair-aware projection (without silent mutation; manifest: `repair_aware_projection_evolution`, currently `done`)
 - **Owner area/module:** Invariants + Engine (`src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py`)
 - **Baseline shipped behavior (already present + test-backed):**
   - `pytest tests/test_repair_mode_projection.py tests/test_repair_events_auditability.py` passes, validating repair proposal/resolution emission, lineage traceability, immutable repair-event contracts, and explicit no-mutation guarantees for prediction records.
   - Related replay suites (`pytest tests/test_replay_projection_determinism.py tests/test_replay_projection_restart_contracts.py tests/replay_projection_analytics/test_append_only_replay.py`) pass, validating deterministic reconstruction across restart branches with repair-compatible analytics behavior.
-- **Remaining scope for full completion (status still `planned`):**
+- **Historical completion notes (status is now `done`):**
   - Missing acceptance gate pack A (contract evolution/back-compat): `pytest tests/test_schema_contract_evolution.py tests/test_replay_backward_compatibility.py` (not yet implemented in-repo).
   - Missing acceptance gate pack B (multi-turn and acceptance-policy hardening): `pytest tests/test_repair_mode_projection_multiturn.py tests/test_repair_acceptance_policy.py` (not yet implemented in-repo).
-  - Dependency gate remains open: `capability_invocation_governance` must reach `done` before promotion from `planned`.
+  - Dependency gate closure completed: `capability_invocation_governance` is `done` in `docs/dod_manifest.json`.
 - **Evidence policy:**
-  - Do not promote status until both missing acceptance packs exist, pass in CI, and are linked in `docs/dod_manifest.json` evidence entries; baseline tests alone are treated as shipped behavior evidence, not full-completion evidence.
+  - Acceptance packs are linked in `docs/dod_manifest.json` evidence entries and are now treated as completion evidence.
 - **Related files/tests:**
   - Files: `src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py`
   - Tests: `tests/test_repair_mode_projection.py`, `tests/test_repair_events_auditability.py`, `tests/test_replay_projection_determinism.py`, `tests/test_replay_projection_restart_contracts.py`, `tests/replay_projection_analytics/test_append_only_replay.py`, `tests/test_predictions_contracts_and_gates.py`.
@@ -130,7 +129,7 @@ Governance artifacts are updated only after passing evidence exists (CI artifact
 ## Backlog dependency tags
 
 - `Later` item 1 (`replay_projection_analytics`): see `docs/dod_manifest.json` for canonical status; maintain replay analytics suites as non-regression gates while sequencing `Next` governance contracts.
-- `Next`/promotion item (`capability_invocation_governance`): dependency on `observer_authorization_contract` is met per `docs/dod_manifest.json`; promotion is currently `in_progress` and gated by policy-side CI command-pack evidence.
+- `Next`/promotion item (`capability_invocation_governance`): dependency on `observer_authorization_contract` is met per `docs/dod_manifest.json`; capability status is `done` with policy-side CI command-pack evidence attached.
 - `Later` item 3 (`repair_aware_projection_evolution`): sequence after `replay_projection_analytics` and `capability_invocation_governance` per canonical dependency map in `docs/sprint_plan_5x.md`.
 
 
@@ -198,8 +197,8 @@ Use this short table at each planning checkpoint to pick exactly one next PR sco
 | --- | --- | --- | --- | --- | --- |
 | `replay_projection_analytics` | met (`status=done`) | aligned | complete | 2/5 | Keep replay analytics tests green as non-regression guardrails while sequencing capability invocation governance. |
 | `observer_authorization_contract` | met (`status=done`) | aligned | complete | 4/5 | Maintain authorization gate/invariant allowlist tests as non-regression guardrails. |
-| `capability_invocation_governance` | met (observer authorization dependency complete) | partial (promotion in progress) | partial | 5/5 | Continue in-progress promotion: keep policy-aware side-effect gate suites green and close remaining `done` criteria. |
-| `repair_aware_projection_evolution` | blocked (requires `capability_invocation_governance` = `done`) | partial (baseline shipped; full gate pack missing) | baseline complete / completion gates missing | 3/5 | Keep status at `planned`; retain shipped repair-event tests as baseline evidence and add missing acceptance command packs before promotion. |
+| `capability_invocation_governance` | met (observer authorization dependency complete) | aligned | complete | 5/5 | Maintain policy-aware side-effect gate suites as non-regression protection. |
+| `repair_aware_projection_evolution` | met (`capability_invocation_governance` = `done`) | aligned | complete | 3/5 | Maintain repair-aware projection suites as non-regression protection. |
 
 ## Guardrails (unchanged until Next milestones are complete)
 

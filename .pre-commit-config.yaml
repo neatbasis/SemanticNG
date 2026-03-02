@@ -43,6 +43,12 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-commit]
+      - id: promotion-governance-pokayoke
+        name: promotion governance poka-yoke checks
+        entry: .github/scripts/run_promotion_checks.sh
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
       - id: qa-push-stage
         name: qa-push stage checks
         entry: python scripts/ci/run_stage_checks.py qa-push

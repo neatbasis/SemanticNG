@@ -8,13 +8,87 @@ import json
 from pathlib import Path
 from typing import Any
 
-import tomllib
+import re
+
+try:
+    import tomllib  # Python 3.11+
+except ModuleNotFoundError:  # pragma: no cover - exercised on Python 3.10 CI
+    tomllib = None
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PYPROJECT = ROOT / "pyproject.toml"
 
 
+def _parse_bool(value: str) -> bool | None:
+    normalized = value.strip().lower()
+    if normalized == "true":
+        return True
+    if normalized == "false":
+        return False
+    return None
+
+
+def _parse_module_value(raw: str) -> str | list[str] | None:
+    value = raw.strip()
+    if value.startswith("[") and value.endswith("]"):
+        return [module for module in re.findall(r'"([^"\n]+)"', value)]
+    if value.startswith('"') and value.endswith('"'):
+        return value[1:-1]
+    return None
+
+
+def _load_overrides_without_tomllib(pyproject_path: Path) -> list[dict[str, Any]]:
+    text = pyproject_path.read_text(encoding="utf-8")
+    blocks = text.split("[[tool.mypy.overrides]]")
+    if len(blocks) <= 1:
+        return []
+
+    overrides: list[dict[str, Any]] = []
+    for block in blocks[1:]:
+        section = block.split("[[", 1)[0].split("[tool.", 1)[0]
+        lines = [line.split("#", 1)[0].rstrip() for line in section.splitlines()]
+        override: dict[str, Any] = {}
+
+        idx = 0
+        while idx < len(lines):
+            line = lines[idx].strip()
+            idx += 1
+            if not line or "=" not in line:
+                continue
+            key, raw = [part.strip() for part in line.split("=", 1)]
+
+            if key == "module" and raw.startswith("[") and not raw.rstrip().endswith("]"):
+                chunks = [raw]
+                while idx < len(lines):
+                    nxt = lines[idx].strip()
+                    idx += 1
+                    if not nxt:
+                        continue
+                    chunks.append(nxt)
+                    if nxt.endswith("]"):
+                        break
+                raw = " ".join(chunks)
+
+            if key == "module":
+                parsed_module = _parse_module_value(raw)
+                if parsed_module is not None:
+                    override[key] = parsed_module
+                continue
+
+            parsed_bool = _parse_bool(raw)
+            if parsed_bool is not None:
+                override[key] = parsed_bool
+
+        if override:
+            overrides.append(override)
+
+    return overrides
+
+
 def _load_overrides(pyproject_path: Path) -> list[dict[str, Any]]:
+    if tomllib is None:
+        return _load_overrides_without_tomllib(pyproject_path)
+
     data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
     tool = data.get("tool")
     if not isinstance(tool, dict):

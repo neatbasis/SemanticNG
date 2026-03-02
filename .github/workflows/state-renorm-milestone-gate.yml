@@ -167,12 +167,28 @@ jobs:
           path: artifacts/transition_evidence.txt
           if-no-files-found: error
 
-      - name: Run unified promotion checklist gate
+      - name: Measure unified promotion checklist state
+        id: promotion_measurement
+        continue-on-error: true
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: |
           make promotion-check
+
+      - name: Publish promotion measurement note
+        if: always()
+        run: |
+          if [[ "${{ steps.promotion_measurement.outcome }}" == "failure" ]]; then
+            {
+              echo "### Promotion checklist measurement"
+              echo
+              echo "Promotion checks failed in CI measurement mode."
+              echo "Pre-commit hook `promotion-governance-pokayoke` should prevent these policy violations before push."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Promotion checklist measurement passed." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Select and run milestone pytest commands for relevant changes
         run: |

@@ -24,6 +24,38 @@ make promotion-governance-check
 
 This target reuses `.github/scripts/run_promotion_checks.sh`, which orchestrates governance validators in a single pass.
 
+## Module-local documentation ownership and projection update flow
+
+This policy governs module-local docs under `src/core/*.md`, `src/semanticng/*.md`, and `src/state_renormalization/README.md`.
+
+### Canonical vs. projection artifacts
+
+- **Canonical (normative) docs:**
+  - `src/core/{AXIOMS.md, INVARIANTS.md, STATE_SPACE.md, CANONICALIZATION.md, MAPPINGS.md, CAPABILITY_LEVELS.md, ARCHITECTURE.md, REFACTORING_METAPLAN.md}`
+  - `src/semanticng/{AXIOMS.md, INVARIANTS.md, STATE_SPACE.md, CANONICALIZATION.md, MAPPINGS.md, CAPABILITY_LEVELS.md, ARCHITECTURE.md}`
+- **Projection artifacts (must mirror canonical intent):**
+  - `src/core/README.md`
+  - `src/semanticng/README.md`
+  - `src/state_renormalization/README.md`
+
+### Regeneration/update commands and cadence
+
+- There is no standalone renderer for these module-local projection files today; update projection artifacts manually in the same PR immediately after canonical edits.
+- Required validation command pack after updates:
+  - `make promotion-governance-check`
+  - `python .github/scripts/validate_milestone_docs.py`
+  - `python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json`
+- **Cadence:** run the command pack for every PR touching these module-local docs; perform a final parity confirmation at sprint-close/release review.
+
+### Required parity checks before merge (when these docs change)
+
+- `pytest tests/test_governance_doc_parity.py`
+- `pytest tests/test_validate_milestone_docs.py tests/test_doc_freshness_slo.py`
+- `python .github/scripts/validate_milestone_docs.py`
+- `python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json`
+
+Merge is blocked if canonical changes are not reflected in projection artifacts, freshness metadata is stale/missing, or any parity validator above fails.
+
 ## CI workflow architecture note
 
 - `quality-guardrails.yml` owns the **baseline quality layer** (lint/type/test-cov) for general repository health and branch protection defaults.
@@ -38,4 +70,4 @@ This target reuses `.github/scripts/run_promotion_checks.sh`, which orchestrates
 - If a single PR spans multiple DMAIC phases, satisfy the union of all required file updates, validators, evidence locations, and merge-blocking checks.
 - Reference this document in PR descriptions when proposing governance or milestone policy adjustments.
 
-_Last regenerated from manifest: 2026-03-01T18:00:00Z (UTC)._
+_Last regenerated from manifest: 2026-03-02T12:00:00Z (UTC)._

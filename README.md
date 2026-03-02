@@ -64,6 +64,16 @@ Before merge, required CI checks must be green for the pull request scope.
 - `State Renormalization Milestone Gate` is additionally required when a PR touches milestone-governed paths (for example `src/state_renormalization/**` and milestone governance docs/workflows).
 - Coverage reporting is produced in CI by the `Quality Guardrails` workflow (`pytest --cov --cov-report=term-missing --cov-report=xml`).
 
+### How this is enforced
+
+Quality gate policy is only authoritative when repository settings enforce it.
+
+- Branch protection on `main` must require successful completion of `Quality Guardrails`.
+- Branch protection must also require `State Renormalization Milestone Gate` for milestone-governed changes.
+- Merges should be blocked for failing or pending required checks (merge queue recommended).
+
+If repository settings do not enforce these controls, treat this section as a governance defect and open an issue using `.github/ISSUE_TEMPLATE/01-enforce-no-merge-on-red.md`.
+
 See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) for local commands to reach CI parity before opening or updating a PR.
 
 ## Requirements

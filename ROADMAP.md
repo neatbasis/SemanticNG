@@ -91,7 +91,7 @@ Governance artifacts are updated only after passing evidence exists (CI artifact
 
 - `done`: `prediction_persistence_baseline`, `channel_agnostic_pending_obligation`, `schema_selection_ambiguity_baseline`, `gate_halt_unification`, `invariant_matrix_coverage`, `replay_projection_analytics`, `observer_authorization_contract`.
 - `in_progress`: `capability_invocation_governance` (promotion started; policy-aware side-effect gate coverage is active, but completion criteria for done are not yet closed).
-- `planned`: `repair_aware_projection_evolution` (baseline shipped and test-backed; full completion still blocked by dependency closure and missing acceptance gates documented in `docs/dod_manifest.json`).
+- `planned`: `repair_aware_projection_evolution` (baseline shipped and test-backed; full completion still blocked by dependency closure and missing acceptance gates documented in docs/dod_manifest.json).
 
 ## Later (larger architecture goals)
 

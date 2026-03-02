@@ -124,3 +124,15 @@ mypy --config-file=pyproject.toml tests/test_engine_*.py tests/test_contracts_*.
 ```
 
 Most failures here are typed-test drift (missing annotations, protocol signature mismatch, or stale contract field names).
+
+## Dependency update triage workflow
+
+Dependabot updates are grouped into `dev-test-tooling` and `runtime-dependencies` in `.github/dependabot.yml`.
+
+When a dependency PR fails, open or convert to issue using `.github/ISSUE_TEMPLATE/05-dependabot-failure-triage.md` and classify the failure before merging.
+
+Recommended disposition policy:
+
+- GitHub Actions patch/minor updates: eligible for auto-merge once required checks are green.
+- Python `dev-test-tooling` updates (`ruff`, `mypy`, `pytest`, `pre-commit`, typing stubs): require human review because they can alter lint/type gate behavior.
+- `runtime-dependencies` updates: require human review plus behavior/regression validation.

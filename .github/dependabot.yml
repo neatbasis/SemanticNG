@@ -25,6 +25,8 @@ updates:
       - dependencies
       - python
       - governance
+      - dev-test-tooling
+      - runtime-dependencies
     reviewers:
       - neatbasis
     groups:

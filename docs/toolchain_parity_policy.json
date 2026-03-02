@@ -1,0 +1,28 @@
+{
+  "python_version": "3.10",
+  "hook_language_version": "python3.10",
+  "mypy": {
+    "tier1_scope": [
+      "src/state_renormalization",
+      "src/core"
+    ],
+    "tier2_scope": [
+      "src",
+      "tests"
+    ]
+  },
+  "canonical_make_targets": [
+    "make qa-hook-parity",
+    "make qa-test-cov",
+    "make qa-full-type-surface"
+  ],
+  "parity_sensitive_workflows": [
+    ".github/workflows/quality-guardrails.yml",
+    ".github/workflows/state-renorm-milestone-gate.yml",
+    ".github/workflows/toolchain-parity-weekly.yml"
+  ],
+  "parity_docs": [
+    "docs/dev_toolchain_parity.md",
+    "docs/DEVELOPMENT.md"
+  ]
+}

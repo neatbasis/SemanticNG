@@ -5,37 +5,32 @@ from __future__ import annotations
 
 import re
 import sys
+import json
 from pathlib import Path
 
+POLICY_PATH = Path("docs/toolchain_parity_policy.json")
 REQUIRED_MYPY_PACKAGES = (
     "pydantic",
     "pytest",
     "gherkin-official",
     "typing-extensions",
 )
-REQUIRED_HOOK_LANGUAGE_VERSION = "python3.10"
-PARITY_SENSITIVE_WORKFLOWS = (
-    ".github/workflows/quality-guardrails.yml",
-    ".github/workflows/state-renorm-milestone-gate.yml",
-    ".github/workflows/toolchain-parity-weekly.yml",
-)
-MYPY_SCOPE_DOCS = (
-    Path("docs/dev_toolchain_parity.md"),
-    Path("docs/DEVELOPMENT.md"),
-)
-COMMAND_PARITY_DOCS = (
-    Path("docs/dev_toolchain_parity.md"),
-    Path("docs/DEVELOPMENT.md"),
-)
-CANONICAL_MAKE_TARGETS = (
-    "make qa-hook-parity",
-    "make qa-test-cov",
-    "make qa-full-type-surface",
-)
 
 
 class ParityError(RuntimeError):
     """Raised when expected hook parity constraints are not met."""
+
+
+def _load_policy() -> dict[str, object]:
+    return json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+
+
+def _report_drift(file_path: Path | str, key: str, expected: object, found: object) -> None:
+    print("Pre-commit parity failure: drift detected.")
+    print(f"  file: {file_path}")
+    print(f"  key: {key}")
+    print(f"  expected: {expected}")
+    print(f"  found: {found}")
 
 
 def _split_requirement(requirement: str) -> tuple[str, str]:
@@ -152,15 +147,13 @@ def _read_python_versions_from_workflow(workflow_path: Path) -> list[str]:
     return re.findall(r"python-version:\s*['\"]?([0-9]+\.[0-9]+)['\"]?", text)
 
 
-def _as_scope_expr(values: list[str]) -> str:
-    return "[" + ", ".join(f'"{value}"' for value in values) + "]"
+def _ensure_docs_match_mypy_scope(
+    mypy_files: list[str], mypy_hook_args: list[str], parity_docs: list[Path]
+) -> None:
+    expected_files = f"- Tier 1 mypy scope: `{mypy_files}`"
+    expected_args = f"- Tier 1 mypy hook args: `{mypy_hook_args}`"
 
-
-def _ensure_docs_match_mypy_scope(mypy_files: list[str], mypy_hook_args: list[str]) -> None:
-    expected_files = f"[tool.mypy].files = {_as_scope_expr(mypy_files)}"
-    expected_args = f"args: {_as_scope_expr(mypy_hook_args)}"
-
-    for doc in MYPY_SCOPE_DOCS:
+    for doc in parity_docs:
         text = doc.read_text(encoding="utf-8")
         missing: list[str] = []
         if expected_files not in text:
@@ -176,11 +169,11 @@ def _ensure_docs_match_mypy_scope(mypy_files: list[str], mypy_hook_args: list[st
             raise ParityError("Documented mypy scope strings are out of sync.")
 
 
-def _ensure_command_parity_strings() -> None:
+def _ensure_command_parity_strings(canonical_make_targets: list[str], parity_docs: list[Path]) -> None:
     workflow = Path(".github/workflows/quality-guardrails.yml")
     workflow_text = workflow.read_text(encoding="utf-8")
 
-    missing_workflow = [target for target in CANONICAL_MAKE_TARGETS if target not in workflow_text]
+    missing_workflow = [target for target in canonical_make_targets if target not in workflow_text]
     if missing_workflow:
         print("Pre-commit parity failure: workflow command parity drift.")
         print(f"  workflow: {workflow}")
@@ -189,9 +182,9 @@ def _ensure_command_parity_strings() -> None:
             print(f"    - {entry}")
         raise ParityError("Workflow command parity strings are out of sync.")
 
-    for doc in COMMAND_PARITY_DOCS:
+    for doc in parity_docs:
         text = doc.read_text(encoding="utf-8")
-        missing_doc = [target for target in CANONICAL_MAKE_TARGETS if target not in text]
+        missing_doc = [target for target in canonical_make_targets if target not in text]
         if missing_doc:
             print("Pre-commit parity failure: docs command parity drift.")
             print(f"  file: {doc}")
@@ -205,33 +198,40 @@ def main() -> int:
     config_lines = Path(".pre-commit-config.yaml").read_text(encoding="utf-8").splitlines()
     pyproject_path = Path("pyproject.toml")
     pyproject_text = pyproject_path.read_text(encoding="utf-8")
+    policy = _load_policy()
+
+    python_version = str(policy["python_version"])
+    required_hook_language_version = str(policy["hook_language_version"])
+    policy_tier1 = list(policy["mypy"]["tier1_scope"])
+    policy_tier2 = list(policy["mypy"]["tier2_scope"])
+    canonical_make_targets = list(policy["canonical_make_targets"])
+    parity_workflows = list(policy["parity_sensitive_workflows"])
+    parity_docs = [Path(path) for path in list(policy["parity_docs"])]
 
     tier1 = _extract_toml_array(pyproject_text, "tier1_strict")
     tier2 = _extract_toml_array(pyproject_text, "tier2_extended")
-    if tier2 != ["src", "tests"]:
-        print("Pre-commit parity failure: unexpected Tier 2 canonical scope.")
-        print("  expected: ['src', 'tests']")
-        print(f"  found: {tier2}")
+    if tier2 != policy_tier2:
+        _report_drift("pyproject.toml", "tool.semanticng.mypy_tiers.tier2_extended", policy_tier2, tier2)
         return 1
 
     mypy_files = _extract_toml_array(pyproject_text, "files")
     if mypy_files != tier1:
-        print("Pre-commit parity failure: [tool.mypy].files must match tier1_strict.")
-        print(f"  tier1_strict: {tier1}")
-        print(f"  [tool.mypy].files: {mypy_files}")
+        _report_drift("pyproject.toml", "tool.mypy.files", tier1, mypy_files)
+        return 1
+
+    if tier1 != policy_tier1:
+        _report_drift("pyproject.toml", "tool.semanticng.mypy_tiers.tier1_strict", policy_tier1, tier1)
         return 1
 
     mypy_block = _extract_hook_block(config_lines, "mypy")
     mypy_hook_args = _extract_hook_args(mypy_block, "mypy")
     expected_mypy_hook_args = ["--config-file=pyproject.toml", *tier1]
     if mypy_hook_args != expected_mypy_hook_args:
-        print("Pre-commit parity failure: mypy hook args must match tier1_strict scope.")
-        print(f"  expected: {expected_mypy_hook_args}")
-        print(f"  found: {mypy_hook_args}")
+        _report_drift(".pre-commit-config.yaml", "hooks.mypy.args", expected_mypy_hook_args, mypy_hook_args)
         return 1
 
-    _ensure_docs_match_mypy_scope(mypy_files, expected_mypy_hook_args)
-    _ensure_command_parity_strings()
+    _ensure_docs_match_mypy_scope(mypy_files, expected_mypy_hook_args, parity_docs)
+    _ensure_command_parity_strings(canonical_make_targets, parity_docs)
 
     mypy_dep_specs = _extract_additional_dependencies(mypy_block)
     mypy_constraints = {
@@ -254,49 +254,55 @@ def main() -> int:
         expected_constraint = constraints.get(package)
         hook_constraint = mypy_constraints[package]
         if expected_constraint is None:
-            print("Pre-commit parity failure: required package constraint missing from pyproject.")
-            print(f"  package: {package}")
+            _report_drift("pyproject.toml", f"project.optional-dependencies.test[{package}]", "<constraint>", None)
             return 1
         if hook_constraint != expected_constraint:
-            print("Pre-commit parity failure: dependency constraint mismatch.")
-            print(f"  package: {package}")
-            print(f"  expected constraint from pyproject: {expected_constraint}")
-            print(f"  found in pre-commit: {hook_constraint}")
+            _report_drift(
+                ".pre-commit-config.yaml",
+                f"hooks.mypy.additional_dependencies[{package}]",
+                expected_constraint,
+                hook_constraint,
+            )
             return 1
 
     py_minor = _read_requires_python_minor(pyproject_path)
     expected_hook_language_version = f"python{py_minor}"
+    if py_minor != python_version:
+        _report_drift("pyproject.toml", "project.requires-python", python_version, py_minor)
+        return 1
 
     for hook_id in ("mypy", "ruff", "ruff-format"):
         hook_block = _extract_hook_block(config_lines, hook_id)
         language_version = _extract_hook_language_version(hook_block, hook_id)
         if (
             language_version != expected_hook_language_version
-            or language_version != REQUIRED_HOOK_LANGUAGE_VERSION
+            or language_version != required_hook_language_version
         ):
-            print("Pre-commit parity failure: language_version mismatch.")
-            print(f"  hook: {hook_id}")
-            print(f"  expected: {expected_hook_language_version}")
-            print(f"  found: {language_version}")
+            _report_drift(
+                ".pre-commit-config.yaml",
+                f"hooks.{hook_id}.language_version",
+                expected_hook_language_version,
+                language_version,
+            )
             return 1
 
     action_version = _read_action_default_python_version(
         Path(".github/actions/python-test-setup/action.yml")
     )
     if action_version != py_minor:
-        print("Pre-commit parity failure: python-test-setup action default is out of sync.")
-        print(f"  expected: {py_minor}")
-        print(f"  found: {action_version}")
+        _report_drift(
+            ".github/actions/python-test-setup/action.yml",
+            "inputs.python-version.default",
+            py_minor,
+            action_version,
+        )
         return 1
 
-    for workflow in PARITY_SENSITIVE_WORKFLOWS:
+    for workflow in parity_workflows:
         versions = _read_python_versions_from_workflow(Path(workflow))
         mismatched = [v for v in versions if v != py_minor]
         if mismatched:
-            print("Pre-commit parity failure: workflow python-version mismatch.")
-            print(f"  workflow: {workflow}")
-            print(f"  expected: {py_minor}")
-            print(f"  found: {', '.join(versions)}")
+            _report_drift(workflow, "python-version", py_minor, versions)
             return 1
 
     print(
@@ -306,7 +312,7 @@ def main() -> int:
         f"mypy deps={', '.join(REQUIRED_MYPY_PACKAGES)}; "
         f"language_version={expected_hook_language_version}; "
         f"python_baseline={py_minor}; "
-        f"workflows_checked={', '.join(PARITY_SENSITIVE_WORKFLOWS)}"
+        f"workflows_checked={', '.join(parity_workflows)}"
     )
     return 0
 

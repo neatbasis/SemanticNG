@@ -18,6 +18,33 @@ on:
     branches: [main]
 
 jobs:
+
+  policy-measurement:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Shared Python setup
+        uses: ./.github/actions/python-test-setup
+
+      - name: Measure .github/scripts scope alignment and complexity
+        run: |
+          python .github/scripts/analyze_script_scope_complexity.py --output artifacts/script_scope_complexity.md
+
+      - name: Publish script measurement summary
+        if: always()
+        run: |
+          cat artifacts/script_scope_complexity.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload script measurement artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: script_scope_complexity.md
+          path: artifacts/script_scope_complexity.md
+          if-no-files-found: error
+
   no-regression-budget:
     runs-on: ubuntu-latest
     steps:

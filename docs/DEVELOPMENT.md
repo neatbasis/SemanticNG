@@ -72,6 +72,10 @@ make qa-commit
 
 Tier 1 mypy scope is intentionally narrow and enforced by the hook (derived from `docs/toolchain_parity_policy.json`).
 
+Tier 1 commit-time checks now also include the `promotion-governance-pokayoke` hook (`.github/scripts/run_promotion_checks.sh`) so policy-surface violations fail fast with explicit remediation commands before commit.
+
+The promotion hook is staged-scope aware by default (runs only when staged files touch governance/promotion surfaces); CI `make promotion-check` forces full-scope validation via `PROMOTION_CHECK_SCOPE=all`.
+
 If `pre-commit` reformats files, stage and rerun until clean:
 
 ```bash

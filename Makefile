@@ -54,7 +54,7 @@ scratch-hygiene:
 	python .github/scripts/check_root_scratch_files.py
 
 promotion-governance-check:
-	.github/scripts/run_promotion_checks.sh
+	PROMOTION_CHECK_SCOPE=all .github/scripts/run_promotion_checks.sh
 
 promotion-check: promotion-governance-check
 

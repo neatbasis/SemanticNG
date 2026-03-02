@@ -43,7 +43,7 @@ For every status-transition capability in this PR, include the exact `pytest` co
 
 ### Capability command/evidence blocks (generated from `docs/dod_manifest.json`)
 
-#### Capability: `capability_invocation_governance` (status: `planned`)
+#### Capability: `capability_invocation_governance` (status: `done`)
 ```text
 pytest tests/test_capability_invocation_governance.py tests/test_capability_adapter_policy_guards.py tests/test_predictions_contracts_and_gates.py
 https://github.com/<org>/<repo>/actions/runs/<run_id>
@@ -88,9 +88,15 @@ https://github.com/<org>/<repo>/actions/runs/<run_id>
 
 ```
 
-#### Capability: `repair_aware_projection_evolution` (status: `planned`)
+#### Capability: `repair_aware_projection_evolution` (status: `done`)
 ```text
 pytest tests/test_repair_mode_projection.py tests/test_repair_events_auditability.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
+pytest tests/test_schema_contract_evolution.py tests/test_replay_backward_compatibility.py
+https://github.com/<org>/<repo>/actions/runs/<run_id>
+
+pytest tests/test_repair_mode_projection_multiturn.py tests/test_repair_acceptance_policy.py
 https://github.com/<org>/<repo>/actions/runs/<run_id>
 
 pytest tests/test_predictions_contracts_and_gates.py

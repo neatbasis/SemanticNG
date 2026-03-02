@@ -318,7 +318,16 @@ def test_project_maturity_bottleneck_claim_is_non_done_manifest_capability() -> 
     manifest_status = _load_manifest_status_map()
     maturity_text = PROJECT_MATURITY_PATH.read_text(encoding="utf-8")
 
+    non_done = sorted([k for k, v in manifest_status.items() if v != "done"])
     match = re.search(r"Current bottleneck capability[^\n]*?\*\*`([a-z0-9_]+)`\*\*", maturity_text)
+
+    if not non_done:
+        assert match is not None and match.group(1) == "none", (
+            "Project maturity bottleneck claim mismatch: expected explicit `none` "
+            "when all manifest capabilities are `done`."
+        )
+        return
+
     assert match is not None, (
         "Project maturity bottleneck claim missing: expected a line like "
         "'Current bottleneck capability ... **`<capability_id>`**' in docs/project_maturity_evaluation.md"
@@ -336,7 +345,7 @@ def test_project_maturity_bottleneck_claim_is_non_done_manifest_capability() -> 
     assert status != "done", (
         "Project maturity bottleneck claim mismatch: "
         f"capability_id='{capability_id}' declared_bottleneck_status='done'. "
-        f"Expected bottleneck in non-done set={sorted([k for k, v in manifest_status.items() if v != 'done'])}"
+        f"Expected bottleneck in non-done set={non_done}"
     )
 
 

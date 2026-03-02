@@ -189,7 +189,7 @@
     {
       "id": "capability_invocation_governance",
       "title": "Capability-invocation governance (policy-aware external actions)",
-      "status": "in_progress",
+      "status": "done",
       "roadmap_section": "Next",
       "code_paths": [
         "src/state_renormalization/engine.py",

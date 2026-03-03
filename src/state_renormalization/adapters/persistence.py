@@ -313,6 +313,7 @@ def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
                 "repair_decision",
                 "ask_outbox_request",
                 "ask_outbox_response",
+                "ask_response_mission_link",
                 "mission_created",
                 "mission_deferred",
                 "mission_completed",

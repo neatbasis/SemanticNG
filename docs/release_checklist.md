@@ -26,6 +26,11 @@ DMAIC change-type routing (required files, validators, evidence locations, and m
 - [ ] **Capability maturity gates enforced:** `planned -> in_progress -> done` transitions are validated by CI entry/exit gate checks.
 - [ ] **Documentation freshness SLO met:** `docs/doc_freshness_slo.json` governs the freshness metadata policy and `python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json` passes.
 - [ ] **Sprint handoff minimum artifacts attached:** Sprint-close report includes exit table, open-risk register, and next-sprint preload list.
+- [ ] **Sprint substrate-value increment included:** Each sprint includes at least one user-visible or external-value increment explicitly tied to substrate capabilities/governance.
+  - Accepted evidence examples (provide at least one):
+    1. A new end-to-end scenario demonstrating real decision value.
+    2. An external adapter integration with policy gating.
+    3. A deterministic replay artifact that answers a concrete product question.
 - [ ] **Python version-contract drift blocked:** `pyproject.toml` `[project].requires-python`, README requirements text, and CI workflow `setup-python` versions must match in the same PR; any drift is a merge blocker for infra/docs changes.
 - [ ] **Tooling/config PR parity evidence attached:** For any tooling or CI/configuration change, include a checked PR checklist entry for **"pre-commit parity verified"** and paste command evidence from `python .github/scripts/check_precommit_parity.py` and `pre-commit run --all-files -v`.
 - [ ] **Status/program sync gate green:** `make program-sync` passes (status schema, objective/milestone/sprint linkage, DoD rollup alignment, and roadmap/sprint-plan references for active objectives).
@@ -287,4 +292,4 @@ Use this template:
 
 If conflict reconciliation drops or defers any behavior, do not merge immediately: open follow-up patch PR(s) in the same integration cycle and link them under the affected checklist entry.
 
-_Last regenerated from manifest: 2026-03-02T00:00:00Z (UTC)._
+_Last regenerated from manifest: 2026-03-03T00:00:00Z (UTC)._

@@ -17,7 +17,11 @@ from state_renormalization.contracts import (
     ProjectionState,
     VerbosityDecision,
 )
-from state_renormalization.engine import evaluate_observation_freshness
+from state_renormalization.engine import (
+    evaluate_observation_freshness,
+    replay_observation_freshness_episode,
+    run_mission_loop,
+)
 
 
 @dataclass
@@ -197,3 +201,64 @@ def test_duplicate_outstanding_request_holds_instead_of_reissuing(
     assert decision.outcome == ObservationFreshnessDecisionOutcome.HOLD
     assert decision.evidence["outstanding_request_id"] == "req:existing"
     assert outbox.requests == []
+
+
+def test_observation_freshness_episode_is_replayable_and_auditable(
+    monkeypatch: MonkeyPatch,
+    tmp_path,
+    make_episode: Callable[..., Episode],
+    make_policy_decision: Callable[..., VerbosityDecision],
+    make_ask_result: Callable[..., AskResult],
+) -> None:
+    monkeypatch.setattr(
+        "state_renormalization.engine._now_iso", lambda: "2026-02-13T00:05:00+00:00"
+    )
+    outbox = _AskOutboxStub()
+    ep = make_episode(
+        decision=make_policy_decision(),
+        ask=make_ask_result(sentence="temperature is 19C"),
+        observations=[],
+    )
+
+    episode_out, belief_out, projection_out = run_mission_loop(
+        ep,
+        BeliefState(),
+        ProjectionState(current_predictions={}, updated_at_iso="2026-02-13T00:05:00+00:00"),
+        observation_freshness_policy_adapter=_FreshnessPolicyAdapter(
+            contract=ObservationFreshnessPolicyContract(
+                scope=ObservationType.USER_UTTERANCE.value,
+                stale_after_seconds=1,
+            ),
+        ),
+        ask_outbox_adapter=outbox,
+        prediction_log_path=tmp_path / "predictions.jsonl",
+        halt_log_path=tmp_path / "halts.jsonl",
+    )
+
+    freshness = next(
+        a
+        for a in episode_out.artifacts
+        if a.get("artifact_kind") == "observation_freshness_decision"
+    )
+    assert freshness["decision"]["outcome"] == ObservationFreshnessDecisionOutcome.ASK_REQUEST.value
+    assert freshness["decision"]["evaluated_at_iso"] == "2026-02-13T00:05:00+00:00"
+    assert any(a.get("artifact_kind") == "invariant_outcomes" for a in episode_out.artifacts)
+    assert outbox.requests
+
+    replayed = replay_observation_freshness_episode(
+        episode=episode_out,
+        belief=belief_out,
+        projection_state=projection_out,
+        policy_adapter=_FreshnessPolicyAdapter(
+            contract=ObservationFreshnessPolicyContract(
+                scope=ObservationType.USER_UTTERANCE.value,
+                stale_after_seconds=1,
+            )
+        ),
+    )
+
+    assert replayed.outcome == ObservationFreshnessDecisionOutcome.ASK_REQUEST
+    assert any(
+        a.get("artifact_kind") == "observation_freshness_replay" and a.get("status") == "match"
+        for a in episode_out.artifacts
+    )

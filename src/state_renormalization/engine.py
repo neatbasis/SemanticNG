@@ -229,6 +229,7 @@ def evaluate_observation_freshness(
     projection_state: ProjectionState,
     policy_adapter: ObservationFreshnessPolicyAdapter,
     ask_outbox_adapter: AskOutboxAdapter | None = None,
+    evaluation_time_iso: str | None = None,
 ) -> ObservationFreshnessDecision:
     raw_contract = policy_adapter.get_contract(
         episode=ep, belief=belief, projection_state=projection_state
@@ -269,12 +270,14 @@ def evaluate_observation_freshness(
         "policy_threshold_seconds": contract.stale_after_seconds,
     }
 
+    evaluated_at_iso = evaluation_time_iso or _now_iso()
+
     if not last_observed_at:
         reason = "no observation available for freshness scope"
         outcome = ObservationFreshnessDecisionOutcome.ASK_REQUEST
     else:
         observed_dt = _parse_iso8601(last_observed_at)
-        now_dt = _parse_iso8601(_now_iso())
+        now_dt = _parse_iso8601(evaluated_at_iso)
         if observed_dt is None or now_dt is None:
             reason = "observation freshness timestamp invalid"
             outcome = ObservationFreshnessDecisionOutcome.ASK_REQUEST
@@ -301,6 +304,7 @@ def evaluate_observation_freshness(
             "last_observed_value": last_observed_value,
             "policy_threshold_seconds": contract.stale_after_seconds,
             "scope": contract.scope,
+            "evaluated_at_iso": evaluated_at_iso,
         }
     )
     if outstanding_request_id:
@@ -311,6 +315,7 @@ def evaluate_observation_freshness(
         outcome=outcome,
         reason=reason,
         stale_after_seconds=contract.stale_after_seconds,
+        evaluated_at_iso=evaluated_at_iso,
         observed_at_iso=contract.observed_at_iso,
         last_observed_at_iso=last_observed_at,
         last_observed_value=last_observed_value,
@@ -323,6 +328,7 @@ def evaluate_observation_freshness(
         "reason": decision.reason,
         "last_observed_at": decision.last_observed_at_iso,
         "last_observed_value": decision.last_observed_value,
+        "evaluated_at_iso": decision.evaluated_at_iso,
         "policy_threshold_seconds": decision.stale_after_seconds,
     }
     _append_episode_artifact(ep, artifact_payload)
@@ -351,11 +357,80 @@ def evaluate_observation_freshness(
                 "reason": decision.reason,
                 "last_observed_at": decision.last_observed_at_iso,
                 "last_observed_value": decision.last_observed_value,
+                "evaluated_at_iso": decision.evaluated_at_iso,
                 "policy_threshold_seconds": decision.stale_after_seconds,
             },
         )
 
     return decision
+
+
+def replay_observation_freshness_episode(
+    *,
+    episode: Episode | Mapping[str, object],
+    belief: BeliefState,
+    projection_state: ProjectionState,
+    policy_adapter: ObservationFreshnessPolicyAdapter,
+) -> ObservationFreshnessDecision:
+    ep = episode if isinstance(episode, Episode) else Episode.model_validate(episode)
+
+    decision_artifact = next(
+        (
+            artifact
+            for artifact in reversed(ep.artifacts)
+            if artifact.get("artifact_kind") == "observation_freshness_decision"
+        ),
+        None,
+    )
+    if decision_artifact is None:
+        raise ValueError("episode has no observation_freshness_decision artifact to replay")
+
+    recorded = ObservationFreshnessDecision.model_validate(decision_artifact.get("decision", {}))
+
+    replay_episode = ep.model_copy(deep=True)
+    if recorded.last_observed_at_iso:
+        try:
+            replay_obs_type = ObservationType(recorded.scope)
+            replay_source = "unknown"
+        except ValueError:
+            replay_obs_type = ObservationType.USER_UTTERANCE
+            replay_source = recorded.scope
+        replay_episode.observations = [
+            Observation(
+                observation_id=f"obs:replay:{recorded.scope}",
+                t_observed_iso=recorded.last_observed_at_iso,
+                type=replay_obs_type,
+                text=recorded.last_observed_value,
+                source=replay_source,
+            )
+        ]
+    else:
+        replay_episode.observations = []
+
+    replay_decision = evaluate_observation_freshness(
+        ep=replay_episode,
+        belief=belief,
+        projection_state=projection_state,
+        policy_adapter=policy_adapter,
+        ask_outbox_adapter=None,
+        evaluation_time_iso=recorded.evaluated_at_iso,
+    )
+
+    if replay_decision.model_dump(mode="json") != recorded.model_dump(mode="json"):
+        raise ValueError("observation freshness replay diverged from recorded decision")
+
+    _append_episode_artifact(
+        ep,
+        {
+            "artifact_kind": "observation_freshness_replay",
+            "status": "match",
+            "scope": recorded.scope,
+            "outcome": recorded.outcome.value,
+            "evaluated_at_iso": recorded.evaluated_at_iso,
+            "decision_artifact_kind": "observation_freshness_decision",
+        },
+    )
+    return replay_decision
 
 
 def _first_halt_from_evaluations(

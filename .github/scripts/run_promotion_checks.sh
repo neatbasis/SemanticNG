@@ -70,15 +70,32 @@ PR_TEMPLATE_PATTERNS=(
   ".github/scripts/render_transition_evidence.py"
 )
 
+BOUNDARY_PATTERNS=(
+  "src/core/**"
+  "src/state_renormalization/**"
+  "src/semanticng/**"
+)
+
+BOUNDARY_CONTRACT_DOC_PATTERNS=(
+  "docs/system_contract_map.md"
+  "docs/dod_manifest.json"
+  "docs/definition_of_complete.md"
+  "docs/documentation_change_control.md"
+)
+
 governance_reasons=()
 freshness_reasons=()
 pr_template_reasons=()
+boundary_reasons=()
+boundary_contract_doc_reasons=()
 
 collect_scope_reasons governance_reasons "${GOVERNANCE_PATTERNS[@]}"
 collect_scope_reasons freshness_reasons "${FRESHNESS_PATTERNS[@]}"
 collect_scope_reasons pr_template_reasons "${PR_TEMPLATE_PATTERNS[@]}"
+collect_scope_reasons boundary_reasons "${BOUNDARY_PATTERNS[@]}"
+collect_scope_reasons boundary_contract_doc_reasons "${BOUNDARY_CONTRACT_DOC_PATTERNS[@]}"
 
-if [[ ${#governance_reasons[@]} -eq 0 && ${#freshness_reasons[@]} -eq 0 && ${#pr_template_reasons[@]} -eq 0 ]]; then
+if [[ ${#governance_reasons[@]} -eq 0 && ${#freshness_reasons[@]} -eq 0 && ${#pr_template_reasons[@]} -eq 0 && ${#boundary_reasons[@]} -eq 0 ]]; then
   echo "Promotion checks skipped: no staged files touched promotion policy surfaces."
   if [[ ${#STAGED_FILES[@]} -gt 0 ]]; then
     printf 'Staged files (non-policy):\n'
@@ -118,6 +135,19 @@ if [[ ${#pr_template_reasons[@]} -gt 0 ]]; then
     git --no-pager diff -- .github/pull_request_template.md
     exit 1
   fi
+fi
+
+
+if [[ ${#boundary_reasons[@]} -gt 0 && ${#boundary_contract_doc_reasons[@]} -eq 0 ]]; then
+  boundary_reason="matched semantic boundary staged path(s): $(printf '%s, ' "${boundary_reasons[@]}")"
+  boundary_reason="${boundary_reason%, }"
+  echo "COMMIT BLOCKED: semantic boundary contract updates are required."
+  echo "Check triggered because: ${boundary_reason}"
+  echo "Also stage at least one matching governance/contract doc update:"
+  printf '  - %s
+' "${BOUNDARY_CONTRACT_DOC_PATTERNS[@]}"
+  echo "Then re-run: make promotion-governance-check"
+  exit 1
 fi
 
 echo "Promotion checks passed."

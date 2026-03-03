@@ -29,8 +29,9 @@ This target reuses `.github/scripts/run_promotion_checks.sh`, which orchestrates
 - `quality-guardrails.yml` owns the **baseline quality layer** (lint/type/test-cov) for general repository health and branch protection defaults.
 - `state-renorm-milestone-gate.yml` owns the **milestone governance layer** (manifest/doc parity validation plus milestone-targeted suites) and now declares a `needs` dependency so governance checks run only after its baseline-quality job succeeds.
 - Both workflows share `.github/actions/python-test-setup/action.yml` for checkout, Python setup, pip caching, and editable test-extra installation to keep CI environment semantics aligned.
-- Trigger boundary intent: baseline quality runs broadly on pull requests/pushes, while milestone governance remains path-scoped to state-renormalization and governance artifacts to avoid unnecessary governance gate runs on unrelated changes.
+- Trigger boundary intent: baseline quality runs broadly on pull requests/pushes, while milestone governance remains path-scoped to semantic boundary paths (`src/core/**`, `src/state_renormalization/**`, `src/semanticng/**`) and governance artifacts to avoid unnecessary governance gate runs on unrelated changes.
 - Branch protection requirement: when governance-scoped docs/scripts are touched (for example `docs/doc_freshness_slo.json`, `docs/release_checklist.md`, or `.github/scripts/validate_doc_freshness_slo.py`), require the `State Renormalization Milestone Gate / milestone-governance` status check so documentation freshness validation is merge-blocking.
+- Semantic boundary contract policy: edits under `src/core/**`, `src/state_renormalization/**`, or `src/semanticng/**` must be accompanied by matching contract/governance documentation updates (at minimum `docs/system_contract_map.md` or `docs/dod_manifest.json`) and must pass `make promotion-governance-check`.
 
 ## Contributor usage notes
 

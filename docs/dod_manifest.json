@@ -412,11 +412,13 @@
   "governed_paths": {
     "src": [
       "src/core/**",
-      "src/state_renormalization/**"
+      "src/state_renormalization/**",
+      "src/semanticng/**"
     ],
     "ci_triggers": [
       "src/core/**",
       "src/state_renormalization/**",
+      "src/semanticng/**",
       "docs/dod_manifest.json",
       "docs/doc_freshness_slo.json",
       "docs/release_checklist.md",

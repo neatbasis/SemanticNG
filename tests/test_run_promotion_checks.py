@@ -110,3 +110,31 @@ def test_relevant_clean_change_passes(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert "Promotion checks passed." in result.stdout
+
+
+def test_semantic_boundary_change_without_contract_docs_blocks_commit(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    _write_file(repo / "src" / "semanticng" / "interfaces.py", "X = 1\n")
+    subprocess.run(["git", "add", "src/semanticng/interfaces.py"], cwd=repo, check=True)
+
+    result = _run_hook(repo)
+
+    assert result.returncode != 0
+    assert "semantic boundary contract updates are required" in result.stdout
+    assert "src/semanticng/interfaces.py" in result.stdout
+
+
+def test_semantic_boundary_change_with_contract_docs_passes(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    _write_file(repo / "src" / "semanticng" / "interfaces.py", "X = 1\n")
+    _write_file(repo / "docs" / "system_contract_map.md", "# contract update\n")
+    subprocess.run(
+        ["git", "add", "src/semanticng/interfaces.py", "docs/system_contract_map.md"],
+        cwd=repo,
+        check=True,
+    )
+
+    result = _run_hook(repo)
+
+    assert result.returncode == 0
+    assert "Promotion checks passed." in result.stdout

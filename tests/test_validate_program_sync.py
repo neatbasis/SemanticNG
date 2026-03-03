@@ -63,3 +63,16 @@ def test_program_sync_fails_on_relational_integrity_breaks(tmp_path: Path, monke
     assert any("unknown sprint" in message for message in messages)
     assert any("orphan milestone" in message for message in messages)
     assert any("items[0] missing id" in message for message in messages)
+
+
+def test_governed_src_requires_semantic_boundary_paths() -> None:
+    manifest = {
+        "governed_paths": {
+            "src": ["src/core/**", "src/state_renormalization/**"],
+            "ci_triggers": [],
+        }
+    }
+
+    issues = validate_program_sync._validate_governed_paths_sync(manifest)
+
+    assert any("governed_paths.src must include src/semanticng/**" in issue.message for issue in issues)

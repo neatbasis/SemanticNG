@@ -96,3 +96,11 @@ def test_json_mode_includes_relational_rollups_and_consistency_warnings() -> Non
     assert all("sprint_id" in row and "milestone_id" in row for row in done_rollups)
 
     assert isinstance(payload["consistency_warnings"], list)
+
+
+def test_json_mode_reports_semanticng_governed_paths() -> None:
+    result = _run_status("json", ROOT)
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    governed_src = payload["meta"]["schema_contract"]["governed_paths"]["src"]
+    assert "src/semanticng/**" in governed_src

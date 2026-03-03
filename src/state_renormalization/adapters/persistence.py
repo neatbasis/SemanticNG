@@ -13,6 +13,7 @@ from state_renormalization.contracts import (
     CapabilityAdapterGate,
     HaltPayloadValidationError,
     HaltRecord,
+    MissionLifecycleEvent,
 )
 
 JsonObj = dict[str, Any]
@@ -222,6 +223,63 @@ def append_ask_outbox_response_event(
     return append_prediction(path=path, record=payload, adapter_gate=adapter_gate)
 
 
+
+
+def append_mission_created_event(
+    record: Any,
+    *,
+    adapter_gate: CapabilityAdapterGate,
+    path: PathLike = PREDICTIONS_LOG_PATH,
+) -> JsonObj:
+    payload = _to_jsonable(record)
+    if not isinstance(payload, dict):
+        raise ValueError("append_mission_created_event expects a dict-like payload")
+    event = {"event_kind": "mission_created", **payload}
+    return append_mission_lifecycle_event(event, adapter_gate=adapter_gate, path=path)
+
+
+def append_mission_deferred_event(
+    record: Any,
+    *,
+    adapter_gate: CapabilityAdapterGate,
+    path: PathLike = PREDICTIONS_LOG_PATH,
+) -> JsonObj:
+    payload = _to_jsonable(record)
+    if not isinstance(payload, dict):
+        raise ValueError("append_mission_deferred_event expects a dict-like payload")
+    event = {"event_kind": "mission_deferred", **payload}
+    return append_mission_lifecycle_event(event, adapter_gate=adapter_gate, path=path)
+
+
+def append_mission_completed_event(
+    record: Any,
+    *,
+    adapter_gate: CapabilityAdapterGate,
+    path: PathLike = PREDICTIONS_LOG_PATH,
+) -> JsonObj:
+    payload = _to_jsonable(record)
+    if not isinstance(payload, dict):
+        raise ValueError("append_mission_completed_event expects a dict-like payload")
+    event = {"event_kind": "mission_completed", **payload}
+    return append_mission_lifecycle_event(event, adapter_gate=adapter_gate, path=path)
+
+
+def append_mission_lifecycle_event(
+    record: Any,
+    *,
+    adapter_gate: CapabilityAdapterGate,
+    path: PathLike = PREDICTIONS_LOG_PATH,
+) -> JsonObj:
+    _enforce_adapter_gate(action="append_mission_lifecycle_event", adapter_gate=adapter_gate)
+
+    payload = _to_jsonable(record)
+    if not isinstance(payload, dict):
+        raise ValueError("append_mission_lifecycle_event expects a dict-like payload")
+
+    event = MissionLifecycleEvent.model_validate(payload)
+    return append_prediction(path=path, record=event.model_dump(mode="json"), adapter_gate=adapter_gate)
+
+
 def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
     """Yield append-only projection lineage rows that can be rehydrated.
 
@@ -255,6 +313,9 @@ def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
                 "repair_decision",
                 "ask_outbox_request",
                 "ask_outbox_response",
+                "mission_created",
+                "mission_deferred",
+                "mission_completed",
             }:
                 yield raw
                 continue

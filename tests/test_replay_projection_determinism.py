@@ -268,3 +268,66 @@ def test_replay_projection_snapshot_remains_identical_for_identical_logs_with_hu
     assert replay_a.model_dump(mode="json") == replay_b.model_dump(mode="json")
     assert replay_a.analytics_snapshot.request_outcome_linkage == {"ask:1": "resume"}
     assert replay_a.analytics_snapshot.outstanding_human_requests == {}
+
+
+def test_mission_lifecycle_replay_is_deterministic_from_identical_lineage_logs(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "mission-seed.jsonl"
+    mission_payload = {
+        "mission_id": "mission:det-1",
+        "mission_identity": "follow up unresolved ambiguity",
+        "kind": "follow_up",
+        "entity_ref": {"kind": "ambiguity", "ref": "amb:123"},
+        "schedule_policy": {"freshness_ttl_s": 900, "min_prompt_interval_s": 120},
+        "completion_mode": "manual",
+        "created_at_iso": "2026-02-15T01:00:00+00:00",
+    }
+
+    append_jsonl(
+        source,
+        {
+            "event_kind": "mission_created",
+            "mission": {
+                **mission_payload,
+                "status": "active",
+                "next_prompt_at": "2026-02-15T01:05:00+00:00",
+                "updated_at_iso": "2026-02-15T01:00:00+00:00",
+                "lineage_refs": [],
+            },
+        },
+    )
+    append_jsonl(
+        source,
+        {
+            "event_kind": "mission_deferred",
+            "mission": {
+                **mission_payload,
+                "status": "deferred",
+                "next_prompt_at": "2026-02-15T01:30:00+00:00",
+                "updated_at_iso": "2026-02-15T01:06:00+00:00",
+                "lineage_refs": [
+                    {
+                        "relation": "deferred_from",
+                        "mission_id": "mission:det-1",
+                        "event_ref": "mission-seed.jsonl@1",
+                    }
+                ],
+            },
+        },
+    )
+
+    restart_a = tmp_path / "mission-a.jsonl"
+    restart_b = tmp_path / "mission-b.jsonl"
+    payload = source.read_text(encoding="utf-8")
+    restart_a.write_text(payload, encoding="utf-8")
+    restart_b.write_text(payload, encoding="utf-8")
+
+    replay_a = replay_projection_analytics(restart_a)
+    replay_b = replay_projection_analytics(restart_b)
+
+    assert replay_a.model_dump(mode="json") == replay_b.model_dump(mode="json")
+    assert replay_a.projection_state.active_missions == {}
+    deferred = replay_a.projection_state.deferred_missions["mission:det-1"]
+    assert deferred.next_prompt_at == "2026-02-15T01:30:00+00:00"
+    assert deferred.lineage_refs[0].event_ref == "mission-seed.jsonl@1"

@@ -951,11 +951,79 @@ class CapabilityAdapterGate(BaseModel):
     allowed: bool = True
 
 
+class MissionKind(StrEnum):
+    FOLLOW_UP = "follow_up"
+    MONITORING = "monitoring"
+    REPAIR = "repair"
+    OTHER = "other"
+
+
+class MissionCompletionMode(StrEnum):
+    MANUAL = "manual"
+    AUTO = "auto"
+    UNTIL_FRESH = "until_fresh"
+
+
+class MissionStatus(StrEnum):
+    ACTIVE = "active"
+    DEFERRED = "deferred"
+    COMPLETED = "completed"
+
+
+class MissionEntityRef(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    kind: str
+    ref: str
+
+
+class MissionFreshnessPolicy(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    freshness_ttl_s: int | None = Field(default=None, ge=0)
+    min_prompt_interval_s: int | None = Field(default=None, ge=0)
+    max_prompt_interval_s: int | None = Field(default=None, ge=0)
+
+
+class MissionLineageRef(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    relation: str
+    mission_id: str
+    event_ref: str | None = None
+
+
+class MissionContract(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    mission_id: str
+    mission_identity: str
+    kind: MissionKind
+    entity_ref: MissionEntityRef
+    schedule_policy: MissionFreshnessPolicy = Field(default_factory=MissionFreshnessPolicy)
+    completion_mode: MissionCompletionMode = MissionCompletionMode.MANUAL
+    status: MissionStatus = MissionStatus.ACTIVE
+    next_prompt_at: str | None = None
+    lineage_refs: list[MissionLineageRef] = Field(default_factory=list)
+    created_at_iso: str
+    updated_at_iso: str
+
+
+class MissionLifecycleEvent(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    event_kind: Literal["mission_created", "mission_deferred", "mission_completed"]
+    mission: MissionContract
+
+
 class ProjectionState(BaseModel):
     model_config = _CONTRACT_CONFIG
 
     current_predictions: dict[str, PredictionRecord] = Field(default_factory=dict)
     prediction_history: list[PredictionRecord] = Field(default_factory=list)
+    active_missions: dict[str, MissionContract] = Field(default_factory=dict)
+    deferred_missions: dict[str, MissionContract] = Field(default_factory=dict)
+    completed_missions: dict[str, MissionContract] = Field(default_factory=dict)
     correction_metrics: dict[str, float] = Field(default_factory=dict)
     last_comparison_at_iso: str | None = None
     updated_at_iso: str

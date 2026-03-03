@@ -40,12 +40,21 @@
       ],
       "item_required": [
         "id",
+        "stable_id",
         "name",
         "status",
         "active",
         "summary",
         "reason",
         "as_of"
+      ],
+      "item_optional": [
+        "depends_on",
+        "satisfies",
+        "milestone_id",
+        "sprint_id",
+        "capability_ids",
+        "dod_refs"
       ]
     },
     "sprints": {
@@ -56,12 +65,21 @@
       ],
       "item_required": [
         "id",
+        "stable_id",
         "name",
         "status",
         "active",
         "summary",
         "reason",
         "as_of"
+      ],
+      "item_optional": [
+        "depends_on",
+        "satisfies",
+        "milestone_id",
+        "sprint_id",
+        "capability_ids",
+        "dod_refs"
       ]
     },
     "objectives": {
@@ -72,12 +90,21 @@
       ],
       "item_required": [
         "id",
+        "stable_id",
         "name",
         "status",
         "active",
         "summary",
         "reason",
         "as_of"
+      ],
+      "item_optional": [
+        "depends_on",
+        "satisfies",
+        "milestone_id",
+        "sprint_id",
+        "capability_ids",
+        "dod_refs"
       ]
     }
   }

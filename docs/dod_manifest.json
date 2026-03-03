@@ -274,7 +274,14 @@
         "capability_invocation_governance"
       ],
       "summary": "Boundary gating and edge-case hardening remain the active objective.",
-      "reason": "Sprint plan keeps this capability on a promotion path with explicit evidence requirements."
+      "reason": "Sprint plan keeps this capability on a promotion path with explicit evidence requirements.",
+      "stable_id": "capability_invocation_governance",
+      "milestone_id": "state-renorm-milestone",
+      "sprint_id": "sprint-5",
+      "depends_on": [],
+      "satisfies": [
+        "capability_invocation_governance"
+      ]
     },
     {
       "id": "repair_aware_projection_evolution",
@@ -283,7 +290,16 @@
         "repair_aware_projection_evolution"
       ],
       "summary": "Objective remains queued behind governance boundary completion.",
-      "reason": "Sequenced in sprint planning docs as a subsequent objective."
+      "reason": "Sequenced in sprint planning docs as a subsequent objective.",
+      "stable_id": "repair_aware_projection_evolution",
+      "milestone_id": "core-rollout-readiness",
+      "sprint_id": "sprint-next",
+      "depends_on": [
+        "capability_invocation_governance"
+      ],
+      "satisfies": [
+        "repair_aware_projection_evolution"
+      ]
     }
   ],
   "milestone_groups": [
@@ -293,7 +309,8 @@
       "status": "in_progress",
       "active": true,
       "summary": "Milestone governance remains active and enforced through docs/test parity controls.",
-      "reason": "Execution evidence in this report is static; latest CI run evidence is not resolved offline."
+      "reason": "Execution evidence in this report is static; latest CI run evidence is not resolved offline.",
+      "stable_id": "state-renorm-milestone"
     },
     {
       "id": "core-rollout-readiness",
@@ -301,7 +318,8 @@
       "status": "planned",
       "active": false,
       "summary": "Deferred until current state-renormalization scope shows sustained no-drift evidence.",
-      "reason": "Roadmap and architecture docs mark future, gated expansion."
+      "reason": "Roadmap and architecture docs mark future, gated expansion.",
+      "stable_id": "core-rollout-readiness"
     }
   ],
   "sprint_groups": [
@@ -311,7 +329,8 @@
       "status": "done",
       "active": false,
       "summary": "Sprint 5 handoff is documented with exit checks and carry-over risks.",
-      "reason": "See docs/sprint_handoffs/sprint-5-handoff.md for closure evidence."
+      "reason": "See docs/sprint_handoffs/sprint-5-handoff.md for closure evidence.",
+      "stable_id": "sprint-5"
     },
     {
       "id": "sprint-next",
@@ -319,7 +338,8 @@
       "status": "in_progress",
       "active": true,
       "summary": "Planning and preload sequencing are active for the next objective slice.",
-      "reason": "Current planning artifacts track pending objective transitions."
+      "reason": "Current planning artifacts track pending objective transitions.",
+      "stable_id": "sprint-next"
     }
   ],
   "project_status": {

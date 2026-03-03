@@ -55,12 +55,18 @@ def _build_objectives(manifest: dict[str, Any], as_of: str) -> dict[str, Any]:
         items.append(
             {
                 "id": str(group["id"]),
+                "stable_id": str(group.get("stable_id", group["id"])),
                 "name": str(group["name"]),
                 "status": status,
                 "active": status == "in_progress",
                 "summary": str(group.get("summary", "")),
                 "reason": str(group.get("reason", "")),
                 "as_of": as_of,
+                "capability_ids": capability_ids,
+                "depends_on": [str(cap_id) for cap_id in group.get("depends_on", []) if isinstance(cap_id, str)],
+                "satisfies": [str(cap_id) for cap_id in group.get("satisfies", capability_ids) if isinstance(cap_id, str)],
+                "milestone_id": str(group.get("milestone_id")) if isinstance(group.get("milestone_id"), str) else None,
+                "sprint_id": str(group.get("sprint_id")) if isinstance(group.get("sprint_id"), str) else None,
             }
         )
     return {"items": items}
@@ -74,12 +80,16 @@ def _build_group_items(manifest: dict[str, Any], key: str, as_of: str) -> dict[s
         items.append(
             {
                 "id": str(group["id"]),
+                "stable_id": str(group.get("stable_id", group["id"])),
                 "name": str(group["name"]),
                 "status": status,
                 "active": bool(group.get("active", status == "in_progress")),
                 "summary": str(group.get("summary", "")),
                 "reason": str(group.get("reason", "")),
                 "as_of": as_of,
+                "depends_on": [str(item) for item in group.get("depends_on", []) if isinstance(item, str)],
+                "milestone_id": str(group.get("milestone_id")) if isinstance(group.get("milestone_id"), str) else None,
+                "sprint_id": str(group.get("sprint_id")) if isinstance(group.get("sprint_id"), str) else None,
             }
         )
     return {"items": items}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import os
 import re
 import subprocess
 import sys
@@ -73,6 +74,7 @@ def _validate_status_report_governed_paths(manifest: dict[str, Any]) -> list[Iss
         check=False,
         capture_output=True,
         text=True,
+        env={**os.environ, "STATUS_SHOW": "all"},
     )
     if result.returncode != 0:
         return [Issue("scripts/dev/status_report.py", f"status-json failed during sync check: {result.stderr.strip() or result.stdout.strip()}")]
@@ -127,6 +129,11 @@ NON_CANONICAL_STATUS_INPUTS = (
     Path("docs/status/objectives.json"),
     ROADMAP_PATH,
     SPRINT_PLAN_PATH,
+)
+STATUS_VIEW_FILES = (
+    Path("docs/status/objectives.json"),
+    Path("docs/status/milestones.json"),
+    Path("docs/status/sprints.json"),
 )
 PROHIBITED_SOURCE_PATTERN = re.compile(
     r"(?i)(docs/status/(project|milestones|sprints|objectives)\.json|ROADMAP\.md|docs/sprint_plan_5x\.md).{0,120}(authoritative|source[- ]of[- ]truth)"
@@ -212,6 +219,182 @@ def _validate_noncanonical_inputs_not_authoritative() -> list[Issue]:
     return issues
 
 
+def _collect_manifest_ids(manifest: dict[str, Any], key: str) -> set[str]:
+    return {
+        item["id"]
+        for item in manifest.get(key, [])
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+
+
+def _validate_single_authoritative_source(manifest: dict[str, Any]) -> list[Issue]:
+    issues: list[Issue] = []
+    source = manifest.get("canonical_source_of_truth")
+    if not isinstance(source, dict):
+        return issues
+
+    extras = source.get("authoritative_sources")
+    if isinstance(extras, list) and len([item for item in extras if isinstance(item, str)]) > 1:
+        issues.append(Issue(str(DOD_MANIFEST_PATH), "multiple authoritative sources configured in canonical_source_of_truth.authoritative_sources"))
+    return issues
+
+
+def _validate_scope_sync_across_manifest_docs_and_status(manifest: dict[str, Any]) -> list[Issue]:
+    issues: list[Issue] = []
+    objective_ids = _collect_manifest_ids(manifest, "capability_groups")
+    milestone_ids = _collect_manifest_ids(manifest, "milestone_groups")
+    sprint_ids = _collect_manifest_ids(manifest, "sprint_groups")
+
+    roadmap = ROADMAP_PATH.read_text(encoding="utf-8") if ROADMAP_PATH.exists() else ""
+    sprint_plan = SPRINT_PLAN_PATH.read_text(encoding="utf-8") if SPRINT_PLAN_PATH.exists() else ""
+    docs_text = f"{roadmap}\n{sprint_plan}"
+
+    for objective_id in sorted(objective_ids):
+        if objective_id not in docs_text:
+            issues.append(Issue(str(ROADMAP_PATH), f"governed objective scope drift: '{objective_id}' missing from roadmap/sprint docs"))
+    for milestone_id in sorted(milestone_ids):
+        if milestone_id not in docs_text:
+            issues.append(Issue(str(ROADMAP_PATH), f"governed milestone scope drift: '{milestone_id}' missing from roadmap/sprint docs"))
+    for sprint_id in sorted(sprint_ids):
+        if sprint_id not in docs_text:
+            issues.append(Issue(str(SPRINT_PLAN_PATH), f"governed sprint scope drift: '{sprint_id}' missing from roadmap/sprint docs"))
+
+    result = subprocess.run(
+        [sys.executable, "scripts/dev/status_report.py", "status-json"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "STATUS_SHOW": "all"},
+    )
+    if result.returncode != 0:
+        issues.append(Issue("scripts/dev/status_report.py", f"status-json failed during scope sync check: {result.stderr.strip() or result.stdout.strip()}"))
+        return issues
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        issues.append(Issue("scripts/dev/status_report.py", f"status-json emitted invalid JSON: {exc.msg}"))
+        return issues
+
+    rendered_objective_ids = {item.get("id") for item in payload.get("objectives", []) if isinstance(item, dict) and isinstance(item.get("id"), str)}
+    rendered_milestone_ids = {item.get("id") for item in payload.get("milestones", []) if isinstance(item, dict) and isinstance(item.get("id"), str)}
+    rendered_sprint_ids = {item.get("id") for item in payload.get("sprints", []) if isinstance(item, dict) and isinstance(item.get("id"), str)}
+
+    if rendered_objective_ids != objective_ids:
+        issues.append(Issue("scripts/dev/status_report.py", "governed objective scope differs between manifest and status renderer"))
+    if rendered_milestone_ids != milestone_ids:
+        issues.append(Issue("scripts/dev/status_report.py", "governed milestone scope differs between manifest and status renderer"))
+    if rendered_sprint_ids != sprint_ids:
+        issues.append(Issue("scripts/dev/status_report.py", "governed sprint scope differs between manifest and status renderer"))
+    return issues
+
+
+def _validate_unknown_status_references(manifest: dict[str, Any]) -> list[Issue]:
+    issues: list[Issue] = []
+    capability_ids = _collect_manifest_ids(manifest, "capabilities")
+    gate_ids = _collect_manifest_ids(manifest, "quality_gates")
+    milestone_ids = _collect_manifest_ids(manifest, "milestone_groups")
+    sprint_ids = _collect_manifest_ids(manifest, "sprint_groups")
+
+    result = subprocess.run(
+        [sys.executable, "scripts/dev/status_report.py", "status-json"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "STATUS_SHOW": "all"},
+    )
+    if result.returncode != 0:
+        return [Issue("scripts/dev/status_report.py", f"status-json failed during reference check: {result.stderr.strip() or result.stdout.strip()}")]
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        return [Issue("scripts/dev/status_report.py", f"status-json emitted invalid JSON: {exc.msg}")]
+
+    for gate in payload.get("quality_gates", []):
+        if not isinstance(gate, dict) or not isinstance(gate.get("id"), str):
+            continue
+        if gate["id"] not in gate_ids:
+            issues.append(Issue("scripts/dev/status_report.py", f"status references unknown gate '{gate['id']}'"))
+
+    for objective in payload.get("objectives", []):
+        if not isinstance(objective, dict):
+            continue
+        objective_id = objective.get("id") if isinstance(objective.get("id"), str) else "<unknown>"
+        for field in ("capability_ids", "depends_on", "satisfies"):
+            values = objective.get(field)
+            if not isinstance(values, list):
+                continue
+            for capability_id in values:
+                if isinstance(capability_id, str) and capability_id not in capability_ids:
+                    issues.append(Issue("scripts/dev/status_report.py", f"objective '{objective_id}' {field} references unknown capability '{capability_id}'"))
+        milestone_id = objective.get("milestone_id")
+        if isinstance(milestone_id, str) and milestone_id not in milestone_ids:
+            issues.append(Issue("scripts/dev/status_report.py", f"objective '{objective_id}' references unknown milestone '{milestone_id}'"))
+        sprint_id = objective.get("sprint_id")
+        if isinstance(sprint_id, str) and sprint_id not in sprint_ids:
+            issues.append(Issue("scripts/dev/status_report.py", f"objective '{objective_id}' references unknown sprint '{sprint_id}'"))
+    return issues
+
+
+def _validate_relational_integrity(manifest: dict[str, Any]) -> list[Issue]:
+    issues: list[Issue] = []
+    objective_ids = _collect_manifest_ids(manifest, "capability_groups")
+    milestone_ids = _collect_manifest_ids(manifest, "milestone_groups")
+    sprint_ids = _collect_manifest_ids(manifest, "sprint_groups")
+    capability_ids = _collect_manifest_ids(manifest, "capabilities")
+
+    if len(objective_ids) != len([item for item in manifest.get("capability_groups", []) if isinstance(item, dict)]):
+        issues.append(Issue(str(DOD_MANIFEST_PATH), "capability_groups contain records with missing IDs"))
+    if len(milestone_ids) != len([item for item in manifest.get("milestone_groups", []) if isinstance(item, dict)]):
+        issues.append(Issue(str(DOD_MANIFEST_PATH), "milestone_groups contain records with missing IDs"))
+    if len(sprint_ids) != len([item for item in manifest.get("sprint_groups", []) if isinstance(item, dict)]):
+        issues.append(Issue(str(DOD_MANIFEST_PATH), "sprint_groups contain records with missing IDs"))
+
+    linked_milestones: set[str] = set()
+    linked_sprints: set[str] = set()
+    for group in manifest.get("capability_groups", []):
+        if not isinstance(group, dict) or not isinstance(group.get("id"), str):
+            continue
+        for capability_id in group.get("capability_ids", []):
+            if isinstance(capability_id, str) and capability_id not in capability_ids:
+                issues.append(Issue(str(DOD_MANIFEST_PATH), f"objective '{group['id']}' references unknown capability '{capability_id}'"))
+        milestone_id = group.get("milestone_id")
+        if isinstance(milestone_id, str):
+            linked_milestones.add(milestone_id)
+            if milestone_id not in milestone_ids:
+                issues.append(Issue(str(DOD_MANIFEST_PATH), f"objective '{group['id']}' links to unknown milestone '{milestone_id}'"))
+        sprint_id = group.get("sprint_id")
+        if isinstance(sprint_id, str):
+            linked_sprints.add(sprint_id)
+            if sprint_id not in sprint_ids:
+                issues.append(Issue(str(DOD_MANIFEST_PATH), f"objective '{group['id']}' links to unknown sprint '{sprint_id}'"))
+
+    for milestone_id in sorted(milestone_ids - linked_milestones):
+        issues.append(Issue(str(DOD_MANIFEST_PATH), f"orphan milestone record '{milestone_id}' has no linked objectives"))
+    for sprint_id in sorted(sprint_ids - linked_sprints):
+        issues.append(Issue(str(DOD_MANIFEST_PATH), f"orphan sprint record '{sprint_id}' has no linked objectives"))
+
+    for status_view in STATUS_VIEW_FILES:
+        if not status_view.exists():
+            issues.append(Issue(str(status_view), "generated status view is missing"))
+            continue
+        try:
+            doc = _load_json(status_view)
+        except json.JSONDecodeError as exc:
+            issues.append(Issue(str(status_view), f"invalid JSON: {exc.msg}"))
+            continue
+        items = doc.get("items") if isinstance(doc, dict) else None
+        if not isinstance(items, list):
+            issues.append(Issue(str(status_view), "expected object with an 'items' array"))
+            continue
+        for idx, item in enumerate(items):
+            if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+                issues.append(Issue(str(status_view), f"items[{idx}] missing id"))
+
+    return issues
+
+
 def _validate_narrative_docs_reference_active_objectives(manifest: dict[str, Any]) -> list[Issue]:
     issues: list[Issue] = []
     roadmap = ROADMAP_PATH.read_text(encoding="utf-8") if ROADMAP_PATH.exists() else ""
@@ -250,10 +433,14 @@ def main() -> int:
 
         if isinstance(manifest, dict) and manifest:
             issues.extend(_validate_manifest_canonical_source(manifest))
+            issues.extend(_validate_single_authoritative_source(manifest))
             _compute_manifest_statuses(manifest)
             issues.extend(_validate_narrative_docs_reference_active_objectives(manifest))
             issues.extend(_validate_governed_paths_sync(manifest))
             issues.extend(_validate_status_report_governed_paths(manifest))
+            issues.extend(_validate_scope_sync_across_manifest_docs_and_status(manifest))
+            issues.extend(_validate_unknown_status_references(manifest))
+            issues.extend(_validate_relational_integrity(manifest))
 
     issues.extend(_validate_truth_contract_doc())
     issues.extend(_validate_noncanonical_inputs_not_authoritative())

@@ -28,7 +28,7 @@ DMAIC change-type routing (required files, validators, evidence locations, and m
 - [ ] **Sprint handoff minimum artifacts attached:** Sprint-close report includes exit table, open-risk register, and next-sprint preload list.
 - [ ] **Python version-contract drift blocked:** `pyproject.toml` `[project].requires-python`, README requirements text, and CI workflow `setup-python` versions must match in the same PR; any drift is a merge blocker for infra/docs changes.
 - [ ] **Tooling/config PR parity evidence attached:** For any tooling or CI/configuration change, include a checked PR checklist entry for **"pre-commit parity verified"** and paste command evidence from `python .github/scripts/check_precommit_parity.py` and `pre-commit run --all-files -v`.
-- [ ] **Status/program sync gate green:** `make status-sync-check` passes (status schema, objective/milestone/sprint linkage, DoD rollup alignment, and roadmap/sprint-plan references for active objectives).
+- [ ] **Status/program sync gate green:** `make program-sync` passes (status schema, objective/milestone/sprint linkage, DoD rollup alignment, and roadmap/sprint-plan references for active objectives).
 
 ### Weekly main health review checklist
 

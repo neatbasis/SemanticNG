@@ -71,7 +71,7 @@
           "timeout_seconds": 60
         },
         {
-          "command": "python scripts/ci/validate_program_sync.py",
+          "command": "make program-sync",
           "timeout_seconds": 20
         },
         {

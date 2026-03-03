@@ -8,6 +8,8 @@ Cross-sprint execution sequencing, capability dependency leverage, and maturity-
 
 Governance artifacts are updated only after passing evidence exists (CI artifact/report links first, then roadmap/manifest/contract-map synchronization).
 
+Governed milestone IDs (canonical manifest scope): `state-renorm-milestone`, `core-rollout-readiness`.
+
 ## Five-sprint objective alignment (execution brief)
 
 1. **Sprint 1:** one high-impact `capability_invocation_governance` boundary slice with halt semantics + evidence reference.

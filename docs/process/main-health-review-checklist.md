@@ -29,10 +29,10 @@ Run this review weekly (recommended: Monday) and link the result in release/gove
 
 ## Program sync control loop
 
-- [ ] Run `make status-sync-check` and attach pass/fail output to weekly health notes.
+- [ ] Run `make program-sync` and attach pass/fail output to weekly health notes.
 - [ ] Confirm status schema validity for `docs/status/{project,milestones,sprints,objectives}.json`.
 - [ ] Confirm relational integrity across objective `depends_on`, `milestone_id`, and `sprint_id` links.
 - [ ] Confirm DoD aggregate alignment between `docs/dod_manifest.json` rollups and status document states.
 - [ ] Confirm every active objective ID is referenced in both `ROADMAP.md` and `docs/sprint_plan_5x.md`.
-- [ ] If drift is detected, fix status + planning docs in the same PR and rerun `make status-sync-check` before merge.
+- [ ] If drift is detected, fix status + planning docs in the same PR and rerun `make program-sync` before merge.
 

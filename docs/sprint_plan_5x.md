@@ -12,6 +12,8 @@ Canonical references:
 - Completion-layer criteria: `docs/definition_of_complete.md`.
 - Coverage threshold governance policy: `docs/release_checklist.md` (Coverage threshold governance policy section).
 
+Governed sprint IDs (canonical manifest scope): `sprint-5`, `sprint-next`.
+
 ## Sprint-close artifact evidence requirement
 
 - [ ] Sprint-close checklist includes coverage artifact evidence for the closing sprint (link to CI artifact or attached report summary), including enough detail to validate governance decisions.

@@ -6,7 +6,7 @@ The **only authoritative input** for capability state, objective status, milesto
 
 - `docs/dod_manifest.json`
 
-Status tooling (`make status`, `make status-json`, `make status-check`, and `make status-sync-check`) must compute status from this manifest only.
+Status tooling (`make status`, `make status-json`, and `make status-check`) is descriptive and must compute status from this manifest only. Hard enforcement is centralized in `make program-sync`.
 
 ## Mode semantics for `make status`
 

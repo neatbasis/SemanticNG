@@ -161,6 +161,26 @@ make qa-ci              # No-regression budget + hook parity + coverage + full m
 make qa-local
 ```
 
+
+## Projection read-model report (episode/scope)
+
+Use the append-only log projection report to reconstruct decision trace details for one episode/scope pair:
+
+```bash
+python scripts/dev/read_model_report.py \
+  --episode-log artifacts/episodes.jsonl \
+  --prediction-log artifacts/predictions.jsonl \
+  --episode-id <episode_id> \
+  --scope <scope_key>
+```
+
+The JSON output includes:
+- `prediction_used`
+- `invariants_evaluated`
+- `policy_decision`
+- `halt_continue_rationale`
+- `evidence_refs`
+
 ## CI failure triage
 
 For local triage parity with CI-style pre-commit failures, run:

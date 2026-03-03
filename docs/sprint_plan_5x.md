@@ -47,8 +47,8 @@ Governed sprint IDs (canonical manifest scope): `sprint-5`, `sprint-next`.
 
 ## Current promotion-state ledger (manifest synchronized)
 
-- `capability_invocation_governance`: `in_progress` (acceptance command pack is active in CI; retain `operational` contract maturity until completion evidence closes).
-- `repair_aware_projection_evolution`: `planned` (sequenced after governance reaches `done`; no independent promotion is valid yet).
+- `capability_invocation_governance`: `done` (acceptance command pack evidence is linked in `docs/dod_manifest.json`; sustain non-regression coverage in CI).
+- `repair_aware_projection_evolution`: `done` (promotion dependencies and acceptance command packs are closed with manifest evidence; continue deterministic replay/repair non-regression checks).
 
 ## Sprint 1 — Governance boundary slice (halt semantics + evidence ref)
 

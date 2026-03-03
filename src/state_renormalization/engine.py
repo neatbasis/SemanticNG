@@ -44,6 +44,7 @@ from state_renormalization.contracts import (
     CapabilityPolicyHaltPayload,
     CaptureOutcome,
     CaptureStatus,
+    ClarificationSlotId,
     CorrectionCostAttribution,
     DecisionEffect,
     Episode,
@@ -190,6 +191,52 @@ class GateInvariantEvaluation:
     phase: str
     outcome: InvariantOutcome
 
+
+
+
+_REMINDER_TYPED_SLOTS: tuple[str, ...] = (
+    ClarificationSlotId.REMINDER_SCHEDULE.value,
+    ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value,
+    ClarificationSlotId.REMINDER_TARGET_ENTITY.value,
+)
+
+
+def _compose_pending_obligation_request(pending_about: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(pending_about, Mapping):
+        return None
+    required_slots = pending_about.get("required_slots")
+    if not isinstance(required_slots, list):
+        return None
+
+    action_options: dict[str, list[str]] = {}
+    if ClarificationSlotId.REMINDER_SCHEDULE.value in required_slots:
+        action_options[ClarificationSlotId.REMINDER_SCHEDULE.value] = [
+            "in 10 minutes",
+            "later today",
+            "tomorrow",
+            "custom",
+        ]
+    if ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value in required_slots:
+        action_options[ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value] = [
+            "manual",
+            "auto",
+            "until_fresh",
+        ]
+
+    return {
+        "required_slots": list(required_slots),
+        "action_options": action_options,
+    }
+
+
+def _extract_typed_slot_values(
+    *,
+    ask_slots: Mapping[str, Any] | None,
+    required_slots: Sequence[str],
+) -> dict[str, Any]:
+    if not isinstance(ask_slots, Mapping):
+        return {}
+    return {slot_id: ask_slots[slot_id] for slot_id in required_slots if slot_id in ask_slots}
 
 class InterventionLifecycleHook(Protocol):
     def __call__(
@@ -2594,16 +2641,36 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
             )
 
             if chosen is not None:
-                belief.pending_about = {
+                pending_about: dict[str, Any] = {
                     "kind": chosen.about.kind.value,
                     "key": chosen.about.key,
                 }
                 if chosen.about.span is not None:
-                    belief.pending_about["span"] = {
+                    pending_about["span"] = {
                         "text": chosen.about.span.text,
                         "start": chosen.about.span.start,
                         "end": chosen.about.span.end,
                     }
+
+                required_slots = [
+                    ask.bind.key
+                    for ask in chosen.ask
+                    if ask.bind is not None and isinstance(ask.bind.key, str)
+                ]
+                if chosen.about.key == "reminder.intent" and not required_slots:
+                    required_slots = list(_REMINDER_TYPED_SLOTS)
+                if required_slots:
+                    pending_about["required_slots"] = required_slots
+
+                typed_values = _extract_typed_slot_values(
+                    ask_slots=ep.ask.slots,
+                    required_slots=required_slots,
+                )
+                if typed_values:
+                    pending_about["typed_slot_values"] = typed_values
+                    belief.bindings.update(typed_values)
+
+                belief.pending_about = pending_about
 
                 # Prefer the first ClarifyingQuestion.q if present
                 q: str | None = None
@@ -2647,6 +2714,12 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
             "pending_about": _to_dict(belief.pending_about),
             "pending_question": belief.pending_question,
             "pending_attempts": belief.pending_attempts,
+            "ask_outbox_request": _compose_pending_obligation_request(belief.pending_about),
+            "typed_slot_values": _to_dict(
+                (belief.pending_about or {}).get("typed_slot_values")
+                if isinstance(belief.pending_about, Mapping)
+                else None
+            ),
         },
     )
 

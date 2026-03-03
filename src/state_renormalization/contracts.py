@@ -161,6 +161,12 @@ class AskFormat(StrEnum):
     MULTICHOICE = "multichoice"
 
 
+class ClarificationSlotId(StrEnum):
+    REMINDER_SCHEDULE = "reminder.schedule"
+    REMINDER_COMPLETION_CONDITION = "reminder.completion_condition"
+    REMINDER_TARGET_ENTITY = "reminder.target_entity"
+
+
 class BindSpec(BaseModel):
     """
     Where the clarification should land in belief.bindings / pending_about.

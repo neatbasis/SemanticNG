@@ -323,3 +323,86 @@ def test_derive_projection_analytics_from_lineage_tracks_human_request_views() -
     assert set(snapshot.outstanding_human_requests.keys()) == {"ask:open"}
     assert set(snapshot.resolved_human_requests.keys()) == {"ask:resolved"}
     assert snapshot.request_outcome_linkage == {"ask:resolved": "resume"}
+
+
+def test_replay_projection_rebuilds_mission_lifecycle_state_with_lineage_traceability(
+    tmp_path: Path,
+) -> None:
+    mission_log = tmp_path / "missions.jsonl"
+
+    mission_base = {
+        "mission_id": "mission:1",
+        "mission_identity": "follow-up weather station",
+        "kind": "monitoring",
+        "entity_ref": {"kind": "station", "ref": "station:west"},
+        "schedule_policy": {
+            "freshness_ttl_s": 600,
+            "min_prompt_interval_s": 60,
+            "max_prompt_interval_s": 300,
+        },
+        "completion_mode": "until_fresh",
+        "next_prompt_at": "2026-02-15T00:05:00+00:00",
+        "lineage_refs": [
+            {"relation": "source_episode", "mission_id": "mission:seed", "event_ref": "episodes.jsonl@3"}
+        ],
+        "created_at_iso": "2026-02-15T00:00:00+00:00",
+    }
+
+    append_jsonl(
+        mission_log,
+        {
+            "event_kind": "mission_created",
+            "mission": {
+                **mission_base,
+                "status": "active",
+                "updated_at_iso": "2026-02-15T00:00:00+00:00",
+            },
+        },
+    )
+    append_jsonl(
+        mission_log,
+        {
+            "event_kind": "mission_deferred",
+            "mission": {
+                **mission_base,
+                "status": "deferred",
+                "next_prompt_at": "2026-02-15T00:20:00+00:00",
+                "updated_at_iso": "2026-02-15T00:10:00+00:00",
+                "lineage_refs": [
+                    {
+                        "relation": "deferred_from",
+                        "mission_id": "mission:1",
+                        "event_ref": "missions.jsonl@1",
+                    }
+                ],
+            },
+        },
+    )
+    append_jsonl(
+        mission_log,
+        {
+            "event_kind": "mission_completed",
+            "mission": {
+                **mission_base,
+                "status": "completed",
+                "next_prompt_at": None,
+                "updated_at_iso": "2026-02-15T00:21:00+00:00",
+                "lineage_refs": [
+                    {
+                        "relation": "completed_from",
+                        "mission_id": "mission:1",
+                        "event_ref": "missions.jsonl@2",
+                    }
+                ],
+            },
+        },
+    )
+
+    replay = replay_projection_analytics(mission_log)
+
+    assert replay.records_processed == 3
+    assert replay.projection_state.active_missions == {}
+    assert replay.projection_state.deferred_missions == {}
+    completed = replay.projection_state.completed_missions["mission:1"]
+    assert completed.status.value == "completed"
+    assert completed.lineage_refs[0].event_ref == "missions.jsonl@2"

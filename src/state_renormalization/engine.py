@@ -62,6 +62,9 @@ from state_renormalization.contracts import (
     ObservationFreshnessPolicyContract,
     ObservationType,
     ObserverFrame,
+    MissionContract,
+    MissionLifecycleEvent,
+    MissionStatus,
     PredictionOutcome,
     PredictionRecord,
     ProjectionAnalyticsSnapshot,
@@ -1699,9 +1702,44 @@ def _project_current_at(
     return ProjectionState(
         current_predictions=current,
         prediction_history=history,
+        active_missions=dict(projection_state.active_missions),
+        deferred_missions=dict(projection_state.deferred_missions),
+        completed_missions=dict(projection_state.completed_missions),
         correction_metrics=dict(projection_state.correction_metrics),
         last_comparison_at_iso=projection_state.last_comparison_at_iso,
         updated_at_iso=updated_at_iso,
+    )
+
+
+def _project_mission_lifecycle(
+    projection_state: ProjectionState,
+    mission_event: MissionLifecycleEvent,
+) -> ProjectionState:
+    mission = mission_event.mission
+    active = dict(projection_state.active_missions)
+    deferred = dict(projection_state.deferred_missions)
+    completed = dict(projection_state.completed_missions)
+
+    active.pop(mission.mission_id, None)
+    deferred.pop(mission.mission_id, None)
+    completed.pop(mission.mission_id, None)
+
+    if mission.status == MissionStatus.ACTIVE:
+        active[mission.mission_id] = mission
+    elif mission.status == MissionStatus.DEFERRED:
+        deferred[mission.mission_id] = mission
+    elif mission.status == MissionStatus.COMPLETED:
+        completed[mission.mission_id] = mission
+
+    return ProjectionState(
+        current_predictions=dict(projection_state.current_predictions),
+        prediction_history=list(projection_state.prediction_history),
+        active_missions=active,
+        deferred_missions=deferred,
+        completed_missions=completed,
+        correction_metrics=dict(projection_state.correction_metrics),
+        last_comparison_at_iso=projection_state.last_comparison_at_iso,
+        updated_at_iso=mission.updated_at_iso,
     )
 
 
@@ -1767,6 +1805,12 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
                 seen_prediction_fingerprints.add(accepted_fingerprint)
                 projection = _apply_accepted_repair_event(projection, resolution_event=resolution)
                 records_processed += 1
+                continue
+
+        if kind in {"mission_created", "mission_deferred", "mission_completed"}:
+            mission_event = MissionLifecycleEvent.model_validate(raw)
+            projection = _project_mission_lifecycle(projection, mission_event)
+            records_processed += 1
 
     analytics = derive_projection_analytics_from_lineage(lineage_rows)
 
@@ -1827,6 +1871,9 @@ def derive_projection_analytics_from_lineage(
         "repair_decision",
         "ask_outbox_request",
         "ask_outbox_response",
+        "mission_created",
+        "mission_deferred",
+        "mission_completed",
     }
 
     for raw in records:

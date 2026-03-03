@@ -11,6 +11,7 @@ from pydantic import BaseModel, ValidationError
 
 from state_renormalization.contracts import (
     CapabilityAdapterGate,
+    ContextSnapshotArtifact,
     HaltPayloadValidationError,
     HaltRecord,
     MissionLifecycleEvent,
@@ -318,6 +319,22 @@ def append_mission_completed_event(
     return append_mission_lifecycle_event(event, adapter_gate=adapter_gate, path=path)
 
 
+def append_context_snapshot_event(
+    record: Any,
+    *,
+    adapter_gate: CapabilityAdapterGate,
+    path: PathLike = PREDICTIONS_LOG_PATH,
+) -> JsonObj:
+    _enforce_adapter_gate(action="append_context_snapshot_event", adapter_gate=adapter_gate)
+
+    payload = _to_jsonable(record)
+    if not isinstance(payload, dict):
+        raise ValueError("append_context_snapshot_event expects a dict-like payload")
+
+    snapshot = ContextSnapshotArtifact.model_validate(payload)
+    return append_prediction(path=path, record=snapshot.model_dump(mode="json"), adapter_gate=adapter_gate)
+
+
 def append_mission_lifecycle_event(
     record: Any,
     *,
@@ -373,6 +390,7 @@ def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
                 "mission_deferred",
                 "mission_completed",
                 "mission_prompted",
+                "context_snapshot",
             }:
                 yield raw
                 continue

@@ -49,3 +49,24 @@ def test_check_mode_passes_on_repository_state() -> None:
     result = _run_status("check", ROOT)
     assert result.returncode == 0
     assert json.loads(result.stdout) == {"issues": []}
+
+
+def test_json_mode_reports_quality_gates_with_offline_safe_statuses() -> None:
+    result = _run_status("json", ROOT)
+    payload = json.loads(result.stdout)
+    gates = payload["quality_gates"]
+    assert any(gate["display_name"].startswith("Quality Guardrails /") for gate in gates)
+    assert any(gate["id"].startswith("milestone_gate.") for gate in gates)
+    allowed_statuses = {"ready", "unknown", "pass", "fail"}
+    for gate in gates:
+        assert gate["classification"] in {"blocking", "measurement-only"}
+        assert gate["status"] in allowed_statuses
+        assert gate["scope"].startswith("always-on/global") or gate["scope"].startswith("path-conditioned:")
+
+
+def test_summary_mode_prints_quality_gates_section() -> None:
+    result = _run_status("summary", ROOT)
+    assert result.returncode == 0
+    assert "Quality Gates:" in result.stdout
+    assert "Quality Guardrails / no-regression-budget" in result.stdout
+    assert "promotion-governance-pokayoke" in result.stdout

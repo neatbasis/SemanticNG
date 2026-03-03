@@ -2,37 +2,29 @@
   "items": [
     {
       "id": "state-renorm-milestone",
+      "stable_id": "state-renorm-milestone",
       "name": "State Renormalization milestone gate",
       "status": "in_progress",
       "active": true,
       "summary": "Milestone governance remains active and enforced through docs/test parity controls.",
       "reason": "Execution evidence in this report is static; latest CI run evidence is not resolved offline.",
-      "as_of": "2026-03-02",
-      "capability_ids": [],
+      "as_of": "2026-03-03",
       "depends_on": [],
       "milestone_id": null,
-      "sprint_id": "sprint-next",
-      "dod_refs": [
-        "docs/status/objectives.json#capability_invocation_governance"
-      ]
+      "sprint_id": null
     },
     {
       "id": "core-rollout-readiness",
+      "stable_id": "core-rollout-readiness",
       "name": "src/core rollout readiness",
       "status": "planned",
       "active": false,
       "summary": "Deferred until current state-renormalization scope shows sustained no-drift evidence.",
       "reason": "Roadmap and architecture docs mark future, gated expansion.",
-      "as_of": "2026-03-02",
-      "capability_ids": [],
-      "depends_on": [
-        "capability_invocation_governance"
-      ],
+      "as_of": "2026-03-03",
+      "depends_on": [],
       "milestone_id": null,
-      "sprint_id": "sprint-next",
-      "dod_refs": [
-        "docs/status/objectives.json#repair_aware_projection_evolution"
-      ]
+      "sprint_id": null
     }
   ]
 }

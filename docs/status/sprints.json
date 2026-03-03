@@ -2,37 +2,29 @@
   "items": [
     {
       "id": "sprint-5",
+      "stable_id": "sprint-5",
       "name": "Sprint 5",
       "status": "done",
       "active": false,
       "summary": "Sprint 5 handoff is documented with exit checks and carry-over risks.",
       "reason": "See docs/sprint_handoffs/sprint-5-handoff.md for closure evidence.",
-      "as_of": "2026-03-02",
-      "capability_ids": [],
+      "as_of": "2026-03-03",
       "depends_on": [],
-      "milestone_id": "state-renorm-milestone",
-      "sprint_id": null,
-      "dod_refs": [
-        "docs/sprint_handoffs/sprint-5-handoff.md"
-      ]
+      "milestone_id": null,
+      "sprint_id": null
     },
     {
       "id": "sprint-next",
+      "stable_id": "sprint-next",
       "name": "Next sprint planning",
       "status": "in_progress",
       "active": true,
       "summary": "Planning and preload sequencing are active for the next objective slice.",
       "reason": "Current planning artifacts track pending objective transitions.",
-      "as_of": "2026-03-02",
-      "capability_ids": [],
-      "depends_on": [
-        "capability_invocation_governance"
-      ],
-      "milestone_id": "core-rollout-readiness",
-      "sprint_id": null,
-      "dod_refs": [
-        "docs/status/objectives.json#repair_aware_projection_evolution"
-      ]
+      "as_of": "2026-03-03",
+      "depends_on": [],
+      "milestone_id": null,
+      "sprint_id": null
     }
   ]
 }

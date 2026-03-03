@@ -70,3 +70,16 @@ def test_summary_mode_prints_quality_gates_section() -> None:
     assert "Quality Gates:" in result.stdout
     assert "Quality Guardrails / no-regression-budget" in result.stdout
     assert "promotion-governance-pokayoke" in result.stdout
+
+
+def test_json_mode_includes_relational_rollups_and_consistency_warnings() -> None:
+    result = _run_status("json", ROOT)
+    payload = json.loads(result.stdout)
+
+    rollups = payload["relational_rollups"]
+    assert set(rollups) == {"active", "in_progress", "done"}
+    done_rollups = rollups["done"]
+    assert any(row["capability_mapping"]["satisfies"] for row in done_rollups)
+    assert all("sprint_id" in row and "milestone_id" in row for row in done_rollups)
+
+    assert isinstance(payload["consistency_warnings"], list)

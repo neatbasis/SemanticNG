@@ -5,7 +5,7 @@
   "active": false,
   "summary": "Repository delivery remains active with ongoing governance and capability hardening work.",
   "reason": "Canonical source maintained in-repo for deterministic offline status reporting.",
-  "as_of": "2026-03-02",
+  "as_of": "2026-03-03",
   "waste_metrics": {
     "duplicate_logic_count": 0,
     "unused_code_delta": 0,
@@ -13,8 +13,8 @@
     "mypy_debt_delta": 0,
     "flaky_test_count": 0
   },
-  "generated_at": "2026-03-02T22:59:57Z",
-  "manifest_commit": "5d4554f5d7d8febd6159cd9b14f8cce0c0b90230",
+  "generated_at": "2026-03-03T00:10:29Z",
+  "manifest_commit": "573372ecb17009b7f930d4708b4edb694522e316",
   "generated_from": "docs/dod_manifest.json",
   "analytics": [
     {

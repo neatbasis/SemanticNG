@@ -169,6 +169,7 @@ def _manifest_collections(manifest: dict[str, Any], as_of: str) -> tuple[dict[st
         objectives.append(
             {
                 "id": group["id"],
+                "stable_id": str(group.get("stable_id", group["id"])),
                 "name": str(group.get("name", group["id"])),
                 "status": status,
                 "active": bool(group.get("active", status == "in_progress")),
@@ -176,6 +177,10 @@ def _manifest_collections(manifest: dict[str, Any], as_of: str) -> tuple[dict[st
                 "reason": str(group.get("reason", "")),
                 "as_of": as_of,
                 "capability_ids": capability_ids,
+                "depends_on": [cap_id for cap_id in group.get("depends_on", []) if isinstance(cap_id, str)],
+                "satisfies": [cap_id for cap_id in group.get("satisfies", capability_ids) if isinstance(cap_id, str)],
+                "milestone_id": group.get("milestone_id") if isinstance(group.get("milestone_id"), str) else None,
+                "sprint_id": group.get("sprint_id") if isinstance(group.get("sprint_id"), str) else None,
                 "dod_refs": [f"{DOD_MANIFEST_PATH.as_posix()}#capability_groups/{group['id']}"]
             }
         )
@@ -189,12 +194,16 @@ def _manifest_collections(manifest: dict[str, Any], as_of: str) -> tuple[dict[st
             rows.append(
                 {
                     "id": group["id"],
+                    "stable_id": str(group.get("stable_id", group["id"])),
                     "name": str(group.get("name", group["id"])),
                     "status": status,
                     "active": bool(group.get("active", status == "in_progress")),
                     "summary": str(group.get("summary", "")),
                     "reason": str(group.get("reason", "")),
                     "as_of": as_of,
+                    "depends_on": [item for item in group.get("depends_on", []) if isinstance(item, str)],
+                    "milestone_id": group.get("milestone_id") if isinstance(group.get("milestone_id"), str) else None,
+                    "sprint_id": group.get("sprint_id") if isinstance(group.get("sprint_id"), str) else None,
                     "dod_refs": [f"{DOD_MANIFEST_PATH.as_posix()}#{key}/{group['id']}"]
                 }
             )
@@ -224,6 +233,70 @@ def _manifest_collections(manifest: dict[str, Any], as_of: str) -> tuple[dict[st
         "analytics": list(project_template.get("analytics", [])),
     }
     return project, {"objectives": objectives, "milestones": milestones, "sprints": sprints}, issues
+
+
+def _objective_relational_rollups(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    rollups: dict[str, list[dict[str, Any]]] = {"active": [], "in_progress": [], "done": []}
+    sprint_by_id = {item["id"]: item for item in payload.get("sprints", []) if isinstance(item, dict) and isinstance(item.get("id"), str)}
+    milestone_by_id = {item["id"]: item for item in payload.get("milestones", []) if isinstance(item, dict) and isinstance(item.get("id"), str)}
+
+    for objective in payload.get("objectives", []):
+        if not isinstance(objective, dict):
+            continue
+        bucket = "done" if objective.get("status") == "done" else "in_progress" if objective.get("status") == "in_progress" else "active" if objective.get("active") else "done"
+        sprint_id = objective.get("sprint_id")
+        milestone_id = objective.get("milestone_id")
+        rollups[bucket].append(
+            {
+                "objective_id": objective.get("id"),
+                "objective_name": objective.get("name"),
+                "status": objective.get("status"),
+                "sprint_id": sprint_id,
+                "sprint_name": sprint_by_id.get(sprint_id, {}).get("name") if isinstance(sprint_id, str) else None,
+                "milestone_id": milestone_id,
+                "milestone_name": milestone_by_id.get(milestone_id, {}).get("name") if isinstance(milestone_id, str) else None,
+                "capability_mapping": {
+                    "depends_on": [item for item in objective.get("depends_on", []) if isinstance(item, str)],
+                    "satisfies": [item for item in objective.get("satisfies", []) if isinstance(item, str)],
+                },
+            }
+        )
+    return rollups
+
+
+def _consistency_warnings(payload: dict[str, Any]) -> list[str]:
+    warnings: list[str] = []
+    active_sprint_ids = {
+        item["id"] for item in payload.get("sprints", []) if isinstance(item, dict) and item.get("active") is True and isinstance(item.get("id"), str)
+    }
+
+    objectives = [item for item in payload.get("objectives", []) if isinstance(item, dict)]
+    for item in objectives:
+        if item.get("active") is not True:
+            continue
+        sprint_id = item.get("sprint_id")
+        if isinstance(sprint_id, str) and sprint_id not in active_sprint_ids:
+            warnings.append(f"active objective '{item.get('id')}' is not linked to an active sprint")
+
+    objectives_by_sprint: dict[str, int] = {}
+    for item in objectives:
+        sprint_id = item.get("sprint_id")
+        if isinstance(sprint_id, str):
+            objectives_by_sprint[sprint_id] = objectives_by_sprint.get(sprint_id, 0) + 1
+    for sprint in payload.get("sprints", []):
+        if not isinstance(sprint, dict) or sprint.get("active") is not True:
+            continue
+        sprint_id = sprint.get("id")
+        if isinstance(sprint_id, str) and objectives_by_sprint.get(sprint_id, 0) == 0:
+            warnings.append(f"active sprint '{sprint_id}' has zero objectives")
+
+    for item in objectives:
+        if item.get("status") != "done":
+            continue
+        satisfies = item.get("satisfies") if isinstance(item.get("satisfies"), list) else []
+        if not satisfies:
+            warnings.append(f"done objective '{item.get('id')}' is missing DoD capability mapping")
+    return warnings
 
 
 def _build_dod_summary(manifest: dict[str, Any]) -> dict[str, Any]:
@@ -318,11 +391,16 @@ def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]
     _, project_issues = project, validate_project_document(Path("docs/dod_manifest.json::project_status"), project)
     issues.extend(project_issues)
 
+    validated_collections: dict[str, list[dict[str, Any]]] = {}
     for label in ("milestones", "sprints", "objectives"):
         doc = {"items": collections[label]}
         validated, validation_issues = validate_item_collection_document(Path(f"docs/dod_manifest.json::{label}"), doc)
         issues.extend(validation_issues)
+        validated_collections[label] = validated
         payload[label] = _filter_items(validated, status_show)
+
+    payload["relational_rollups"] = _objective_relational_rollups(validated_collections)
+    payload["consistency_warnings"] = _consistency_warnings(validated_collections)
 
     return payload, issues
 
@@ -363,6 +441,33 @@ def emit_human_summary(payload: dict[str, Any], validation_issues: list[Issue]) 
         print("\nValidation warnings:")
         for issue in validation_issues:
             print(f"- {issue.path}: {issue.message}")
+    relational_rollups = payload.get("relational_rollups", {})
+    print("\nObjective Relational Rollups:")
+    for key in ("active", "in_progress", "done"):
+        print(f"{key}:")
+        rows = relational_rollups.get(key, []) if isinstance(relational_rollups, dict) else []
+        if not rows:
+            print("- none")
+            continue
+        for row in rows:
+            mapping = row.get("capability_mapping", {})
+            depends_on = mapping.get("depends_on", []) if isinstance(mapping, dict) else []
+            satisfies = mapping.get("satisfies", []) if isinstance(mapping, dict) else []
+            print(
+                f"- {row.get('objective_name')} ({row.get('objective_id')})"
+                f" | sprint={row.get('sprint_id')}"
+                f" | milestone={row.get('milestone_id')}"
+                f" | depends_on={depends_on}"
+                f" | satisfies={satisfies}"
+            )
+
+    consistency_warnings = payload.get("consistency_warnings", [])
+    print("\nConsistency warnings:")
+    if not consistency_warnings:
+        print("- none")
+    else:
+        for warning in consistency_warnings:
+            print(f"- {warning}")
 
 
 def emit_json_payload(payload: dict[str, Any]) -> None:

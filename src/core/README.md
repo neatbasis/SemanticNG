@@ -83,15 +83,15 @@ See local docs for formal definitions and admissibility criteria.
 Levels are formally defined in [CAPABILITY_LEVELS.md](./CAPABILITY_LEVELS.md). Summary:
 
 - **L0 — Declared:** constraint docs exist and are ordered.
-- **L1 — Enforced surface:** boundary export/import semantics are constrained.
-- **L2 — Governed evolution:** edits preserve invariants and canonical commutation.
+- **L1 — Enforced boundary:** package API stays minimal while internal deterministic core modules are allowed.
+- **L2 — Governed deterministic evolution:** edits preserve invariants and maintain pure transition/policy semantics without I/O or adapter coupling.
 - **L3 — Audit-ready:** violations are classifiable and release-blocking.
 
 ### Level Coverage (Current)
 
 | Module / Surface | L0 | L1 | L2 | L3 | Notes |
 |---|---|---|---|---|---|
-| `src/core/__init__.py` | ✅ | ✅ | ✅ | ✅ | Enforces minimal export and version provenance contract. |
+| `src/core/__init__.py` (+ internal pure core modules) | ✅ | ✅ | ✅ | ✅ | Public API stays minimal; internal deterministic contracts/transitions/policies are allowed with no I/O or adapter coupling. |
 | Constraint stack docs | ✅ | ✅ | ✅ | ⏳ | Classification is explicit; automated release gating can keep expanding. |
 
 ---

@@ -3,9 +3,9 @@
 Let `M_core` be the `src/core` module boundary.
 
 ## Symbolic constraints
-- **I1 (Surface minimality):** `Exports(M_core) = {__version__}`.
+- **I1 (Public surface minimality):** `PublicExports(M_core) = {__version__}` while internal core modules for deterministic domain contracts/transitions/policies are permitted.
 - **I2 (Version provenance):** `__version__` in `core` must be imported from `semanticng._version`.
-- **I3 (No orchestration):** `core` defines no feature workflow semantics; only foundational boundary contract.
+- **I3 (No integration coupling):** `core` may define deterministic domain state-transition and policy evaluation logic, but must not perform I/O or import adapter/integration modules.
 
 ## Failure semantics
 - Violation of **I1** or **I2** is a **contract break** (reject release/build).

@@ -243,6 +243,48 @@ def _build_dod_summary(manifest: dict[str, Any]) -> dict[str, Any]:
     return summary
 
 
+def _manifest_quality_gates(manifest: dict[str, Any]) -> list[dict[str, str]]:
+    gates: list[dict[str, str]] = []
+    raw_gates = manifest.get("quality_gates", [])
+    if not isinstance(raw_gates, list):
+        return gates
+
+    for gate in raw_gates:
+        if not isinstance(gate, dict):
+            continue
+        gate_id = gate.get("id")
+        display_name = gate.get("display_name")
+        classification = gate.get("classification")
+        scope = gate.get("scope")
+        if not all(isinstance(item, str) and item for item in (gate_id, display_name, classification, scope)):
+            continue
+
+        evidence = gate.get("ci_evidence") if isinstance(gate.get("ci_evidence"), dict) else {}
+        evidence_status = evidence.get("status")
+        has_evidence_link = isinstance(evidence.get("link"), str) and bool(evidence["link"])
+
+        status = "unknown"
+        status_reason = "CI not resolved offline"
+        if isinstance(evidence_status, str) and has_evidence_link and evidence_status in {"pass", "fail"}:
+            status = evidence_status
+            status_reason = "resolved from canonical CI evidence"
+        elif bool(gate.get("ready", False)):
+            status = "ready"
+            status_reason = "ready in canonical manifest; CI not resolved offline"
+
+        gates.append(
+            {
+                "id": gate_id,
+                "display_name": display_name,
+                "classification": classification,
+                "scope": scope,
+                "status": status,
+                "status_reason": status_reason,
+            }
+        )
+    return gates
+
+
 def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]:
     issues: list[Issue] = []
     payload = _base_payload(status_show=status_show)
@@ -271,6 +313,7 @@ def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]
     issues.extend(collection_issues)
     payload["project"] = project
     payload["dod"] = _build_dod_summary(manifest)
+    payload["quality_gates"] = _manifest_quality_gates(manifest)
 
     _, project_issues = project, validate_project_document(Path("docs/dod_manifest.json::project_status"), project)
     issues.extend(project_issues)
@@ -306,6 +349,16 @@ def emit_human_summary(payload: dict[str, Any], validation_issues: list[Issue]) 
             refs = item.get("dod_refs", [])
             if refs:
                 print(f"  refs: {', '.join(refs)}")
+    quality_gates = payload.get("quality_gates", [])
+    print("\nQuality Gates:")
+    if not quality_gates:
+        print("- unknown: no quality gate inventory available")
+    for gate in quality_gates:
+        print(f"- {gate['id']} ({gate['display_name']})")
+        print(f"  classification: {gate['classification']}")
+        print(f"  scope: {gate['scope']}")
+        print(f"  status: {gate['status']}")
+        print(f"  reason: {gate['status_reason']}")
     if validation_issues:
         print("\nValidation warnings:")
         for issue in validation_issues:

@@ -418,5 +418,63 @@
       ".github/workflows/quality-guardrails.yml",
       ".github/actions/python-test-setup/action.yml"
     ]
-  }
+  },
+  "quality_gates": [
+    {
+      "id": "quality_guardrails.no_regression_budget",
+      "display_name": "Quality Guardrails / no-regression-budget",
+      "classification": "blocking",
+      "scope": "always-on/global",
+      "ready": true
+    },
+    {
+      "id": "quality_guardrails.baseline_lint_type",
+      "display_name": "Quality Guardrails / baseline-lint-type",
+      "classification": "blocking",
+      "scope": "always-on/global",
+      "ready": true
+    },
+    {
+      "id": "quality_guardrails.baseline_test_cov",
+      "display_name": "Quality Guardrails / baseline-test-cov",
+      "classification": "blocking",
+      "scope": "always-on/global",
+      "ready": true
+    },
+    {
+      "id": "quality_guardrails.full_type_surface",
+      "display_name": "Quality Guardrails / full-type-surface",
+      "classification": "blocking",
+      "scope": "always-on/global",
+      "ready": true
+    },
+    {
+      "id": "quality_guardrails.policy_measurement",
+      "display_name": "Quality Guardrails / policy-measurement",
+      "classification": "measurement-only",
+      "scope": "always-on/global",
+      "ready": true
+    },
+    {
+      "id": "milestone_gate.baseline_quality",
+      "display_name": "State Renormalization Milestone Gate / baseline-quality",
+      "classification": "blocking",
+      "scope": "path-conditioned: governed_paths.ci_triggers",
+      "ready": true
+    },
+    {
+      "id": "milestone_gate.milestone_governance",
+      "display_name": "State Renormalization Milestone Gate / milestone-governance",
+      "classification": "blocking",
+      "scope": "path-conditioned: governed_paths.ci_triggers",
+      "ready": true
+    },
+    {
+      "id": "milestone_gate.promotion_governance_pokayoke",
+      "display_name": "promotion-governance-pokayoke",
+      "classification": "blocking",
+      "scope": "path-conditioned: governed_paths.ci_triggers",
+      "ready": true
+    }
+  ]
 }

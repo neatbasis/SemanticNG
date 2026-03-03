@@ -124,12 +124,20 @@ def test_project_episode_scope_read_model_has_stable_top_level_shape(tmp_path: P
     assert report["policy_decision"]["decision_id"] == "dec:1"
     assert report["halt_continue_rationale"]["outcome"] == "halt"
     assert report["prediction_used"]["prediction_id"] == "pred:1"
+    assert report["answer_provenance"]["mode"] == "reconstructed"
     assert report["answer_provenance"]["temporal_invariant"] == {
         "invariant_id": "time_travel_answering.as_of.v1",
         "query_mode": "latest",
         "as_of_iso": None,
         "satisfied": True,
     }
+    assert report["answer_provenance"]["context_snapshot_ref"] == "missing:context_snapshot"
+    assert report["answer_provenance"]["missing_artifact_disclosures"] == [
+        {
+            "artifact_role": "context_snapshot",
+            "disclosure": "No persisted context_snapshot artifact found; answer was reconstructed without snapshot grounding.",
+        }
+    ]
 
 
 def test_project_episode_scope_read_model_json_is_deterministic(tmp_path: Path) -> None:
@@ -209,3 +217,21 @@ def test_project_episode_scope_read_model_as_of_fails_closed_on_future_artifact(
         assert "temporal constraints cannot be satisfied" in str(exc)
     else:
         raise AssertionError("expected as_of read-model projection to fail closed")
+
+
+def test_strict_replay_mode_fails_when_historical_output_artifact_is_absent(tmp_path: Path) -> None:
+    episode_log, prediction_log = _write_fixture_logs(tmp_path)
+
+    try:
+        project_episode_scope_read_model(
+            episode_log_path=episode_log,
+            prediction_log_path=prediction_log,
+            episode_id="ep:1",
+            scope="turn:1",
+            answer_mode="strict_replay",
+            historical_output_artifact_ref="predictions.jsonl@999",
+        )
+    except ValueError as exc:
+        assert "strict_replay mode requires a persisted historical output artifact reference" in str(exc)
+    else:
+        raise AssertionError("expected strict replay to fail when historical output artifact is absent")

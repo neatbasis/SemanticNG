@@ -5,6 +5,11 @@ from pathlib import Path
 from typing import Literal
 
 from state_renormalization.adapters.persistence import iter_projection_lineage_records, read_jsonl
+from state_renormalization.contracts import TimeTravelAnswer, TimeTravelAnswerMode
+
+_RECONSTRUCTION_POLICY_ID = "time_travel_answering.reconstruction_policy.v1"
+_RECONSTRUCTION_TEMPLATE_ID = "time_travel_answering.template.v1"
+_RECONSTRUCTION_MODEL_ID = "time_travel_answering.model.v1"
 
 
 def _as_str(value: object) -> str | None:
@@ -42,6 +47,27 @@ def _collect_prediction_used(
     return latest
 
 
+def _jsonl_ref_exists(path: str | Path, ref: str) -> bool:
+    source, _, line = ref.rpartition("@")
+    if not source or not line.isdigit() or int(line) <= 0:
+        return False
+    if Path(source).name != Path(path).name:
+        return False
+    target_lineno = int(line)
+    for meta, _ in read_jsonl(path):
+        if meta.get("lineno") == target_lineno:
+            return True
+    return False
+
+
+def _latest_context_snapshot_ref(path: str | Path) -> str | None:
+    latest_ref: str | None = None
+    for meta, row in read_jsonl(path):
+        if row.get("event_kind") == "context_snapshot":
+            latest_ref = f"{Path(path).name}@{meta['lineno']}"
+    return latest_ref
+
+
 def project_episode_scope_read_model(
     *,
     episode_log_path: str | Path,
@@ -50,6 +76,8 @@ def project_episode_scope_read_model(
     scope: str,
     query_mode: Literal["latest", "as_of"] = "latest",
     as_of_iso: str | None = None,
+    answer_mode: Literal["strict_replay", "reconstructed"] = "reconstructed",
+    historical_output_artifact_ref: str | None = None,
 ) -> dict[str, object]:
     selected_episode: dict[str, object] | None = None
     for _, row in read_jsonl(episode_log_path):
@@ -153,6 +181,31 @@ def project_episode_scope_read_model(
     if temporal_halts:
         raise ValueError("temporal constraints cannot be satisfied for requested as_of")
 
+    mode = TimeTravelAnswerMode(answer_mode)
+    missing_artifact_disclosures: list[dict[str, str]] = []
+    if mode == TimeTravelAnswerMode.STRICT_REPLAY:
+        if not isinstance(historical_output_artifact_ref, str) or not historical_output_artifact_ref:
+            raise ValueError("strict_replay mode requires exact historical output artifact reference")
+        if not _jsonl_ref_exists(prediction_log_path, historical_output_artifact_ref):
+            raise ValueError("strict_replay mode requires a persisted historical output artifact reference")
+        context_snapshot_ref = None
+        reconstruction_policy_id = None
+        reconstruction_template_id = None
+        reconstruction_model_id = None
+    else:
+        context_snapshot_ref = _latest_context_snapshot_ref(prediction_log_path)
+        if context_snapshot_ref is None:
+            context_snapshot_ref = "missing:context_snapshot"
+            missing_artifact_disclosures.append(
+                {
+                    "artifact_role": "context_snapshot",
+                    "disclosure": "No persisted context_snapshot artifact found; answer was reconstructed without snapshot grounding.",
+                }
+            )
+        reconstruction_policy_id = _RECONSTRUCTION_POLICY_ID
+        reconstruction_template_id = _RECONSTRUCTION_TEMPLATE_ID
+        reconstruction_model_id = _RECONSTRUCTION_MODEL_ID
+
     policy_decision = selected_episode.get("policy_decision")
     if not isinstance(policy_decision, dict):
         policy_decision = {}
@@ -172,6 +225,24 @@ def project_episode_scope_read_model(
             "retryability": None,
         }
 
+    answer_provenance = TimeTravelAnswer.model_validate(
+        {
+            "mode": mode.value,
+            "temporal_invariant": {
+                "invariant_id": "time_travel_answering.as_of.v1",
+                "query_mode": query_mode,
+                "as_of_iso": as_of_iso,
+                "satisfied": True,
+            },
+            "historical_output_artifact_ref": historical_output_artifact_ref,
+            "context_snapshot_ref": context_snapshot_ref,
+            "reconstruction_policy_id": reconstruction_policy_id,
+            "reconstruction_template_id": reconstruction_template_id,
+            "reconstruction_model_id": reconstruction_model_id,
+            "missing_artifact_disclosures": missing_artifact_disclosures,
+        }
+    ).model_dump(mode="json")
+
     return {
         "episode_id": episode_id,
         "scope": scope,
@@ -187,14 +258,7 @@ def project_episode_scope_read_model(
         },
         "halt_continue_rationale": rationale,
         "evidence_refs": evidence_refs,
-        "answer_provenance": {
-            "temporal_invariant": {
-                "invariant_id": "time_travel_answering.as_of.v1",
-                "query_mode": query_mode,
-                "as_of_iso": as_of_iso,
-                "satisfied": True,
-            }
-        },
+        "answer_provenance": answer_provenance,
     }
 
 

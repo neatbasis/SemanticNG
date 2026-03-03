@@ -1234,6 +1234,69 @@ class ContextSnapshotArtifact(BaseModel):
     selected_artifact_refs: list[ContextSnapshotRef] = Field(default_factory=list)
 
 
+class TimeTravelAnswerMode(StrEnum):
+    STRICT_REPLAY = "strict_replay"
+    RECONSTRUCTED = "reconstructed"
+
+
+class TemporalInvariantProvenance(BaseModel):
+    """Evidence that time-travel answer constraints were evaluated."""
+
+    model_config = _CONTRACT_CONFIG
+
+    invariant_id: Literal["time_travel_answering.as_of.v1"] = "time_travel_answering.as_of.v1"
+    query_mode: Literal["latest", "as_of"]
+    as_of_iso: str | None = None
+    satisfied: bool
+
+
+class MissingArtifactDisclosure(BaseModel):
+    """Typed disclosure of a missing lineage artifact used for answering."""
+
+    model_config = _CONTRACT_CONFIG
+
+    artifact_role: str
+    disclosure: str
+
+
+class TimeTravelAnswer(BaseModel):
+    """Contract for replayed/reconstructed answers with explicit provenance."""
+
+    model_config = _CONTRACT_CONFIG
+
+    mode: TimeTravelAnswerMode
+    temporal_invariant: TemporalInvariantProvenance
+    historical_output_artifact_ref: str | None = None
+    context_snapshot_ref: str | None = None
+    reconstruction_policy_id: str | None = None
+    reconstruction_template_id: str | None = None
+    reconstruction_model_id: str | None = None
+    missing_artifact_disclosures: list[MissingArtifactDisclosure] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_mode_requirements(self) -> Self:
+        if self.mode == TimeTravelAnswerMode.STRICT_REPLAY:
+            if not isinstance(self.historical_output_artifact_ref, str) or not self.historical_output_artifact_ref:
+                raise ValueError(
+                    "strict_replay mode requires historical_output_artifact_ref"
+                )
+            return self
+
+        reconstructed_required = (
+            ("context_snapshot_ref", self.context_snapshot_ref),
+            ("reconstruction_policy_id", self.reconstruction_policy_id),
+            ("reconstruction_template_id", self.reconstruction_template_id),
+            ("reconstruction_model_id", self.reconstruction_model_id),
+        )
+        missing = [name for name, value in reconstructed_required if not isinstance(value, str) or not value]
+        if missing:
+            raise ValueError(
+                "reconstructed mode requires context snapshot + reconstruction identifiers: "
+                + ", ".join(missing)
+            )
+        return self
+
+
 class PredictionOutcome(BaseModel):
     model_config = _CONTRACT_CONFIG
 

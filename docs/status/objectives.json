@@ -6,8 +6,8 @@
       "name": "Capability invocation governance",
       "status": "done",
       "active": false,
-      "summary": "Boundary gating and edge-case hardening remain the active objective.",
-      "reason": "Sprint plan keeps this capability on a promotion path with explicit evidence requirements.",
+      "summary": "Lifecycle: done, in sustainment mode for non-regression hardening.",
+      "reason": "Maintenance posture: evidence refresh and guardrail verification continue while maturity remains done.",
       "as_of": "2026-03-03",
       "capability_ids": [
         "capability_invocation_governance"
@@ -25,8 +25,8 @@
       "name": "Repair-aware projection evolution",
       "status": "done",
       "active": false,
-      "summary": "Objective remains queued behind governance boundary completion.",
-      "reason": "Sequenced in sprint planning docs as a subsequent objective.",
+      "summary": "Lifecycle: done, in sustainment mode pending downstream rollout sequencing.",
+      "reason": "Maintenance posture: evidence refresh remains active while rollout dependencies are tracked separately from done maturity.",
       "as_of": "2026-03-03",
       "capability_ids": [
         "repair_aware_projection_evolution"

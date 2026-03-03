@@ -273,8 +273,8 @@
       "capability_ids": [
         "capability_invocation_governance"
       ],
-      "summary": "Boundary gating and edge-case hardening remain the active objective.",
-      "reason": "Sprint plan keeps this capability on a promotion path with explicit evidence requirements.",
+      "summary": "Lifecycle: done, in sustainment mode for non-regression hardening.",
+      "reason": "Maintenance posture: evidence refresh and guardrail verification continue while maturity remains done.",
       "stable_id": "capability_invocation_governance",
       "milestone_id": "state-renorm-milestone",
       "sprint_id": "sprint-5",
@@ -289,8 +289,8 @@
       "capability_ids": [
         "repair_aware_projection_evolution"
       ],
-      "summary": "Objective remains queued behind governance boundary completion.",
-      "reason": "Sequenced in sprint planning docs as a subsequent objective.",
+      "summary": "Lifecycle: done, in sustainment mode pending downstream rollout sequencing.",
+      "reason": "Maintenance posture: evidence refresh remains active while rollout dependencies are tracked separately from done maturity.",
       "stable_id": "repair_aware_projection_evolution",
       "milestone_id": "core-rollout-readiness",
       "sprint_id": "sprint-next",
@@ -308,8 +308,8 @@
       "name": "State Renormalization milestone gate",
       "status": "in_progress",
       "active": true,
-      "summary": "Milestone governance remains active and enforced through docs/test parity controls.",
-      "reason": "Execution evidence in this report is static; latest CI run evidence is not resolved offline.",
+      "summary": "Lifecycle: in_progress, with active sustainment controls for no-drift enforcement.",
+      "reason": "Maintenance posture: non-regression hardening and CI evidence refresh are ongoing while milestone lifecycle stays in_progress.",
       "stable_id": "state-renorm-milestone"
     },
     {
@@ -317,8 +317,8 @@
       "name": "src/core rollout readiness",
       "status": "planned",
       "active": false,
-      "summary": "Deferred until current state-renormalization scope shows sustained no-drift evidence.",
-      "reason": "Roadmap and architecture docs mark future, gated expansion.",
+      "summary": "Lifecycle: planned, with pre-sustainment readiness checks defined.",
+      "reason": "Maintenance posture: evidence model is documented for future refresh once lifecycle moves beyond planned.",
       "stable_id": "core-rollout-readiness"
     }
   ],
@@ -328,8 +328,8 @@
       "name": "Sprint 5",
       "status": "done",
       "active": false,
-      "summary": "Sprint 5 handoff is documented with exit checks and carry-over risks.",
-      "reason": "See docs/sprint_handoffs/sprint-5-handoff.md for closure evidence.",
+      "summary": "Lifecycle: done, in sustainment mode for handoff non-regression follow-through.",
+      "reason": "Maintenance posture: closure evidence is frozen, with periodic refresh only if regressions surface.",
       "stable_id": "sprint-5"
     },
     {
@@ -337,16 +337,16 @@
       "name": "Next sprint planning",
       "status": "in_progress",
       "active": true,
-      "summary": "Planning and preload sequencing are active for the next objective slice.",
-      "reason": "Current planning artifacts track pending objective transitions.",
+      "summary": "Lifecycle: in_progress, with active planning maintenance for objective transitions.",
+      "reason": "Maintenance posture: sequencing artifacts are refreshed continuously while sprint lifecycle remains in_progress.",
       "stable_id": "sprint-next"
     }
   ],
   "project_status": {
     "id": "semanticng",
     "name": "SemanticNG",
-    "summary": "Repository delivery remains active with ongoing governance and capability hardening work.",
-    "reason": "Canonical source maintained in-repo for deterministic offline status reporting.",
+    "summary": "Lifecycle: done, in sustainment mode with ongoing governance hardening.",
+    "reason": "Maintenance posture: canonical in-repo evidence is refreshed to preserve non-regression confidence independently of done maturity.",
     "analytics": [
       {
         "id": "5s_metrics",

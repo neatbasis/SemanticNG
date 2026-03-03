@@ -1027,8 +1027,19 @@ class MissionContract(BaseModel):
 class MissionLifecycleEvent(BaseModel):
     model_config = _CONTRACT_CONFIG
 
-    event_kind: Literal["mission_created", "mission_deferred", "mission_completed"]
+    event_kind: Literal[
+        "mission_created", "mission_deferred", "mission_completed", "mission_prompted"
+    ]
     mission: MissionContract
+    prompted_at_iso: str | None = None
+    ask_ref: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_prompt_fields(self) -> Self:
+        if self.event_kind == "mission_prompted":
+            if not self.prompted_at_iso or not self.ask_ref:
+                raise ValueError("mission_prompted requires prompted_at_iso and ask_ref")
+        return self
 
 
 class ProjectionState(BaseModel):

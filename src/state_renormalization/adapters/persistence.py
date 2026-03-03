@@ -317,6 +317,7 @@ def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
                 "mission_created",
                 "mission_deferred",
                 "mission_completed",
+                "mission_prompted",
             }:
                 yield raw
                 continue

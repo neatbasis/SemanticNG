@@ -3,8 +3,8 @@
   "name": "SemanticNG",
   "status": "done",
   "active": false,
-  "summary": "Repository delivery remains active with ongoing governance and capability hardening work.",
-  "reason": "Canonical source maintained in-repo for deterministic offline status reporting.",
+  "summary": "Lifecycle: done, in sustainment mode with ongoing governance hardening.",
+  "reason": "Maintenance posture: canonical in-repo evidence is refreshed to preserve non-regression confidence independently of done maturity.",
   "as_of": "2026-03-03",
   "waste_metrics": {
     "duplicate_logic_count": 0,
@@ -13,8 +13,8 @@
     "mypy_debt_delta": 0,
     "flaky_test_count": 0
   },
-  "generated_at": "2026-03-03T00:10:29Z",
-  "manifest_commit": "573372ecb17009b7f930d4708b4edb694522e316",
+  "generated_at": "2026-03-03T00:46:01Z",
+  "manifest_commit": "20923f39da521f1afa11c6f7661a4d2aba59141a",
   "generated_from": "docs/dod_manifest.json",
   "analytics": [
     {

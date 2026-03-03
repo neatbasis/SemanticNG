@@ -64,10 +64,23 @@ def test_json_mode_reports_quality_gates_with_offline_safe_statuses() -> None:
         assert gate["scope"].startswith("always-on/global") or gate["scope"].startswith("path-conditioned:")
 
 
+
+
+def test_json_mode_uses_offline_deterministic_mode_when_ci_evidence_unresolved() -> None:
+    result = _run_status("json", ROOT)
+    payload = json.loads(result.stdout)
+
+    assert payload["meta"]["mode"] == "Offline deterministic mode"
+    for gate in payload["quality_gates"]:
+        if gate["status"] in {"ready", "unknown"}:
+            assert "CI not resolved offline" in gate["status_reason"]
+
+
 def test_summary_mode_prints_quality_gates_section() -> None:
     result = _run_status("summary", ROOT)
     assert result.returncode == 0
     assert "Quality Gates:" in result.stdout
+    assert "Mode: Offline deterministic mode" in result.stdout
     assert "Quality Guardrails / no-regression-budget" in result.stdout
     assert "promotion-governance-pokayoke" in result.stdout
 

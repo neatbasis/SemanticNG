@@ -17,6 +17,10 @@ from status_schema import (
 
 DOD_MANIFEST_PATH = Path("docs/dod_manifest.json")
 GOVERNED_PATHS_KEY = "governed_paths"
+OFFLINE_MODE_BANNER = "Offline deterministic mode"
+CI_RESOLVED_MODE_BANNER = "CI-resolved mode"
+CI_UNRESOLVED_REASON = "CI not resolved offline"
+CI_RESOLVED_REASON = "resolved from canonical CI evidence"
 Issue = ValidationIssue
 
 
@@ -47,6 +51,7 @@ def _base_payload(status_show: str) -> dict[str, Any]:
             "deterministic": True,
             "offline": True,
             "status_show": status_show,
+            "mode": OFFLINE_MODE_BANNER,
             "unknown_policy": "Print unknown with reason when data is missing or unresolved.",
             "generated_from": {
                 "manifest": DOD_MANIFEST_PATH.as_posix(),
@@ -337,13 +342,13 @@ def _manifest_quality_gates(manifest: dict[str, Any]) -> list[dict[str, str]]:
         has_evidence_link = isinstance(evidence.get("link"), str) and bool(evidence["link"])
 
         status = "unknown"
-        status_reason = "CI not resolved offline"
+        status_reason = CI_UNRESOLVED_REASON
         if isinstance(evidence_status, str) and has_evidence_link and evidence_status in {"pass", "fail"}:
             status = evidence_status
-            status_reason = "resolved from canonical CI evidence"
+            status_reason = CI_RESOLVED_REASON
         elif bool(gate.get("ready", False)):
             status = "ready"
-            status_reason = "ready in canonical manifest; CI not resolved offline"
+            status_reason = f"ready in canonical manifest; {CI_UNRESOLVED_REASON}"
 
         gates.append(
             {
@@ -356,6 +361,14 @@ def _manifest_quality_gates(manifest: dict[str, Any]) -> list[dict[str, str]]:
             }
         )
     return gates
+
+
+def _resolve_mode_banner(quality_gates: list[dict[str, str]]) -> str:
+    return (
+        CI_RESOLVED_MODE_BANNER
+        if any(gate.get("status") in {"pass", "fail"} and gate.get("status_reason") == CI_RESOLVED_REASON for gate in quality_gates)
+        else OFFLINE_MODE_BANNER
+    )
 
 
 def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]:
@@ -387,6 +400,7 @@ def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]
     payload["project"] = project
     payload["dod"] = _build_dod_summary(manifest)
     payload["quality_gates"] = _manifest_quality_gates(manifest)
+    payload["meta"]["mode"] = _resolve_mode_banner(payload["quality_gates"])
 
     _, project_issues = project, validate_project_document(Path("docs/dod_manifest.json::project_status"), project)
     issues.extend(project_issues)
@@ -409,6 +423,7 @@ def emit_human_summary(payload: dict[str, Any], validation_issues: list[Issue]) 
     project = payload["project"]
     print("SemanticNG Delivery Status")
     print("=" * 26)
+    print(f"Mode: {payload.get('meta', {}).get('mode', OFFLINE_MODE_BANNER)}")
     print(f"Project: {project['name']} ({project['status']})")
     print(f"Summary: {project['summary']}")
     print(f"Reason: {project['reason']}")

@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+import pytest
+
 from state_renormalization.adapters.persistence import append_jsonl, read_jsonl
 from state_renormalization.contracts import (
     AskResult,
@@ -381,6 +383,20 @@ def test_replay_projection_rebuilds_mission_lifecycle_state_with_lineage_traceab
     append_jsonl(
         mission_log,
         {
+            "event_kind": "prediction",
+            "prediction_id": "pred:mission-proof",
+            "scope_key": "station:west",
+            "prediction_key": "station:west:fresh",
+            "filtration_id": "conversation:c1",
+            "target_variable": "freshness",
+            "target_horizon_iso": "2026-02-15T00:21:00+00:00",
+            "expectation": 1.0,
+            "issued_at_iso": "2026-02-15T00:20:30+00:00",
+        },
+    )
+    append_jsonl(
+        mission_log,
+        {
             "event_kind": "mission_completed",
             "mission": {
                 **mission_base,
@@ -395,14 +411,64 @@ def test_replay_projection_rebuilds_mission_lifecycle_state_with_lineage_traceab
                     }
                 ],
             },
+            "completion_evidence_ref": "missions.jsonl@3",
+            "completion_payload": {
+                "completion_mode": "until_fresh",
+                "observation_ref": "missions.jsonl@3",
+            },
         },
     )
 
     replay = replay_projection_analytics(mission_log)
 
-    assert replay.records_processed == 3
+    assert replay.records_processed == 4
     assert replay.projection_state.active_missions == {}
     assert replay.projection_state.deferred_missions == {}
     completed = replay.projection_state.completed_missions["mission:1"]
     assert completed.status.value == "completed"
     assert completed.lineage_refs[0].event_ref == "missions.jsonl@2"
+
+
+def test_replay_projection_rejects_mission_completed_without_valid_evidence(tmp_path: Path) -> None:
+    mission_log = tmp_path / "missions_invalid.jsonl"
+
+    append_jsonl(
+        mission_log,
+        {
+            "event_kind": "mission_created",
+            "mission": {
+                "mission_id": "mission:bad",
+                "mission_identity": "follow-up station",
+                "kind": "monitoring",
+                "entity_ref": {"kind": "station", "ref": "station:west"},
+                "schedule_policy": {},
+                "completion_mode": "manual",
+                "status": "active",
+                "lineage_refs": [],
+                "created_at_iso": "2026-02-15T00:00:00+00:00",
+                "updated_at_iso": "2026-02-15T00:00:00+00:00",
+            },
+        },
+    )
+    append_jsonl(
+        mission_log,
+        {
+            "event_kind": "mission_completed",
+            "mission": {
+                "mission_id": "mission:bad",
+                "mission_identity": "follow-up station",
+                "kind": "monitoring",
+                "entity_ref": {"kind": "station", "ref": "station:west"},
+                "schedule_policy": {},
+                "completion_mode": "manual",
+                "status": "completed",
+                "lineage_refs": [],
+                "created_at_iso": "2026-02-15T00:00:00+00:00",
+                "updated_at_iso": "2026-02-15T00:10:00+00:00",
+            },
+            "completion_payload": {"completion_mode": "manual", "confirmed_by": "operator"},
+        },
+    )
+
+    with pytest.raises(ValueError, match="completion_evidence_ref"):
+        replay_projection_analytics(mission_log)

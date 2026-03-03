@@ -225,6 +225,60 @@ def append_ask_outbox_response_event(
 
 
 
+
+
+def _parse_jsonl_ref(ref: str) -> tuple[str, int] | None:
+    if "@" not in ref:
+        return None
+    source, _, line_no = ref.rpartition("@")
+    if not source or not line_no.isdigit():
+        return None
+    idx = int(line_no)
+    if idx <= 0:
+        return None
+    return source, idx
+
+
+def _read_jsonl_row(path: PathLike, line_no: int) -> JsonObj | None:
+    for meta, obj in read_jsonl(path):
+        if meta.get("lineno") == line_no:
+            return obj
+    return None
+
+
+def _validate_completion_evidence_ref(*, event: MissionLifecycleEvent, path: PathLike) -> None:
+    if event.event_kind != "mission_completed":
+        return
+
+    ref = event.completion_evidence_ref
+    if not isinstance(ref, str):
+        raise ValueError("mission_completed requires completion_evidence_ref")
+
+    parsed = _parse_jsonl_ref(ref)
+    if parsed is None:
+        raise ValueError("completion_evidence_ref must be a concrete jsonl line reference")
+
+    source_name, line_no = parsed
+    target_path = Path(path)
+    if Path(source_name).name != target_path.name:
+        raise ValueError("completion_evidence_ref must point to the active mission log")
+
+    evidence_row = _read_jsonl_row(target_path, line_no)
+    if evidence_row is None:
+        raise ValueError("completion_evidence_ref points to a missing persisted event")
+
+    evidence_kind = evidence_row.get("event_kind")
+    allowed_kinds = {
+        "prediction",
+        "prediction_record",
+        "repair_proposal",
+        "repair_resolution",
+        "repair_decision",
+    }
+    if evidence_kind not in allowed_kinds:
+        raise ValueError("completion_evidence_ref must point to prediction/repair persisted evidence")
+
+
 def append_mission_created_event(
     record: Any,
     *,
@@ -277,6 +331,7 @@ def append_mission_lifecycle_event(
         raise ValueError("append_mission_lifecycle_event expects a dict-like payload")
 
     event = MissionLifecycleEvent.model_validate(payload)
+    _validate_completion_evidence_ref(event=event, path=path)
     return append_prediction(path=path, record=event.model_dump(mode="json"), adapter_gate=adapter_gate)
 
 

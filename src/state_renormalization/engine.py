@@ -2083,6 +2083,67 @@ def project_current(pred: PredictionRecord, projection_state: ProjectionState) -
     return _project_current_at(pred, projection_state, updated_at_iso=_now_iso())
 
 
+def _parse_jsonl_event_ref(ref: str) -> tuple[str, int] | None:
+    if "@" not in ref:
+        return None
+    source, _, offset = ref.rpartition("@")
+    if not source or not offset.isdigit():
+        return None
+    line_no = int(offset)
+    if line_no <= 0:
+        return None
+    return source, line_no
+
+
+def _read_jsonl_event_at(path: Path, line_no: int) -> Mapping[str, object] | None:
+    with path.open("r", encoding="utf-8") as handle:
+        for idx, line in enumerate(handle, start=1):
+            if idx != line_no:
+                continue
+            raw_line = line.strip()
+            if not raw_line:
+                return None
+            try:
+                payload = json.loads(raw_line)
+            except json.JSONDecodeError:
+                return None
+            if not isinstance(payload, Mapping):
+                return None
+            return payload
+    return None
+
+
+def _validate_replay_completion_evidence_ref(*, event: MissionLifecycleEvent, log_path: Path) -> None:
+    if event.event_kind != "mission_completed":
+        return
+
+    ref = event.completion_evidence_ref
+    if not isinstance(ref, str):
+        raise ValueError("mission_completed requires completion_evidence_ref")
+
+    parsed = _parse_jsonl_event_ref(ref)
+    if parsed is None:
+        raise ValueError("completion_evidence_ref must be a concrete jsonl line reference")
+
+    source_name, line_no = parsed
+    if Path(source_name).name != log_path.name:
+        raise ValueError("completion_evidence_ref must point to the replay log")
+
+    row = _read_jsonl_event_at(log_path, line_no)
+    if row is None:
+        raise ValueError("completion_evidence_ref points to a missing persisted event")
+
+    allowed_kinds = {
+        "prediction",
+        "prediction_record",
+        "repair_proposal",
+        "repair_resolution",
+        "repair_decision",
+    }
+    if row.get("event_kind") not in allowed_kinds:
+        raise ValueError("completion_evidence_ref must point to prediction/repair persisted evidence")
+
+
 def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionReplayResult:
     path = Path(prediction_log_path)
     if not path.exists():
@@ -2145,6 +2206,7 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
 
         if kind in {"mission_created", "mission_deferred", "mission_completed", "mission_prompted"}:
             mission_event = MissionLifecycleEvent.model_validate(raw)
+            _validate_replay_completion_evidence_ref(event=mission_event, log_path=path)
             projection = _project_mission_lifecycle(projection, mission_event)
             records_processed += 1
 

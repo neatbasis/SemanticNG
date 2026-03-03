@@ -11,10 +11,17 @@ from pydantic import ValidationError
 from state_renormalization.adapters.persistence import (
     append_halt,
     append_jsonl,
+    append_mission_completed_event,
     read_halt_record,
     read_jsonl,
 )
-from state_renormalization.contracts import CapabilityAdapterGate, Episode, EvidenceRef, HaltRecord
+from state_renormalization.contracts import (
+    CapabilityAdapterGate,
+    Episode,
+    EvidenceRef,
+    HaltRecord,
+    MissionCompletionMode,
+)
 from state_renormalization.engine import to_jsonable_episode
 
 TEST_GATE = CapabilityAdapterGate(invocation_id="invoke:test", allowed=True)
@@ -398,3 +405,62 @@ def test_append_halt_round_trip_preserves_all_canonical_and_stable_id_fields(
         "step_id": "stp_1",
         **canonical,
     }
+
+
+def _mission_payload(*, completion_mode: str = "manual") -> dict[str, object]:
+    return {
+        "mission": {
+            "mission_id": "mission:1",
+            "mission_identity": "follow-up station",
+            "kind": "monitoring",
+            "entity_ref": {"kind": "station", "ref": "station:west"},
+            "schedule_policy": {},
+            "completion_mode": completion_mode,
+            "status": "completed",
+            "next_prompt_at": None,
+            "lineage_refs": [],
+            "created_at_iso": "2026-02-15T00:00:00+00:00",
+            "updated_at_iso": "2026-02-15T00:05:00+00:00",
+        }
+    }
+
+
+def test_append_mission_completed_event_fails_closed_without_evidence_ref(tmp_path: Path) -> None:
+    log_path = tmp_path / "missions.jsonl"
+
+    with pytest.raises(ValueError, match="completion_evidence_ref"):
+        append_mission_completed_event(
+            {
+                **_mission_payload(),
+                "completion_payload": {
+                    "completion_mode": MissionCompletionMode.MANUAL.value,
+                    "confirmed_by": "operator",
+                },
+            },
+            adapter_gate=TEST_GATE,
+            path=log_path,
+        )
+
+
+def test_append_mission_completed_event_accepts_valid_linked_evidence(tmp_path: Path) -> None:
+    log_path = tmp_path / "missions.jsonl"
+
+    append_jsonl(log_path, {"event_kind": "prediction", "prediction_id": "pred:1"})
+
+    ref = append_mission_completed_event(
+        {
+            **_mission_payload(),
+            "completion_evidence_ref": "missions.jsonl@1",
+            "completion_payload": {
+                "completion_mode": MissionCompletionMode.MANUAL.value,
+                "confirmed_by": "operator",
+            },
+        },
+        adapter_gate=TEST_GATE,
+        path=log_path,
+    )
+
+    rows = [rec for _, rec in read_jsonl(log_path)]
+    assert rows[-1]["event_kind"] == "mission_completed"
+    assert rows[-1]["completion_evidence_ref"] == "missions.jsonl@1"
+    assert ref == {"kind": "jsonl", "ref": "missions.jsonl@2"}

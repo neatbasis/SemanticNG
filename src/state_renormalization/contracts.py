@@ -1033,12 +1033,42 @@ class MissionLifecycleEvent(BaseModel):
     mission: MissionContract
     prompted_at_iso: str | None = None
     ask_ref: str | None = None
+    completion_evidence_ref: str | None = None
+    completion_payload: dict[str, Any] | None = None
 
     @model_validator(mode="after")
     def _validate_prompt_fields(self) -> Self:
         if self.event_kind == "mission_prompted":
             if not self.prompted_at_iso or not self.ask_ref:
                 raise ValueError("mission_prompted requires prompted_at_iso and ask_ref")
+        if self.event_kind == "mission_completed":
+            if not self.completion_evidence_ref:
+                raise ValueError("mission_completed requires completion_evidence_ref")
+            payload = self.completion_payload
+            if not isinstance(payload, dict):
+                raise ValueError("mission_completed requires completion_payload")
+
+            mode = self.mission.completion_mode
+            payload_mode = payload.get("completion_mode")
+            if payload_mode != mode.value:
+                raise ValueError(
+                    "mission_completed completion_payload.completion_mode must match mission.completion_mode"
+                )
+
+            if mode == MissionCompletionMode.MANUAL:
+                if not isinstance(payload.get("confirmed_by"), str) or not payload.get(
+                    "confirmed_by"
+                ).strip():
+                    raise ValueError(
+                        "manual mission completion requires completion_payload.confirmed_by"
+                    )
+            elif mode == MissionCompletionMode.UNTIL_FRESH:
+                if not isinstance(payload.get("observation_ref"), str) or not payload.get(
+                    "observation_ref"
+                ).strip():
+                    raise ValueError(
+                        "until_fresh mission completion requires completion_payload.observation_ref"
+                    )
         return self
 
 

@@ -48,6 +48,9 @@ from state_renormalization.contracts import (
     CaptureOutcome,
     CaptureStatus,
     ClarificationSlotId,
+    ContextSnapshotArtifact,
+    ContextSnapshotRef,
+    ContextSnapshotSelectionFilters,
     CorrectionCostAttribution,
     DecisionEffect,
     Episode,
@@ -2238,6 +2241,90 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
         projection_state=projection,
         analytics_snapshot=analytics,
         records_processed=records_processed,
+    )
+
+
+_CONTEXT_SNAPSHOT_EVENT_TIME_FIELDS: tuple[str, ...] = (
+    "event_time",
+    "event_time_iso",
+    "created_at_iso",
+    "responded_at_iso",
+    "recorded_at_iso",
+    "issued_at_iso",
+    "corrected_at_iso",
+    "compared_at_iso",
+    "prompted_at_iso",
+    "timestamp",
+    "timestamp_iso",
+    "t_asked_iso",
+)
+
+DEFAULT_CONTEXT_SNAPSHOT_SELECTABLE_KINDS: frozenset[str] = frozenset(
+    {
+        "ask_outbox_request",
+        "ask_outbox_response",
+        "interaction",
+        "prior_interaction",
+        "interaction_digest",
+        "external_knowledge_digest",
+        "external_knowledge_retrieval",
+        "external_knowledge_retrieval_output",
+        "retrieval_output",
+    }
+)
+
+
+def _event_time_from_record(record: Mapping[str, object]) -> str | None:
+    for key in _CONTEXT_SNAPSHOT_EVENT_TIME_FIELDS:
+        value = record.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
+
+
+def build_context_snapshot_artifact(
+    records: Sequence[Mapping[str, object]],
+    *,
+    as_of_iso: str,
+    selectable_kinds: Sequence[str] | None = None,
+    artifact_ref_prefix: str = "predictions.jsonl",
+) -> ContextSnapshotArtifact:
+    kinds = list(selectable_kinds) if selectable_kinds is not None else sorted(
+        DEFAULT_CONTEXT_SNAPSHOT_SELECTABLE_KINDS
+    )
+    allowed = set(kinds)
+    selected: list[ContextSnapshotRef] = []
+
+    for index, record in enumerate(records, start=1):
+        artifact_kind = record.get("event_kind") or record.get("artifact_kind")
+        if not isinstance(artifact_kind, str) or artifact_kind not in allowed:
+            continue
+
+        event_time = _event_time_from_record(record)
+        if event_time is None or event_time > as_of_iso:
+            continue
+
+        selected.append(
+            ContextSnapshotRef(
+                artifact_ref=f"{artifact_ref_prefix}@{index}",
+                artifact_kind=artifact_kind,
+                event_time=event_time,
+            )
+        )
+
+    filters = ContextSnapshotSelectionFilters(as_of_iso=as_of_iso, selectable_kinds=kinds)
+    hash_basis = {
+        "selection_filters": filters.model_dump(mode="json"),
+        "selected_artifact_refs": [item.model_dump(mode="json") for item in selected],
+    }
+    stable_hash = hashlib.sha256(
+        json.dumps(hash_basis, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+    return ContextSnapshotArtifact(
+        snapshot_hash=stable_hash,
+        selection_filters=filters,
+        selected_artifact_refs=selected,
     )
 
 

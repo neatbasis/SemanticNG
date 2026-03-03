@@ -1204,6 +1204,36 @@ class ProjectionAnalyticsSnapshot(BaseModel):
         return self.correction_cost_total / float(self.correction_count)
 
 
+class ContextSnapshotSelectionFilters(BaseModel):
+    """Selection knobs for deterministic as-of context snapshots."""
+
+    model_config = _CONTRACT_CONFIG
+
+    as_of_iso: str
+    selectable_kinds: list[str] = Field(default_factory=list)
+
+
+class ContextSnapshotRef(BaseModel):
+    """Stable reference to one selected artifact row from append-only storage."""
+
+    model_config = _CONTRACT_CONFIG
+
+    artifact_ref: str
+    artifact_kind: str
+    event_time: str
+
+
+class ContextSnapshotArtifact(BaseModel):
+    """Append-only contract for deterministic replayable knowledge context."""
+
+    model_config = _CONTRACT_CONFIG
+
+    event_kind: Literal["context_snapshot"] = "context_snapshot"
+    snapshot_hash: str
+    selection_filters: ContextSnapshotSelectionFilters
+    selected_artifact_refs: list[ContextSnapshotRef] = Field(default_factory=list)
+
+
 class PredictionOutcome(BaseModel):
     model_config = _CONTRACT_CONFIG
 

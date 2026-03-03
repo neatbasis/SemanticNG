@@ -329,6 +329,7 @@ class ObservationFreshnessDecision(BaseModel):
     outcome: ObservationFreshnessDecisionOutcome
     reason: str
     stale_after_seconds: float = Field(ge=0)
+    evaluated_at_iso: str | None = None
     observed_at_iso: str | None = Field(
         default=None, validation_alias=AliasChoices("observed_at_iso", "observed_at")
     )

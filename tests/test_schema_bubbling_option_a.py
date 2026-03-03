@@ -17,6 +17,7 @@ from state_renormalization.contracts import (
     AskStatus,
     BeliefState,
     CaptureOutcome,
+    ClarificationSlotId,
     ClarifyingQuestion,
     Episode,
     ResolutionPolicy,
@@ -119,3 +120,59 @@ def test_schema_selection_artifact_does_not_leak_channel_specific_terms(
     assert "satellite_" not in s
     assert art["schemas"][0]["schema_id"] == "schema:actionable_intent"
     assert art["schemas"][0]["source"] == "selector:default"
+
+
+def test_option_a_persists_typed_slots_and_composes_ask_outbox_options(
+    monkeypatch: pytest.MonkeyPatch,
+    make_episode: Callable[..., Episode],
+) -> None:
+    sel = SchemaSelection(
+        schemas=[SchemaHit(name="clarify.reminder", score=0.9)],
+        ambiguities=[
+            Ambiguity(
+                status=AmbiguityStatus.UNRESOLVED,
+                about=AmbiguityAbout(kind=AboutKind.INTENT, key="reminder.intent"),
+                type=AmbiguityType.UNDERSPECIFIED,
+                ask=[
+                    ClarifyingQuestion(
+                        q="When should I remind you?",
+                        format=AskFormat.MULTICHOICE,
+                        options=["later today", "tomorrow"],
+                        bind={"key": ClarificationSlotId.REMINDER_SCHEDULE.value},
+                    ),
+                    ClarifyingQuestion(
+                        q="Completion mode?",
+                        format=AskFormat.MULTICHOICE,
+                        options=["manual", "auto", "until_fresh"],
+                        bind={"key": ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value},
+                    ),
+                ],
+                resolution_policy=ResolutionPolicy.ASK_USER,
+            )
+        ],
+    )
+
+    def fake_selector(user_text: str | None, *, error: CaptureOutcome | None) -> SchemaSelection:
+        return sel
+
+    monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
+
+    ep2, b2 = apply_schema_bubbling(
+        make_episode(
+            ask=AskResult(
+                status=AskStatus.OK,
+                sentence="remind me",
+                slots={ClarificationSlotId.REMINDER_SCHEDULE.value: "tomorrow"},
+            )
+        ),
+        BeliefState(),
+    )
+
+    assert b2.pending_about is not None
+    assert b2.pending_about["typed_slot_values"][ClarificationSlotId.REMINDER_SCHEDULE.value] == "tomorrow"
+    assert b2.bindings[ClarificationSlotId.REMINDER_SCHEDULE.value] == "tomorrow"
+
+    artifact = next(a for a in ep2.artifacts if a.get("kind") == "schema_selection")
+    request = artifact["ask_outbox_request"]
+    assert request is not None
+    assert ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value in request["action_options"]

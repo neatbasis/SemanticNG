@@ -11,6 +11,7 @@ from state_renormalization.contracts import (
     CaptureOutcome,
     CaptureStatus,
     Channel,
+    ClarificationSlotId,
     Episode,
     VerbosityDecision,
 )
@@ -46,3 +47,68 @@ def test_apply_schema_bubbling_sets_pending_and_emits_schema_selection_artifact(
         assert isinstance(pending_question, str) and pending_question.strip(), (
             "pending_question must be set"
         )
+
+
+def test_pending_obligation_artifact_exposes_typed_reminder_options(
+    monkeypatch,
+    make_episode: Callable[..., Episode],
+) -> None:
+    from state_renormalization.contracts import (
+        AboutKind,
+        Ambiguity,
+        AmbiguityAbout,
+        AmbiguityStatus,
+        AmbiguityType,
+        AskFormat,
+        ClarifyingQuestion,
+        ResolutionPolicy,
+        SchemaHit,
+        SchemaSelection,
+    )
+
+    sel = SchemaSelection(
+        schemas=[SchemaHit(name="clarify.reminder", score=0.92)],
+        ambiguities=[
+            Ambiguity(
+                status=AmbiguityStatus.UNRESOLVED,
+                about=AmbiguityAbout(kind=AboutKind.INTENT, key="reminder.intent"),
+                type=AmbiguityType.UNDERSPECIFIED,
+                ask=[
+                    ClarifyingQuestion(
+                        q="When should I remind you?",
+                        format=AskFormat.MULTICHOICE,
+                        bind={"key": ClarificationSlotId.REMINDER_SCHEDULE.value},
+                    ),
+                    ClarifyingQuestion(
+                        q="Completion mode?",
+                        format=AskFormat.MULTICHOICE,
+                        bind={"key": ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value},
+                    ),
+                    ClarifyingQuestion(
+                        q="About what?",
+                        format=AskFormat.FREEFORM,
+                        bind={"key": ClarificationSlotId.REMINDER_TARGET_ENTITY.value},
+                    ),
+                ],
+                resolution_policy=ResolutionPolicy.ASK_USER,
+            )
+        ],
+    )
+
+    def fake_selector(user_text: str | None, *, error):
+        return sel
+
+    monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
+
+    ep, belief = apply_schema_bubbling(make_episode(), BeliefState())
+    assert belief.pending_about is not None
+    assert belief.pending_about["required_slots"] == [
+        ClarificationSlotId.REMINDER_SCHEDULE.value,
+        ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value,
+        ClarificationSlotId.REMINDER_TARGET_ENTITY.value,
+    ]
+
+    artifact = next(a for a in ep.artifacts if a.get("kind") == "schema_selection")
+    assert artifact["ask_outbox_request"]["action_options"][
+        ClarificationSlotId.REMINDER_SCHEDULE.value
+    ]

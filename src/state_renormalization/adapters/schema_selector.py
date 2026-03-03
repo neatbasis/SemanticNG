@@ -19,6 +19,7 @@ from state_renormalization.contracts import (
     CaptureOutcome,
     CaptureStatus,
     ClarifyingQuestion,
+    ClarificationSlotId,
     ResolutionPolicy,
     SchemaHit,
     SchemaSelection,
@@ -292,6 +293,19 @@ class UncertaintyRule(BaseRule):
 
 
 @dataclass(frozen=True)
+class ReminderIntentRule(BaseRule):
+    name: str = "reminder_intent"
+
+    def applies(self, ctx: SelectorCheckContext) -> bool:
+        return bool(ctx.metadata.get("mentions_reminder")) and not bool(
+            ctx.metadata.get("has_schedule_signal")
+        )
+
+    def emit(self, ctx: SelectorCheckContext) -> SchemaSelection:
+        return _reminder_missing_schedule_emit(ctx)
+
+
+@dataclass(frozen=True)
 class ActionableIntentRule(BaseRule):
     name: str = "actionable_intent"
 
@@ -452,6 +466,48 @@ def _uncertainty_emit(ctx: SelectorCheckContext) -> SchemaSelection:
     )
 
 
+def _reminder_missing_schedule_emit(ctx: SelectorCheckContext) -> SchemaSelection:
+    about = _about(AboutKind.INTENT, "reminder.intent", span_text=ctx.raw)
+    amb = _amb(
+        about=about,
+        type_=AmbiguityType.UNDERSPECIFIED,
+        ask=[
+            ClarifyingQuestion(
+                q="When should I remind you?",
+                format=AskFormat.MULTICHOICE,
+                options=["in 10 minutes", "later today", "tomorrow", "custom"],
+                bind={"key": ClarificationSlotId.REMINDER_SCHEDULE.value, "expected_type": "string"},
+            ),
+            ClarifyingQuestion(
+                q="Should this reminder auto-complete once I notify you?",
+                format=AskFormat.MULTICHOICE,
+                options=["manual", "auto", "until_fresh"],
+                bind={
+                    "key": ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value,
+                    "expected_type": "enum",
+                },
+            ),
+            ClarifyingQuestion(
+                q="What is this reminder about?",
+                format=AskFormat.FREEFORM,
+                bind={
+                    "key": ClarificationSlotId.REMINDER_TARGET_ENTITY.value,
+                    "expected_type": "string",
+                },
+            ),
+        ],
+        evidence={"signals": ["reminder_intent", "missing_schedule"]},
+        notes="Reminder intent requires explicit schedule, completion mode, and target entity.",
+    )
+    return _selection(
+        schemas=[
+            SchemaHit(name="clarify.reminder", score=0.94, about=about),
+            SchemaHit(name="clarification_needed", score=0.78, about=about),
+        ],
+        ambiguities=[amb],
+    )
+
+
 def _actionable_emit(ctx: SelectorCheckContext) -> SchemaSelection:
     about = _about(AboutKind.INTENT, "user.intent", span_text=ctx.raw)
     return _selection(
@@ -492,6 +548,23 @@ def build_selector_context(text: str | None, *, error: CaptureOutcome | None) ->
             "mentions_timerish": any(
                 w in normalized for w in ["timer", "remind", "reminder", "in "]
             ),
+            "mentions_reminder": any(w in normalized for w in ["remind", "reminder"]),
+            "has_schedule_signal": any(
+                token in tokens
+                for token in {
+                    "at",
+                    "on",
+                    "tomorrow",
+                    "today",
+                    "tonight",
+                    "morning",
+                    "evening",
+                    "am",
+                    "pm",
+                }
+            )
+            or bool(re.search(r"\b\d{1,2}:\d{2}\b", normalized))
+            or bool(re.search(r"\bin\s+\d+\s+(second|seconds|minute|minutes|hour|hours)\b", normalized)),
         },
     )
 
@@ -558,6 +631,7 @@ register_rule(phase="ambiguity-disambiguation", rule=VagueActorRule())
 register_rule(phase="ambiguity-disambiguation", rule=UrlIntentRule())
 register_rule(phase="ambiguity-disambiguation", rule=TimerUnitRule())
 register_rule(phase="ambiguity-disambiguation", rule=UncertaintyRule())
+register_rule(phase="ambiguity-disambiguation", rule=ReminderIntentRule())
 
 register_rule(phase="fallback", rule=ActionableIntentRule())
 

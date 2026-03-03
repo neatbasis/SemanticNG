@@ -22,6 +22,7 @@ from state_renormalization.adapters.schema_selector import (
 from state_renormalization.contracts import (
     CaptureOutcome,
     CaptureStatus,
+    ClarificationSlotId,
     SchemaHit,
     SchemaSelection,
 )
@@ -244,3 +245,15 @@ def test_selector_pipeline_surfaces_policy_findings_for_ambiguity_phase() -> Non
     assert any(
         f.code == "selector.prefer_clarification_on_ambiguity.v1" for f in decision.policy_findings
     )
+
+
+def test_reminder_without_schedule_requires_typed_clarification_slots() -> None:
+    sel = naive_schema_selector(text="remind me to check the report", error=None)
+
+    assert [hit.name for hit in sel.schemas] == ["clarify.reminder", "clarification_needed"]
+    assert sel.ambiguities
+    ask = sel.ambiguities[0].ask
+    bind_keys = [q.bind.key for q in ask if q.bind is not None]
+    assert ClarificationSlotId.REMINDER_SCHEDULE.value in bind_keys
+    assert ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value in bind_keys
+    assert ClarificationSlotId.REMINDER_TARGET_ENTITY.value in bind_keys

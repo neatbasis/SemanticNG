@@ -20,6 +20,7 @@ from state_renormalization.contracts import (
     CaptureStatus,
     ClarifyingQuestion,
     ClarificationSlotId,
+    IntentOutput,
     ResolutionPolicy,
     SchemaHit,
     SchemaSelection,
@@ -202,11 +203,16 @@ def _amb(
 
 
 def _selection(
-    *, schemas: list[SchemaHit], ambiguities: list[Ambiguity], notes: str | None = None
+    *,
+    schemas: list[SchemaHit],
+    ambiguities: list[Ambiguity],
+    intent_outputs: list[IntentOutput] | None = None,
+    notes: str | None = None,
 ) -> SchemaSelection:
     return SchemaSelection(
         schemas=sort_schema_hits(schemas),
         ambiguities=ambiguities,
+        intent_outputs=intent_outputs or [],
         notes=notes,
     )
 
@@ -303,6 +309,19 @@ class ReminderIntentRule(BaseRule):
 
     def emit(self, ctx: SelectorCheckContext) -> SchemaSelection:
         return _reminder_missing_schedule_emit(ctx)
+
+
+@dataclass(frozen=True)
+class ReminderMissionCreateIntentRule(BaseRule):
+    name: str = "reminder_mission_create_intent"
+
+    def applies(self, ctx: SelectorCheckContext) -> bool:
+        return bool(ctx.metadata.get("mentions_reminder")) and bool(
+            ctx.metadata.get("has_schedule_signal")
+        )
+
+    def emit(self, ctx: SelectorCheckContext) -> SchemaSelection:
+        return _reminder_mission_create_emit(ctx)
 
 
 @dataclass(frozen=True)
@@ -516,6 +535,28 @@ def _actionable_emit(ctx: SelectorCheckContext) -> SchemaSelection:
     )
 
 
+def _reminder_mission_create_emit(ctx: SelectorCheckContext) -> SchemaSelection:
+    about = _about(AboutKind.INTENT, "reminder.intent", span_text=ctx.raw)
+    return _selection(
+        schemas=[SchemaHit(name="intent.mission_create", score=0.91, about=about)],
+        ambiguities=[],
+        intent_outputs=[
+            IntentOutput(
+                type="mission_creation",
+                payload={
+                    "intent": "reminder.create",
+                    "ambiguity_state": "resolved",
+                    "required_slots": [
+                        ClarificationSlotId.REMINDER_SCHEDULE.value,
+                        ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value,
+                        ClarificationSlotId.REMINDER_TARGET_ENTITY.value,
+                    ],
+                },
+            )
+        ],
+    )
+
+
 def build_selector_context(text: str | None, *, error: CaptureOutcome | None) -> SelectorContext:
     raw = text or ""
     normalized = normalize_text(raw)
@@ -632,6 +673,7 @@ register_rule(phase="ambiguity-disambiguation", rule=UrlIntentRule())
 register_rule(phase="ambiguity-disambiguation", rule=TimerUnitRule())
 register_rule(phase="ambiguity-disambiguation", rule=UncertaintyRule())
 register_rule(phase="ambiguity-disambiguation", rule=ReminderIntentRule())
+register_rule(phase="fallback", rule=ReminderMissionCreateIntentRule(), prepend=True)
 
 register_rule(phase="fallback", rule=ActionableIntentRule())
 

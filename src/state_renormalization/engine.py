@@ -6,6 +6,7 @@ from __future__ import annotations
 # module only via the ordered integration stack documented in docs/integration_notes.md.
 import hashlib
 import importlib
+import json
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -24,6 +25,7 @@ from state_renormalization.adapters.persistence import (
     append_ask_outbox_response_event,
     append_halt,
     append_jsonl,
+    append_mission_created_event,
     append_prediction_event,
     append_prediction_record_event,
     iter_projection_lineage_records,
@@ -237,6 +239,140 @@ def _extract_typed_slot_values(
     if not isinstance(ask_slots, Mapping):
         return {}
     return {slot_id: ask_slots[slot_id] for slot_id in required_slots if slot_id in ask_slots}
+
+
+def _build_canonical_mission_draft(
+    *,
+    ask_slots: Mapping[str, Any] | None,
+    bindings: Mapping[str, Any],
+) -> dict[str, Any]:
+    merged: dict[str, Any] = {}
+    for slot in _REMINDER_TYPED_SLOTS:
+        if isinstance(bindings.get(slot), str) and str(bindings[slot]).strip():
+            merged[slot] = str(bindings[slot]).strip()
+    if isinstance(ask_slots, Mapping):
+        for slot in _REMINDER_TYPED_SLOTS:
+            value = ask_slots.get(slot)
+            if isinstance(value, str) and value.strip():
+                merged[slot] = value.strip()
+
+    completion = merged.get(ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value, "manual")
+    entity = merged.get(ClarificationSlotId.REMINDER_TARGET_ENTITY.value)
+    schedule = merged.get(ClarificationSlotId.REMINDER_SCHEDULE.value)
+    return {
+        "kind": "follow_up",
+        "intent": "reminder.create",
+        "schedule": schedule,
+        "completion_mode": completion,
+        "entity_ref": {"kind": "reminder_target", "ref": entity},
+        "slot_bindings": merged,
+    }
+
+
+def _find_latest_ask_outbox_response_ref(ep: Episode) -> str | None:
+    for artifact in reversed(ep.artifacts):
+        if artifact.get("artifact_kind") != "ask_outbox_response":
+            continue
+        response = artifact.get("response")
+        if isinstance(response, Mapping) and isinstance(response.get("request_id"), str):
+            return f"ask_outbox_response:{response['request_id']}"
+    return None
+
+
+def _maybe_create_mission_from_intent(
+    *,
+    ep: Episode,
+    belief: BeliefState,
+    projection_state: ProjectionState,
+    prediction_log_path: str | Path,
+) -> ProjectionState:
+    if "intent.mission_create" not in belief.active_schemas:
+        return projection_state
+
+    draft = belief.bindings.get("mission.draft")
+    if not isinstance(draft, Mapping):
+        return projection_state
+
+    entity_ref = draft.get("entity_ref") if isinstance(draft.get("entity_ref"), Mapping) else {}
+    entity_value = entity_ref.get("ref")
+    schedule = draft.get("schedule")
+    if not isinstance(entity_value, str) or not entity_value.strip() or not isinstance(schedule, str):
+        return projection_state
+
+    intent_hash = hashlib.sha256(
+        json.dumps({"schemas": sorted(belief.active_schemas)}, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:16]
+    idempotency_key = f"{ep.conversation_id}:{ep.turn_index}:{intent_hash}"
+    for existing in [
+        *projection_state.active_missions.values(),
+        *projection_state.deferred_missions.values(),
+        *projection_state.completed_missions.values(),
+    ]:
+        if existing.idempotency_key == idempotency_key:
+            _append_episode_artifact(
+                ep,
+                {
+                    "artifact_kind": "mission_create_skipped",
+                    "reason": "idempotent_replay",
+                    "idempotency_key": idempotency_key,
+                    "mission_id": existing.mission_id,
+                },
+            )
+            return projection_state
+
+    now = _now_iso()
+    mission_id = _new_id("mission:")
+    response_ref = _find_latest_ask_outbox_response_ref(ep) or (
+        f"ask_response:{ep.conversation_id}:{ep.turn_index}"
+    )
+    mission_event = MissionLifecycleEvent(
+        event_kind="mission_created",
+        mission=MissionContract(
+            mission_id=mission_id,
+            mission_identity=f"reminder:{entity_value.strip().lower()}",
+            idempotency_key=idempotency_key,
+            kind="follow_up",
+            entity_ref={"kind": "reminder_target", "ref": entity_value.strip()},
+            completion_mode=draft.get("completion_mode", "manual"),
+            status="active",
+            created_at_iso=now,
+            updated_at_iso=now,
+            lineage_refs=[
+                {
+                    "relation": "resolved_by",
+                    "mission_id": mission_id,
+                    "event_ref": response_ref,
+                }
+            ],
+        ),
+    )
+    mission_ref = append_mission_created_event(
+        mission_event.model_dump(mode="json"),
+        adapter_gate=CapabilityAdapterGate(invocation_id=_new_id("invoke:"), allowed=True),
+        path=prediction_log_path,
+    )
+    append_jsonl(
+        prediction_log_path,
+        {
+            "event_kind": "ask_response_mission_link",
+            "relation": "resolved_by",
+            "response_ref": response_ref,
+            "mission_id": mission_id,
+            "idempotency_key": idempotency_key,
+            "created_at_iso": now,
+        },
+    )
+
+    _append_episode_artifact(
+        ep,
+        {
+            "artifact_kind": "mission_created",
+            "mission": mission_event.mission.model_dump(mode="json"),
+            "evidence_ref": mission_ref,
+            "idempotency_key": idempotency_key,
+        },
+    )
+    return _project_mission_lifecycle(projection_state, mission_event)
 
 class InterventionLifecycleHook(Protocol):
     def __call__(
@@ -1918,6 +2054,7 @@ def derive_projection_analytics_from_lineage(
         "repair_decision",
         "ask_outbox_request",
         "ask_outbox_response",
+        "ask_response_mission_link",
         "mission_created",
         "mission_deferred",
         "mission_completed",
@@ -1955,6 +2092,15 @@ def derive_projection_analytics_from_lineage(
                 resolved_requests[response.request_id] = response
                 request_outcome_linkage[response.request_id] = response.status
                 outstanding_requests.pop(response.request_id, None)
+                continue
+
+            elif kind == "ask_response_mission_link":
+                response_ref = raw.get("response_ref")
+                mission_id = raw.get("mission_id")
+                if isinstance(response_ref, str) and ":" in response_ref:
+                    request_id = response_ref.split(":", 1)[1]
+                    if isinstance(mission_id, str):
+                        request_outcome_linkage[request_id] = mission_id
                 continue
 
             # Apply correction accounting if we got a corrected prediction.
@@ -2164,6 +2310,9 @@ def _reconcile_predictions(
     return ProjectionState(
         current_predictions=dict(updated_projection.current_predictions),
         prediction_history=list(updated_projection.prediction_history),
+        active_missions=dict(updated_projection.active_missions),
+        deferred_missions=dict(updated_projection.deferred_missions),
+        completed_missions=dict(updated_projection.completed_missions),
         correction_metrics=metrics,
         last_comparison_at_iso=_now_iso() if compared else projection_state.last_comparison_at_iso,
         updated_at_iso=_now_iso(),
@@ -2406,6 +2555,12 @@ def run_mission_loop(
 
     ep, belief = apply_utterance_interpretation(ep, belief)
     ep, belief = apply_schema_bubbling(ep, belief)
+    updated_projection = _maybe_create_mission_from_intent(
+        ep=ep,
+        belief=belief,
+        projection_state=updated_projection,
+        prediction_log_path=prediction_log_path,
+    )
     append_turn_summary(ep)
     return ep, belief, updated_projection
 
@@ -2690,6 +2845,12 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
             else:
                 belief.pending_attempts += 1
 
+    if any(schema_name == "intent.mission_create" for schema_name in belief.active_schemas):
+        belief.bindings["mission.draft"] = _build_canonical_mission_draft(
+            ask_slots=ep.ask.slots,
+            bindings=belief.bindings,
+        )
+
     belief.belief_version += 1
     belief.updated_at_iso = _now_iso()
 
@@ -2709,6 +2870,7 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
                 for h in sel.schemas
             ],
             "ambiguities": [_to_dict(a) for a in belief.ambiguities_active],
+            "intent_outputs": [_to_dict(o) for o in sel.intent_outputs],
             "ambiguity_state": belief.ambiguity_state.value,
             "notes": sel.notes,
             "pending_about": _to_dict(belief.pending_about),
@@ -2720,6 +2882,7 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
                 if isinstance(belief.pending_about, Mapping)
                 else None
             ),
+            "mission_draft": _to_dict(belief.bindings.get("mission.draft")),
         },
     )
 

@@ -257,3 +257,15 @@ def test_reminder_without_schedule_requires_typed_clarification_slots() -> None:
     assert ClarificationSlotId.REMINDER_SCHEDULE.value in bind_keys
     assert ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value in bind_keys
     assert ClarificationSlotId.REMINDER_TARGET_ENTITY.value in bind_keys
+
+
+def test_reminder_with_schedule_emits_mission_creation_intent_output_only_after_resolution() -> None:
+    ambiguous = naive_schema_selector(text="remind me to check the report", error=None)
+    assert [hit.name for hit in ambiguous.schemas] == ["clarify.reminder", "clarification_needed"]
+    assert ambiguous.intent_outputs == []
+
+    resolved = naive_schema_selector(text="remind me tomorrow morning to check the report", error=None)
+    assert [hit.name for hit in resolved.schemas] == ["intent.mission_create"]
+    assert len(resolved.intent_outputs) == 1
+    assert resolved.intent_outputs[0].type == "mission_creation"
+    assert resolved.intent_outputs[0].payload["ambiguity_state"] == "resolved"

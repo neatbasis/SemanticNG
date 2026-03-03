@@ -235,7 +235,15 @@ class SchemaSelection(BaseModel):
 
     schemas: list[SchemaHit] = Field(default_factory=list)
     ambiguities: list[Ambiguity] = Field(default_factory=list)
+    intent_outputs: list[IntentOutput] = Field(default_factory=list)
     notes: str | None = None
+
+
+class IntentOutput(BaseModel):
+    model_config = _CONTRACT_CONFIG
+
+    type: str
+    payload: dict[str, Any] = Field(default_factory=dict)
 
 
 def project_ambiguity_state(ambiguities: list[Ambiguity]) -> AmbiguityStatus:
@@ -1004,6 +1012,7 @@ class MissionContract(BaseModel):
 
     mission_id: str
     mission_identity: str
+    idempotency_key: str | None = None
     kind: MissionKind
     entity_ref: MissionEntityRef
     schedule_policy: MissionFreshnessPolicy = Field(default_factory=MissionFreshnessPolicy)

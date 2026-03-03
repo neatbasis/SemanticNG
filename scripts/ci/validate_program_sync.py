@@ -100,8 +100,15 @@ def _validate_governed_paths_sync(manifest: dict[str, Any]) -> list[Issue]:
 
     if not src_globs:
         issues.append(Issue(str(DOD_MANIFEST_PATH), "governed_paths.src must list governed src globs"))
-    if not any(fnmatch.fnmatch("src/core/example.py", pattern) for pattern in src_globs):
-        issues.append(Issue(str(DOD_MANIFEST_PATH), "governed_paths.src must include src/core/**"))
+
+    required_src_examples = {
+        "src/core/**": "src/core/example.py",
+        "src/state_renormalization/**": "src/state_renormalization/example.py",
+        "src/semanticng/**": "src/semanticng/example.py",
+    }
+    for required_glob, sample_path in required_src_examples.items():
+        if not any(fnmatch.fnmatch(sample_path, pattern) for pattern in src_globs):
+            issues.append(Issue(str(DOD_MANIFEST_PATH), f"governed_paths.src must include {required_glob}"))
 
     expected_src_sentence = f"Governed source scope (canonical): {', '.join(src_globs)}"
     for doc_path in (README_PATH, DEVELOPMENT_PATH):

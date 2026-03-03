@@ -66,12 +66,12 @@ Guardrail classification guidance for contributors (invariants vs policies vs he
 
 Before merge, required CI checks must be green for the pull request scope.
 
-Governed source scope (canonical): src/core/**, src/state_renormalization/** (source: `docs/dod_manifest.json#governed_paths.src`).
+Governed source scope (canonical): src/core/**, src/state_renormalization/**, src/semanticng/** (source: `docs/dod_manifest.json#governed_paths.src`).
 
 **Enforcement model (explicit):** poka-yoke blockers are `Quality Guardrails` blocking jobs globally plus `State Renormalization Milestone Gate` only on milestone-governed paths; measurement-only telemetry is `Quality Guardrails / policy-measurement` and the milestone workflow promotion-check measurement note.
 
 - `Quality Guardrails` is the baseline required quality suite (pre-commit parity, pytest + coverage gate, and full-surface mypy).
-- `State Renormalization Milestone Gate` is a **conditional blocker** only for milestone-governed path changes (for example `src/core/**, src/state_renormalization/**` and milestone governance docs/workflows).
+- `State Renormalization Milestone Gate` is a **conditional blocker** only for milestone-governed path changes (for example `src/core/**, src/state_renormalization/**, src/semanticng/**` and milestone governance docs/workflows).
 - Coverage reporting is produced in CI by the `Quality Guardrails` workflow (`pytest --cov --cov-report=term-missing --cov-report=xml`).
 
 ### How this is enforced

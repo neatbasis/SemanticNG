@@ -217,6 +217,95 @@ This completes the slice migration.
 
 ---
 
+
+# Concrete migration slice plan (deterministic path)
+
+## Slice ID
+`core-slice-invariant-eval-orchestration-v1`
+
+## Capability scope
+Migrate **invariant evaluation orchestration** into `src/core` while keeping persistence, schema-selection, and observation adapters in `src/state_renormalization`.
+
+### Why this slice
+* Deterministic decision path already exists (given explicit inputs).
+* High leverage: this flow sits on the critical halt/allow gate boundary.
+* Existing tests in `tests/test_invariants.py` and gate-contract suites provide a parity baseline.
+
+## 1) Seam contract (define first)
+Create an explicit seam contract in `src/core` for orchestration-level invariant evaluation.
+
+**Proposed contract surface**
+* `InvariantEvaluationInput`
+  * normalized candidate state
+  * relevant contract/invariant payloads
+  * deterministic context bundle (clock/id/random already resolved before core)
+* `InvariantEvaluationResult`
+  * per-invariant outcomes (pass/fail/non-applicable)
+  * normalized halt recommendation + reason taxonomy
+  * deterministic evidence payload (stable ordering)
+* `InvariantEvaluationPort` (if external lookups are still needed)
+  * narrow read-only hooks that adapters implement in `src/state_renormalization/adapters/`
+
+**Boundary rule for this slice**
+* `src/core` owns decision logic and result shaping.
+* `src/state_renormalization` owns I/O, serialization, storage, and adapter calls.
+
+## 2) Add parity tests around current behavior
+Before moving logic, capture legacy behavior with explicit parity fixtures.
+
+**Parity test plan**
+* Add fixture-driven tests that execute the same inputs through:
+  1) current orchestration path in `src/state_renormalization`, and
+  2) new `src/core` orchestration entrypoint.
+* Normalize non-semantic variance (ordering/metadata) before compare.
+* Assert parity on:
+  * halt vs continue outcome,
+  * per-invariant status matrix,
+  * reason/evidence shape.
+
+**Suggested test locations**
+* Extend `tests/test_invariants.py` for matrix parity cases.
+* Extend `tests/test_predictions_contracts_and_gates.py` for halt contract parity.
+
+## 3) Move deterministic logic to `src/core`
+Migrate only deterministic orchestration behavior first:
+
+* Rule evaluation ordering and aggregation.
+* Conflict resolution between invariant outcomes.
+* Final deterministic recommendation shaping.
+
+Do **not** move:
+* persistence writes,
+* schema adapter integration,
+* observation freshness adapter calls,
+* any filesystem/network access.
+
+## 4) Keep adapters/I-O in `src/state_renormalization`
+Leave imperative shell responsibilities in place and thin them:
+
+* Keep adapter implementations under `src/state_renormalization/adapters/`.
+* Keep orchestration caller/wiring in `src/state_renormalization/engine.py` as a facade.
+* Facade should map adapter data into seam input, call core, then map result to existing external contract.
+
+## 5) Completion marker in roadmap/manifest notes
+When parity is green and routing is switched, append this exact marker in planning artifacts:
+
+* **ROADMAP decision notes log marker**
+  * `COMPLETION-MARKER: core-slice-invariant-eval-orchestration-v1 (parity=yes, routed_to_core=yes, adapters_unchanged=yes)`
+* **Manifest evidence note marker**
+  * `COMPLETION-MARKER: core-slice-invariant-eval-orchestration-v1` + links to parity test command output and CI run.
+
+A slice is not complete until both markers are present.
+
+## Exit criteria for this slice
+* Seam contract merged and used by the engine facade.
+* Parity tests pass in CI for legacy-vs-core comparison.
+* Deterministic orchestration logic is imported from `src/core` only.
+* Adapter/I-O responsibilities remain under `src/state_renormalization`.
+* Completion markers added to roadmap + manifest notes.
+
+---
+
 # PR checklist (required for all refactoring PRs)
 
 Every refactoring PR must satisfy:

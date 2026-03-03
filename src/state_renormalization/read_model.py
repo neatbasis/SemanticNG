@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Literal
 
 from state_renormalization.adapters.persistence import iter_projection_lineage_records, read_jsonl
 
@@ -15,9 +16,11 @@ def _collect_prediction_used(
     prediction_log_path: str | Path,
     episode_id: str,
     scope: str,
+    query_mode: Literal["latest", "as_of"] = "latest",
+    as_of_iso: str | None = None,
 ) -> dict[str, object] | None:
     latest: dict[str, object] | None = None
-    for row in iter_projection_lineage_records(prediction_log_path):
+    for row in iter_projection_lineage_records(prediction_log_path, query_mode=query_mode, as_of_iso=as_of_iso):
         kind = row.get("event_kind")
         if kind not in {"prediction", "prediction_record"}:
             continue
@@ -45,6 +48,8 @@ def project_episode_scope_read_model(
     prediction_log_path: str | Path,
     episode_id: str,
     scope: str,
+    query_mode: Literal["latest", "as_of"] = "latest",
+    as_of_iso: str | None = None,
 ) -> dict[str, object]:
     selected_episode: dict[str, object] | None = None
     for _, row in read_jsonl(episode_log_path):
@@ -123,6 +128,8 @@ def project_episode_scope_read_model(
         prediction_log_path=prediction_log_path,
         episode_id=episode_id,
         scope=scope,
+        query_mode=query_mode,
+        as_of_iso=as_of_iso,
     )
 
     if prediction_used is not None:
@@ -135,6 +142,16 @@ def project_episode_scope_read_model(
                     and isinstance(ref.get("ref"), str)
                 ):
                     evidence_refs.append({"kind": ref["kind"], "ref": ref["ref"]})
+
+    temporal_halts = [
+        row
+        for row in iter_projection_lineage_records(
+            prediction_log_path, query_mode=query_mode, as_of_iso=as_of_iso
+        )
+        if row.get("invariant_id") == "time_travel_answering.as_of.v1"
+    ]
+    if temporal_halts:
+        raise ValueError("temporal constraints cannot be satisfied for requested as_of")
 
     policy_decision = selected_episode.get("policy_decision")
     if not isinstance(policy_decision, dict):
@@ -170,6 +187,14 @@ def project_episode_scope_read_model(
         },
         "halt_continue_rationale": rationale,
         "evidence_refs": evidence_refs,
+        "answer_provenance": {
+            "temporal_invariant": {
+                "invariant_id": "time_travel_answering.as_of.v1",
+                "query_mode": query_mode,
+                "as_of_iso": as_of_iso,
+                "satisfied": True,
+            }
+        },
     }
 
 
@@ -179,11 +204,15 @@ def project_episode_scope_read_model_json(
     prediction_log_path: str | Path,
     episode_id: str,
     scope: str,
+    query_mode: Literal["latest", "as_of"] = "latest",
+    as_of_iso: str | None = None,
 ) -> str:
     payload = project_episode_scope_read_model(
         episode_log_path=episode_log_path,
         prediction_log_path=prediction_log_path,
         episode_id=episode_id,
         scope=scope,
+        query_mode=query_mode,
+        as_of_iso=as_of_iso,
     )
     return json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2)

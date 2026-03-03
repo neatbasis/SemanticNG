@@ -421,6 +421,7 @@
       "docs/doc_freshness_slo.json",
       "docs/release_checklist.md",
       "docs/documentation_change_control.md",
+      "docs/definition_of_complete.md",
       "docs/sprint_handoffs/**",
       "docs/system_contract_map.md",
       "ROADMAP.md",

@@ -109,6 +109,19 @@ Minimum evidence baseline:
 - Replay analytics suites that verify lineage recovery.
 
 
+### Gate E: sprint substrate value increment
+
+- Each sprint must include **at least one** delivered increment that is user-visible or provides clear external value, and that increment must be explicitly tied to substrate capabilities/governance in this repository.
+- Sprint-close evidence must link the increment to the enabling substrate contract(s), gate(s), or replay/governance artifact(s) it depends on.
+- If no qualifying increment is shipped, sprint close is incomplete and requires an explicit governance waiver with owner, rationale, and recovery sprint.
+
+Accepted evidence examples (at least one per sprint):
+
+1. A new end-to-end scenario demonstrating real decision value.
+2. An external adapter integration with policy gating.
+3. A deterministic replay artifact that answers a concrete product question.
+
+
 ## Promotion synchronization + handoff protocol
 
 Capability status/maturity promotions are only complete when the governance triplet and progress artifact are updated together in one PR:
@@ -136,4 +149,4 @@ Explicit handoff ownership:
 - This document defines when those capabilities are considered complete at capability, integration, and system layers.
 - `docs/system_contract_map.md` remains the source of truth for contract maturity and changelog evidence.
 
-_Last regenerated from manifest: 2026-03-01T00:00:00Z (UTC)._
+_Last regenerated from manifest: 2026-03-03T00:00:00Z (UTC)._

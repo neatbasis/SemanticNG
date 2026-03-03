@@ -10,7 +10,7 @@ import json
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any, Protocol, TypeAlias
@@ -26,6 +26,7 @@ from state_renormalization.adapters.persistence import (
     append_halt,
     append_jsonl,
     append_mission_created_event,
+    append_mission_lifecycle_event,
     append_prediction_event,
     append_prediction_record_event,
     iter_projection_lineage_records,
@@ -398,6 +399,158 @@ def _parse_iso8601(value: str) -> datetime | None:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=UTC)
     return parsed
+
+
+def _to_utc_iso(value: str | None) -> str:
+    parsed = _parse_iso8601(value or "")
+    if parsed is None:
+        return _now_iso()
+    return parsed.astimezone(UTC).isoformat()
+
+
+def _mission_open_ask_requests(prediction_log_path: str | Path) -> dict[str, list[str]]:
+    open_by_mission: dict[str, list[str]] = {}
+    request_to_mission: dict[str, str] = {}
+
+    for raw in iter_projection_lineage_records(prediction_log_path):
+        kind = raw.get("event_kind")
+        if kind == "ask_outbox_request":
+            metadata = raw.get("metadata")
+            request_id = raw.get("request_id")
+            mission_id = metadata.get("mission_id") if isinstance(metadata, Mapping) else None
+            if isinstance(request_id, str) and isinstance(mission_id, str):
+                request_to_mission[request_id] = mission_id
+                open_by_mission.setdefault(mission_id, []).append(request_id)
+        elif kind == "ask_outbox_response":
+            request_id = raw.get("request_id")
+            if isinstance(request_id, str):
+                mission_id = request_to_mission.get(request_id)
+                if mission_id is None:
+                    continue
+                open_requests = [req for req in open_by_mission.get(mission_id, []) if req != request_id]
+                if open_requests:
+                    open_by_mission[mission_id] = open_requests
+                else:
+                    open_by_mission.pop(mission_id, None)
+    return open_by_mission
+
+
+def _emit_due_mission_prompts(
+    *,
+    ep: Episode,
+    projection_state: ProjectionState,
+    prediction_log_path: str | Path,
+    ask_outbox_adapter: AskOutboxAdapter | None,
+) -> ProjectionState:
+    if ask_outbox_adapter is None:
+        return projection_state
+
+    updated_projection = projection_state
+    clock_iso = _to_utc_iso(ep.t_asked_iso)
+    clock = _parse_iso8601(clock_iso)
+    if clock is None:
+        return projection_state
+
+    open_asks = _mission_open_ask_requests(prediction_log_path)
+
+    missions = [
+        *updated_projection.active_missions.values(),
+        *updated_projection.deferred_missions.values(),
+    ]
+    for mission in missions:
+        due_at_iso = mission.next_prompt_at or mission.created_at_iso
+        due_at = _parse_iso8601(due_at_iso)
+        if due_at is None:
+            continue
+        due_at = due_at.astimezone(UTC)
+        if due_at > clock:
+            continue
+
+        existing_open = open_asks.get(mission.mission_id, [])
+        if existing_open:
+            _append_episode_artifact(
+                ep,
+                {
+                    "artifact_kind": "mission_prompt_skipped",
+                    "mission_id": mission.mission_id,
+                    "reason": "open_ask_exists",
+                    "open_request_ids": existing_open,
+                },
+            )
+            continue
+
+        context = {
+            "mission_id": mission.mission_id,
+            "mission_identity": mission.mission_identity,
+            "mission_status": mission.status.value,
+            "engine_clock_iso": clock_iso,
+            "due_at_iso": due_at.isoformat(),
+            "overdue": due_at < clock,
+            "timezone": "UTC",
+        }
+        request_id = ask_outbox_adapter.create_request(
+            f"Mission follow-up due: {mission.mission_identity}",
+            "Please provide the latest status update for this mission.",
+            context,
+        )
+
+        request_artifact = AskOutboxRequestArtifact(
+            request_id=request_id,
+            scope="mission_scheduler",
+            reason="due_mission_prompt",
+            created_at_iso=clock_iso,
+            metadata=context,
+        )
+        request_ref = append_ask_outbox_request_event(
+            request_artifact.model_dump(mode="json"),
+            adapter_gate=CapabilityAdapterGate(invocation_id=_new_id("invoke:"), allowed=True),
+            path=prediction_log_path,
+        )
+
+        min_interval = mission.schedule_policy.min_prompt_interval_s or 0
+        next_prompt_at_iso = (clock + timedelta(seconds=min_interval)).isoformat()
+        updated_mission = mission.model_copy(
+            update={"next_prompt_at": next_prompt_at_iso, "updated_at_iso": clock_iso}
+        )
+        lifecycle_event = MissionLifecycleEvent(
+            event_kind="mission_prompted",
+            mission=updated_mission,
+            prompted_at_iso=clock_iso,
+            ask_ref=f"ask_outbox_request:{request_id}",
+        )
+        mission_ref = append_mission_lifecycle_event(
+            lifecycle_event.model_dump(mode="json"),
+            adapter_gate=CapabilityAdapterGate(invocation_id=_new_id("invoke:"), allowed=True),
+            path=prediction_log_path,
+        )
+
+        _append_episode_artifact(
+            ep,
+            {
+                "artifact_kind": "ask_outbox_request",
+                "phase": "mission_scheduler",
+                "request": request_artifact.model_dump(mode="json"),
+                "evidence_ref": request_ref,
+            },
+        )
+        _append_episode_artifact(
+            ep,
+            {
+                "artifact_kind": "mission_prompted",
+                "mission_id": mission.mission_id,
+                "ask_ref": lifecycle_event.ask_ref,
+                "prompted_at_iso": clock_iso,
+                "due_at_iso": due_at.isoformat(),
+                "overdue": due_at < clock,
+                "next_prompt_at": next_prompt_at_iso,
+                "evidence_ref": mission_ref,
+            },
+        )
+
+        open_asks.setdefault(mission.mission_id, []).append(request_id)
+        updated_projection = _project_mission_lifecycle(updated_projection, lifecycle_event)
+
+    return updated_projection
 
 
 def _observation_matches_scope(*, observation: Observation, scope: str) -> bool:
@@ -1990,7 +2143,7 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
                 records_processed += 1
                 continue
 
-        if kind in {"mission_created", "mission_deferred", "mission_completed"}:
+        if kind in {"mission_created", "mission_deferred", "mission_completed", "mission_prompted"}:
             mission_event = MissionLifecycleEvent.model_validate(raw)
             projection = _project_mission_lifecycle(projection, mission_event)
             records_processed += 1
@@ -2058,6 +2211,7 @@ def derive_projection_analytics_from_lineage(
         "mission_created",
         "mission_deferred",
         "mission_completed",
+        "mission_prompted",
     }
 
     for raw in records:
@@ -2394,6 +2548,13 @@ def run_mission_loop(
     )
     if not should_continue:
         return ep, belief, updated_projection
+
+    updated_projection = _emit_due_mission_prompts(
+        ep=ep,
+        projection_state=updated_projection,
+        prediction_log_path=prediction_log_path,
+        ask_outbox_adapter=ask_outbox_adapter,
+    )
 
     if observation_freshness_policy_adapter is not None:
         evaluate_observation_freshness(

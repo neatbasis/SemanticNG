@@ -151,3 +151,57 @@ def test_iter_projection_lineage_records_includes_ask_outbox_events_for_replay(
     lineage_twice = list(iter_projection_lineage_records(path))
 
     assert lineage_once == lineage_twice == [request, response]
+
+
+def test_iter_projection_lineage_records_as_of_emits_halt_and_rejects_future_artifacts(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "predictions.jsonl"
+
+    append_jsonl(
+        path,
+        {
+            "event_kind": "prediction",
+            "prediction_id": "pred:past",
+            "issued_at_iso": "2026-02-14T00:00:00+00:00",
+        },
+    )
+    append_jsonl(
+        path,
+        {
+            "event_kind": "prediction",
+            "prediction_id": "pred:future",
+            "issued_at_iso": "2026-02-14T00:10:00+00:00",
+        },
+    )
+
+    lineage = list(
+        iter_projection_lineage_records(
+            path,
+            query_mode="as_of",
+            as_of_iso="2026-02-14T00:05:00+00:00",
+        )
+    )
+
+    assert [row.get("prediction_id") for row in lineage if row.get("event_kind") == "prediction"] == [
+        "pred:past"
+    ]
+    temporal_halts = [
+        row for row in lineage if row.get("invariant_id") == "time_travel_answering.as_of.v1"
+    ]
+    assert len(temporal_halts) == 1
+    assert temporal_halts[0]["details"]["policy_code"] == "artifact_after_as_of"
+
+
+def test_iter_projection_lineage_records_as_of_emits_halt_for_missing_timestamp(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "predictions.jsonl"
+    append_jsonl(path, {"event_kind": "prediction", "prediction_id": "pred:no-time"})
+
+    lineage = list(
+        iter_projection_lineage_records(path, query_mode="as_of", as_of_iso="2026-02-14T00:05:00+00:00")
+    )
+    assert len(lineage) == 1
+    assert lineage[0]["invariant_id"] == "time_travel_answering.as_of.v1"
+    assert lineage[0]["details"]["policy_code"] == "missing_artifact_timestamp"

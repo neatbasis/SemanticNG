@@ -472,3 +472,40 @@ def test_replay_projection_rejects_mission_completed_without_valid_evidence(tmp_
 
     with pytest.raises(ValueError, match="completion_evidence_ref"):
         replay_projection_analytics(mission_log)
+
+
+def test_replay_projection_analytics_as_of_fails_closed_on_future_artifact(tmp_path: Path) -> None:
+    log_path = tmp_path / "predictions.jsonl"
+    append_jsonl(
+        log_path,
+        {
+            "event_kind": "prediction",
+            "prediction_id": "pred:past",
+            "scope_key": "turn:1",
+            "filtration_id": "conversation:c1",
+            "target_variable": "user_response_present",
+            "target_horizon_iso": "2026-02-13T00:00:00+00:00",
+            "issued_at_iso": "2026-02-13T00:00:00+00:00",
+            "expectation": 0.1,
+        },
+    )
+    append_jsonl(
+        log_path,
+        {
+            "event_kind": "prediction",
+            "prediction_id": "pred:future",
+            "scope_key": "turn:2",
+            "filtration_id": "conversation:c1",
+            "target_variable": "user_response_present",
+            "target_horizon_iso": "2026-02-13T01:00:00+00:00",
+            "issued_at_iso": "2026-02-13T01:00:00+00:00",
+            "expectation": 0.2,
+        },
+    )
+
+    with pytest.raises(ValueError, match="temporal constraints cannot be satisfied"):
+        replay_projection_analytics(
+            log_path,
+            query_mode="as_of",
+            as_of_iso="2026-02-13T00:30:00+00:00",
+        )

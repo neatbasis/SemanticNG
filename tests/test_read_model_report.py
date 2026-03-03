@@ -117,12 +117,19 @@ def test_project_episode_scope_read_model_has_stable_top_level_shape(tmp_path: P
         "policy_decision",
         "halt_continue_rationale",
         "evidence_refs",
+        "answer_provenance",
     ]
     assert report["episode_id"] == "ep:1"
     assert report["scope"] == "turn:1"
     assert report["policy_decision"]["decision_id"] == "dec:1"
     assert report["halt_continue_rationale"]["outcome"] == "halt"
     assert report["prediction_used"]["prediction_id"] == "pred:1"
+    assert report["answer_provenance"]["temporal_invariant"] == {
+        "invariant_id": "time_travel_answering.as_of.v1",
+        "query_mode": "latest",
+        "as_of_iso": None,
+        "satisfied": True,
+    }
 
 
 def test_project_episode_scope_read_model_json_is_deterministic(tmp_path: Path) -> None:
@@ -172,3 +179,33 @@ def test_cli_report_emits_json(tmp_path: Path) -> None:
     payload = json.loads(result.stdout)
     assert payload["episode_id"] == "ep:1"
     assert payload["scope"] == "turn:1"
+
+
+def test_project_episode_scope_read_model_as_of_fails_closed_on_future_artifact(
+    tmp_path: Path,
+) -> None:
+    episode_log, prediction_log = _write_fixture_logs(tmp_path)
+    append_jsonl(
+        prediction_log,
+        {
+            "event_kind": "prediction",
+            "episode_id": "ep:1",
+            "prediction_id": "pred:future",
+            "scope_key": "turn:1",
+            "issued_at_iso": "2026-01-01T00:10:00+00:00",
+        },
+    )
+
+    try:
+        project_episode_scope_read_model(
+            episode_log_path=episode_log,
+            prediction_log_path=prediction_log,
+            episode_id="ep:1",
+            scope="turn:1",
+            query_mode="as_of",
+            as_of_iso="2026-01-01T00:05:00+00:00",
+        )
+    except ValueError as exc:
+        assert "temporal constraints cannot be satisfied" in str(exc)
+    else:
+        raise AssertionError("expected as_of read-model projection to fail closed")

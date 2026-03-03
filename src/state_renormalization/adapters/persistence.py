@@ -4,8 +4,9 @@ from __future__ import annotations
 import json
 from collections.abc import Iterator
 from dataclasses import asdict, is_dataclass
+import hashlib
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ValidationError
 
@@ -22,6 +23,23 @@ PathLike = str | Path
 
 PREDICTIONS_LOG_PATH = Path("artifacts/predictions.jsonl")
 PREDICTION_RECORDS_LOG_PATH = Path("artifacts/prediction_records.jsonl")
+_TIME_TRAVEL_INVARIANT_ID = "time_travel_answering.as_of.v1"
+_LINEAGE_RECORD_TIME_FIELDS: tuple[str, ...] = (
+    "observed_at_iso",
+    "persisted_at_iso",
+    "event_time",
+    "event_time_iso",
+    "created_at_iso",
+    "responded_at_iso",
+    "recorded_at_iso",
+    "issued_at_iso",
+    "corrected_at_iso",
+    "compared_at_iso",
+    "prompted_at_iso",
+    "timestamp",
+    "timestamp_iso",
+    "t_asked_iso",
+)
 
 
 def _to_jsonable(x: Any) -> Any:
@@ -352,7 +370,53 @@ def append_mission_lifecycle_event(
     return append_prediction(path=path, record=event.model_dump(mode="json"), adapter_gate=adapter_gate)
 
 
-def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
+def _lineage_record_time_iso(record: JsonObj) -> str | None:
+    for key in _LINEAGE_RECORD_TIME_FIELDS:
+        value = record.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
+
+
+def _time_travel_violation_halt(
+    *,
+    as_of_iso: str,
+    source_name: str,
+    line_no: int,
+    violation_code: str,
+    artifact_kind: str,
+    observed_time_iso: str | None,
+) -> JsonObj:
+    fingerprint = hashlib.sha256(
+        f"{as_of_iso}|{line_no}|{violation_code}|{artifact_kind}|{observed_time_iso or ''}".encode(
+            "utf-8"
+        )
+    ).hexdigest()
+    return HaltRecord.build_canonical_payload(
+        halt_id=f"halt:{fingerprint}",
+        stage="adapter:projection_lineage_replay",
+        invariant_id=_TIME_TRAVEL_INVARIANT_ID,
+        reason="temporal constraint violation",
+        details={
+            "policy_code": violation_code,
+            "query_mode": "as_of",
+            "as_of_iso": as_of_iso,
+            "artifact_kind": artifact_kind,
+            "observed_time_iso": observed_time_iso,
+            "line_no": line_no,
+        },
+        evidence=[{"kind": "jsonl", "ref": f"{source_name}@{line_no}"}],
+        retryability=False,
+        timestamp=as_of_iso,
+    )
+
+
+def iter_projection_lineage_records(
+    path: PathLike,
+    *,
+    query_mode: Literal["latest", "as_of"] = "latest",
+    as_of_iso: str | None = None,
+) -> Iterator[JsonObj]:
     """Yield append-only projection lineage rows that can be rehydrated.
 
     Includes prediction events and canonical halt payload rows.
@@ -361,9 +425,11 @@ def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
     p = Path(path)
     if not p.exists():
         return
+    if query_mode == "as_of" and not isinstance(as_of_iso, str):
+        raise ValueError("as_of query mode requires as_of_iso")
 
     with p.open("r", encoding="utf-8") as handle:
-        for line in handle:
+        for line_no, line in enumerate(handle, start=1):
             raw_line = line.strip()
             if not raw_line:
                 continue
@@ -377,6 +443,7 @@ def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
                 continue
 
             kind = raw.get("event_kind")
+            candidate: JsonObj | None = None
             if kind in {
                 "prediction_record",
                 "prediction",
@@ -392,16 +459,41 @@ def iter_projection_lineage_records(path: PathLike) -> Iterator[JsonObj]:
                 "mission_prompted",
                 "context_snapshot",
             }:
-                yield raw
-                continue
+                candidate = raw
+            else:
+                # IMPORTANT:
+                # - lineage iteration should be resilient (skip malformed rows)
+                # - prefer strict Pydantic validation here so "halt" rows are guaranteed canonical
+                try:
+                    candidate = HaltRecord.validate_payload(raw).to_canonical_payload()
+                except Exception:
+                    continue
 
-            # IMPORTANT:
-            # - lineage iteration should be resilient (skip malformed rows)
-            # - prefer strict Pydantic validation here so "halt" rows are guaranteed canonical
-            try:
-                yield HaltRecord.validate_payload(raw).to_canonical_payload()
-            except Exception:
-                continue
+            if query_mode == "as_of" and isinstance(as_of_iso, str):
+                event_time = _lineage_record_time_iso(candidate)
+                artifact_kind = str(candidate.get("event_kind") or candidate.get("stage") or "unknown")
+                if event_time is None:
+                    yield _time_travel_violation_halt(
+                        as_of_iso=as_of_iso,
+                        source_name=p.name,
+                        line_no=line_no,
+                        violation_code="missing_artifact_timestamp",
+                        artifact_kind=artifact_kind,
+                        observed_time_iso=None,
+                    )
+                    continue
+                if event_time > as_of_iso:
+                    yield _time_travel_violation_halt(
+                        as_of_iso=as_of_iso,
+                        source_name=p.name,
+                        line_no=line_no,
+                        violation_code="artifact_after_as_of",
+                        artifact_kind=artifact_kind,
+                        observed_time_iso=event_time,
+                    )
+                    continue
+
+            yield candidate
 
 
 def _canonicalize_halt_payload(record: Any) -> JsonObj:

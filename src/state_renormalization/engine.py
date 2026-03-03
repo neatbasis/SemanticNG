@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Protocol, TypeAlias
+from typing import Any, Literal, Protocol, TypeAlias
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -2147,7 +2147,12 @@ def _validate_replay_completion_evidence_ref(*, event: MissionLifecycleEvent, lo
         raise ValueError("completion_evidence_ref must point to prediction/repair persisted evidence")
 
 
-def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionReplayResult:
+def replay_projection_analytics(
+    prediction_log_path: str | Path,
+    *,
+    query_mode: Literal["latest", "as_of"] = "latest",
+    as_of_iso: str | None = None,
+) -> ProjectionReplayResult:
     path = Path(prediction_log_path)
     if not path.exists():
         return ProjectionReplayResult(
@@ -2164,8 +2169,11 @@ def replay_projection_analytics(prediction_log_path: str | Path) -> ProjectionRe
     lineage_rows: list[Mapping[str, object]] = []
     seen_prediction_fingerprints: set[tuple[object, ...]] = set()
 
-    for raw in iter_projection_lineage_records(path):
+    for raw in iter_projection_lineage_records(path, query_mode=query_mode, as_of_iso=as_of_iso):
         lineage_rows.append(raw)
+        if raw.get("invariant_id") == "time_travel_answering.as_of.v1":
+            raise ValueError("temporal constraints cannot be satisfied for requested as_of")
+
         kind = raw.get("event_kind")
         if kind in {"prediction_record", "prediction"}:
             payload = {k: v for k, v in raw.items() if k in fields}

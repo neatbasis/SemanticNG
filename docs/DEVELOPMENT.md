@@ -122,6 +122,20 @@ The pre-push gate must include all of the following checks:
 
 Each stage prints deterministic failure diagnostics: exact rerun command and the first failing file paths parsed from tool output.
 
+Use the canonical local preflight command before opening/refreshing a PR:
+
+```bash
+make preflight-canonical
+```
+
+This target runs `python scripts/ci/run_stage_checks.py qa-ci --mode local`, which executes the `qa-ci` ordered stage list from `docs/process/quality_stage_commands.json` without CI env auto-switching.
+
+Interpret stop reasons from the emitted JSON line when a blocking stage fails:
+
+- `reason_code="command_failed"`: the command returned non-zero; rerun the printed `next_action` command after fixing reported files.
+- `reason_code="timeout"`: the command exceeded its timeout budget; rerun locally (same command) and reduce runtime or split work before retrying.
+- If `stop_on_fail=true`, execution halts immediately after that failure (`Stopping execution after blocking failure ...`).
+
 `qa-commit` also supports staged-path filtering to avoid expensive checks when staged changes are outside Tier-1 runtime paths:
 
 - The hook reads `git diff --cached --name-only --diff-filter=ACMR` and applies `run_if_paths` filters from `docs/process/quality_stage_commands.json`.

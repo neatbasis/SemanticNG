@@ -201,9 +201,16 @@ def main() -> int:
         action="store_true",
         help="Run every command for the selected stage, ignoring staged-path filters.",
     )
+    parser.add_argument(
+        "--mode",
+        choices=("auto", "local", "ci"),
+        default="auto",
+        help="Execution mode. 'local' disables CI env auto-detection, 'ci' forces full-stage behavior.",
+    )
     args = parser.parse_args()
 
-    full_stage = args.full_stage or os.getenv("CI", "").lower() in {"1", "true", "yes"}
+    ci_env_enabled = os.getenv("CI", "").lower() in {"1", "true", "yes"}
+    full_stage = args.full_stage or args.mode == "ci" or (args.mode == "auto" and ci_env_enabled)
     changed_files: tuple[str, ...] = ()
     if args.stage == "qa-commit" and not full_stage:
         changed_files = _staged_files()

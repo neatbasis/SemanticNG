@@ -69,5 +69,35 @@
         }
       ]
     }
-  ]
+  ],
+  "status_artifacts": {
+    "latest_directive": {
+      "id": "DR-2026-001",
+      "version": 1,
+      "date": "2026-03-01",
+      "source": "docs/directives/MILESTONE-SOURCE-OF-TRUTH.json"
+    },
+    "ci_deterministic_run_name": {
+      "stage": "qa-ci",
+      "branch": "work",
+      "value": "ci::work::canon::2299b25d9385::stage::qa-ci"
+    },
+    "last_fail_fast_stop_reason": {
+      "summary": "unknown",
+      "reason_code": "unknown",
+      "stage_id": "unknown",
+      "next_action": "Rerun failed stage command locally after triage.",
+      "reason": "No persisted fail-fast stop artifact is tracked in-repo yet."
+    },
+    "drift_incidents": {
+      "open_incident_count": 0,
+      "last_incident_summary": "none recorded",
+      "resolution_sla": {
+        "triage_business_days": 1,
+        "fix_business_days": 5,
+        "waiver_business_days": 2,
+        "source": "docs/quality_learning_loop.md"
+      }
+    }
+  }
 }

@@ -6,6 +6,18 @@
 - Required governance artifacts: `ROADMAP.md`, `docs/dod_manifest.json`, `docs/system_contract_map.md`.
 - Evidence links must be attached before status/maturity promotions are recorded.
 
+## Required status artifacts snapshot
+
+| Artifact field | Required value | Evidence/source |
+| --- | --- | --- |
+| `latest_directive.id` + `latest_directive.version` | Latest accepted directive record ID/version (for example `DR-2026-001`, `1`). | `docs/directives/*.json` |
+| `ci_deterministic_run_name.value` | Deterministic run-name emitted for `qa-ci` stage on this branch/commit. | `python scripts/ci/derive_ci_run_name.py qa-ci --branch <branch>` |
+| `last_fail_fast_stop_reason.summary` | Last fail-fast stop summary (or `unknown` with reason when unresolved). | `python scripts/ci/run_stage_checks.py <stage>` logs/artifacts |
+| `drift_incidents.*` | Current drift incident count + latest incident summary. | Drift incident tracker / governance notes |
+| `drift_incidents.resolution_sla.*` | SLA bounds (triage/fix/waiver business-day targets). | `docs/quality_learning_loop.md` |
+| `research_only_dod_usage` | Boolean (`true`/`false`) indicating whether closure relies on research-only DoD usage. | Handoff close rationale |
+| `research_only_closure_plan` | Required when `research_only_dod_usage=true`; include owner, due date, and closure path to full DoD. | Follow-up issue/plan link |
+
 ## Five-sprint objective mapping checklist
 
 - [ ] Sprint 1: one high-impact `capability_invocation_governance` boundary slice with halt semantics + evidence ref.

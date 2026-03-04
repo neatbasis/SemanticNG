@@ -1,0 +1,18 @@
+{
+  "id": "DR-2026-001",
+  "title": "Second duplicate",
+  "status": "accepted",
+  "date": "2026-01-11",
+  "owners": ["platform"],
+  "context": "Test duplicate IDs.",
+  "decision": "Create second duplicate record.",
+  "consequences": "Validator should detect duplicates.",
+  "canonical_refs": [
+    "docs/dod_manifest.json",
+    "docs/system_contract_map.md",
+    "docs/process/quality_stage_commands.json"
+  ],
+  "evidence_commands": ["echo ok"],
+  "ci_policy": "blocking",
+  "supersedes": null
+}

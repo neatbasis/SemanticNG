@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Decision Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "title",
+    "status",
+    "date",
+    "owners",
+    "context",
+    "decision",
+    "consequences",
+    "canonical_refs",
+    "evidence_commands",
+    "ci_policy",
+    "supersedes"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^DR-[0-9]{4}-[0-9]{3}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "accepted", "deprecated", "superseded"]
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "owners": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "context": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "consequences": {
+      "type": "string",
+      "minLength": 1
+    },
+    "canonical_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^(docs|src|scripts)/"
+      }
+    },
+    "evidence_commands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "ci_policy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supersedes": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "string",
+        "pattern": "^DR-[0-9]{4}-[0-9]{3}$"
+      }
+    }
+  }
+}

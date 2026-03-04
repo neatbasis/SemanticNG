@@ -1,5 +1,7 @@
 name: Quality Guardrails
 
+# topology-role: required-orchestrator
+
 # Pyproject-to-CI quality gate mapping
 #
 # | pyproject.toml section | Canonical command (Makefile) | Notes |

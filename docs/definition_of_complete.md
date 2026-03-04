@@ -149,4 +149,14 @@ Explicit handoff ownership:
 - This document defines when those capabilities are considered complete at capability, integration, and system layers.
 - `docs/system_contract_map.md` remains the source of truth for contract maturity and changelog evidence.
 
+## Research note: weaker definition of done
+
+The team acknowledges a weaker interim definition of done for research tracking:
+
+- The system can deliver its own documentation artifacts.
+- Drift detection is active and surfaces merge-conflict-producing divergence early.
+- This state is useful for research/learning loops, but it is **not** sufficient to claim full completion against the completion layers and gates above.
+
+Any sprint or milestone closing on this weaker condition must explicitly label it as research-only and include a follow-up plan to satisfy the full Definition of Complete gates.
+
 _Last regenerated from manifest: 2026-03-03T00:00:00Z (UTC)._

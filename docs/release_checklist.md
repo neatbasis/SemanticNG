@@ -54,6 +54,12 @@ Run this audit once per quarter and attach evidence in the release/governance re
 - [ ] **Quarterly exception tracking complete:** Any temporary exception/waiver is tracked via `.github/ISSUE_TEMPLATE/01-enforce-no-merge-on-red.md` and includes owner + closure date.
 - [ ] **Automated drift audit reviewed:** Latest `Branch Protection Audit` workflow run is green (or an approved incident documents remediation), and owner/escalation details in `docs/branch_protection_audit.md` are up to date.
 
+### Workflow topology policy checks (required)
+
+- [ ] **Single required orchestrator enforced:** Exactly one workflow in `.github/workflows/*.yml` carries the topology marker comment `# topology-role: required-orchestrator`.
+- [ ] **Auxiliary workflows remain evidence-only:** All workflows without the marker are configured as non-required checks (advisory/evidence-only) in branch protection and merge queue settings.
+- [ ] **Topology validator green:** `python scripts/ci/validate_workflow_topology.py` passes in CI and local release verification.
+
 ## Toolchain parity KPI tracking (release governance)
 
 Track these KPIs for each release window and summarize trend direction in release notes or governance review artifacts:

@@ -32,6 +32,15 @@ In particular, `baseline-lint-type` and `full-type-surface` are mandatory requir
 
 Milestone-gate checks remain required for PR/merge-queue entries that touch milestone-governed paths, enforced by workflow path filters.
 
+## Workflow topology policy (required-check orchestration)
+
+Exactly one GitHub Actions workflow is allowed to act as the required-check orchestrator for `main` branch protection.
+
+- **Required orchestrator marker convention:** the orchestrator workflow must include the exact comment line `# topology-role: required-orchestrator` in `.github/workflows/<workflow>.yml`.
+- **Cardinality requirement:** there must be exactly one workflow carrying this marker.
+- **Auxiliary workflow requirement:** every workflow without this marker is auxiliary and must remain non-required, evidence-only, or advisory (for example audits, weekly telemetry, or regression sentinels).
+- **Validation gate:** `python scripts/ci/validate_workflow_topology.py` enforces this topology contract by scanning `.github/workflows/*.yml`.
+
 ## Temporary exceptions (time-boxed stabilization policy)
 
 Temporary exceptions are allowed only for emergency stabilization and must satisfy all conditions below:

@@ -13,6 +13,12 @@ This canonical matrix defines mandatory documentation update paths and merge-blo
 | **Control** (validators/tests/CI checks and freshness metadata) | `.github/workflows/*` (if control gates change); `.github/scripts/validate_milestone_docs.py`; `docs/doc_freshness_slo.json`; `docs/release_checklist.md`; `tests/test_validate_milestone_docs.py` (or relevant governance tests). | `python .github/scripts/validate_milestone_docs.py`; `python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json`; `pytest tests/test_validate_milestone_docs.py tests/test_doc_freshness_slo.py`. | PR body governance/handoff mandatory section with explicit control-gate updates; sprint handoff includes validator outcomes and freshness SLO compliance timestamp. | Block merge if control-gate scripts/tests are changed without synchronized policy docs, freshness metadata is stale/missing, or CI validator coverage regresses. |
 
 
+## Directive schema validation policy
+
+- For PRs that add or modify files under `docs/directives/*.json`, include `python scripts/ci/validate_decision_records.py` in the required evidence command set.
+- Treat directive-schema validation as merge-blocking for those PRs; missing or failing evidence should be handled the same way as other governance-validator failures.
+
+
 
 ## Promotion governance one-command flow
 

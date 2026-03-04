@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -21,6 +22,8 @@ OFFLINE_MODE_BANNER = "Offline deterministic mode"
 CI_RESOLVED_MODE_BANNER = "CI-resolved mode"
 CI_UNRESOLVED_REASON = "CI not resolved offline"
 CI_RESOLVED_REASON = "resolved from canonical CI evidence"
+DIRECTIVES_DIR = Path("docs/directives")
+QUALITY_LEARNING_LOOP_PATH = Path("docs/quality_learning_loop.md")
 Issue = ValidationIssue
 
 
@@ -58,6 +61,36 @@ def _base_payload(status_show: str) -> dict[str, Any]:
                 "manifest_commit": "unknown",
                 "generated_at": "unknown",
             },
+            "latest_directive": {
+                "id": "unknown",
+                "version": "unknown",
+                "date": "unknown",
+                "source": "unknown",
+                "reason": "directive records not resolved",
+            },
+            "ci_deterministic_run_name": {
+                "stage": "qa-ci",
+                "branch": "unknown",
+                "value": "unknown",
+                "reason": "deterministic CI run-name could not be derived",
+            },
+            "last_fail_fast_stop_reason": {
+                "summary": "unknown",
+                "reason_code": "unknown",
+                "stage_id": "unknown",
+                "next_action": "unknown",
+                "reason": "no fail-fast stop reason artifact found",
+            },
+            "drift_incidents": {
+                "open_incident_count": "unknown",
+                "last_incident_summary": "unknown",
+                "resolution_sla": {
+                    "triage_business_days": 1,
+                    "fix_business_days": 5,
+                    "waiver_business_days": 2,
+                    "source": QUALITY_LEARNING_LOOP_PATH.as_posix(),
+                },
+            },
             "schema_contract": {
                 "allowed_status": sorted(STATUS_FILE_CONTRACTS["project"]["properties"]["status"]["enum"]),
                 "required_keys": list(STATUS_FILE_CONTRACTS["project"]["required"]),
@@ -85,6 +118,70 @@ def _manifest_governed_paths(manifest: dict[str, Any]) -> dict[str, list[str]]:
     src = [item for item in governed.get("src", []) if isinstance(item, str)]
     ci_triggers = [item for item in governed.get("ci_triggers", []) if isinstance(item, str)]
     return {"src": src, "ci_triggers": ci_triggers}
+
+
+def _latest_directive_record() -> dict[str, str | int]:
+    records: list[dict[str, str | int]] = []
+    for path in sorted(DIRECTIVES_DIR.glob("*.json")):
+        try:
+            payload = _load_json(path)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        record_id = payload.get("id")
+        record_date = payload.get("date")
+        if not isinstance(record_id, str) or not isinstance(record_date, str):
+            continue
+        version = payload.get("version")
+        if not isinstance(version, int):
+            match = re.search(r"-(\d+)$", record_id)
+            version = int(match.group(1)) if match else "unknown"
+        records.append(
+            {
+                "id": record_id,
+                "version": version,
+                "date": record_date,
+                "source": path.as_posix(),
+                "reason": "resolved from directive records",
+            }
+        )
+    if not records:
+        return {
+            "id": "unknown",
+            "version": "unknown",
+            "date": "unknown",
+            "source": "unknown",
+            "reason": "directive records not resolved",
+        }
+    records.sort(key=lambda item: (str(item["date"]), str(item["id"])))
+    return records[-1]
+
+
+def _resolve_ci_run_name(stage: str = "qa-ci") -> dict[str, str]:
+    branch = _safe_git("rev-parse", "--abbrev-ref", "HEAD") or "unknown"
+    try:
+        completed = subprocess.run(
+            ["python", "scripts/ci/derive_ci_run_name.py", stage, "--branch", branch],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        completed = None
+    if completed and completed.returncode == 0:
+        return {
+            "stage": stage,
+            "branch": branch,
+            "value": completed.stdout.strip() or "unknown",
+            "reason": "derived from scripts/ci/derive_ci_run_name.py",
+        }
+    return {
+        "stage": stage,
+        "branch": branch,
+        "value": "unknown",
+        "reason": "deterministic CI run-name could not be derived",
+    }
 
 def _load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -393,6 +490,8 @@ def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]
         "manifest_commit": _safe_git("rev-parse", "HEAD") or "unknown",
         "generated_at": generated_at,
     }
+    payload["meta"]["latest_directive"] = _latest_directive_record()
+    payload["meta"]["ci_deterministic_run_name"] = _resolve_ci_run_name()
 
     project, collections, collection_issues = _manifest_collections(manifest, as_of)
     payload["meta"]["schema_contract"]["governed_paths"] = _manifest_governed_paths(manifest)

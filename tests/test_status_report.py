@@ -104,3 +104,42 @@ def test_json_mode_reports_semanticng_governed_paths() -> None:
     payload = json.loads(result.stdout)
     governed_src = payload["meta"]["schema_contract"]["governed_paths"]["src"]
     assert "src/semanticng/**" in governed_src
+
+
+def test_json_mode_includes_required_status_artifacts_fields() -> None:
+    result = _run_status("json", ROOT)
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+
+    artifacts = payload["meta"]
+
+    latest_directive = artifacts["latest_directive"]
+    assert set(latest_directive) == {"id", "version", "date", "source", "reason"}
+    assert isinstance(latest_directive["id"], str)
+    assert isinstance(latest_directive["version"], (int, str))
+    assert isinstance(latest_directive["date"], str)
+    assert isinstance(latest_directive["source"], str)
+
+    ci_run_name = artifacts["ci_deterministic_run_name"]
+    assert set(ci_run_name) == {"stage", "branch", "value", "reason"}
+    assert ci_run_name["stage"] == "qa-ci"
+    assert isinstance(ci_run_name["branch"], str)
+    assert isinstance(ci_run_name["value"], str)
+
+    fail_fast = artifacts["last_fail_fast_stop_reason"]
+    assert set(fail_fast) == {"summary", "reason_code", "stage_id", "next_action", "reason"}
+    assert isinstance(fail_fast["summary"], str)
+    assert isinstance(fail_fast["reason_code"], str)
+    assert isinstance(fail_fast["stage_id"], str)
+    assert isinstance(fail_fast["next_action"], str)
+
+    drift_incidents = artifacts["drift_incidents"]
+    assert set(drift_incidents) == {"open_incident_count", "last_incident_summary", "resolution_sla"}
+    assert isinstance(drift_incidents["last_incident_summary"], str)
+
+    resolution_sla = drift_incidents["resolution_sla"]
+    assert set(resolution_sla) == {"triage_business_days", "fix_business_days", "waiver_business_days", "source"}
+    assert isinstance(resolution_sla["triage_business_days"], int)
+    assert isinstance(resolution_sla["fix_business_days"], int)
+    assert isinstance(resolution_sla["waiver_business_days"], int)
+    assert isinstance(resolution_sla["source"], str)

@@ -29,7 +29,8 @@
         "as_of"
       ],
       "optional": [
-        "analytics"
+        "analytics",
+        "status_artifacts"
       ]
     },
     "milestones": {
@@ -55,6 +56,9 @@
         "sprint_id",
         "capability_ids",
         "dod_refs"
+      ],
+      "optional": [
+        "status_artifacts"
       ]
     },
     "sprints": {
@@ -80,6 +84,9 @@
         "sprint_id",
         "capability_ids",
         "dod_refs"
+      ],
+      "optional": [
+        "status_artifacts"
       ]
     },
     "objectives": {
@@ -105,7 +112,16 @@
         "sprint_id",
         "capability_ids",
         "dod_refs"
+      ],
+      "optional": [
+        "status_artifacts"
       ]
     }
-  }
+  },
+  "status_artifacts_required_keys": [
+    "latest_directive",
+    "ci_deterministic_run_name",
+    "last_fail_fast_stop_reason",
+    "drift_incidents"
+  ]
 }

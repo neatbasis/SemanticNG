@@ -30,6 +30,18 @@ make promotion-governance-check
 
 This target reuses `.github/scripts/run_promotion_checks.sh`, which orchestrates governance validators in a single pass.
 
+## Sprint-specific promotion criteria, rollback, and ownership
+
+Promotion updates in any DMAIC phase that advance sprint status must satisfy the sprint criteria below before merge:
+
+| Sprint | Promotion criterion (must be shipped) | Rollback trigger | Owner role |
+| --- | --- | --- | --- |
+| Sprint 1 | Schema + validator + deterministic naming shipped with linked evidence in roadmap/sprint/handoff artifacts. | Validator/parity drift or deterministic naming mismatch found in promotion-governance checks. | **Capability owner** executes status rollback in manifest + sprint artifacts. |
+| Sprint 2 | Single orchestrator + fail-fast enforcement shipped with fail-closed evidence and synchronized contract-map updates. | Any fail-open path, orchestrator split, or missing fail-fast evidence appears in required checks. | **Contract owner** rolls back contract maturity/changelog updates tied to the failed promotion. |
+| Sprint 3 | Status/handoff operational artifacts shipped and consumed across roadmap, sprint plan, and handoff documents before promotion closeout. | Promotion-governance parity fails because operational artifacts are missing, stale, or not consumed in handoff review. | **Release/governance owner** blocks/reverts promotion closeout until artifact consumption is restored. |
+
+Owner roles are aligned to the handoff ownership structure defined in `docs/definition_of_complete.md`.
+
 ## CI workflow architecture note
 
 - `quality-guardrails.yml` owns the **baseline quality layer** (lint/type/test-cov) for general repository health and branch protection defaults.

@@ -18,6 +18,18 @@ Governed milestone IDs (canonical manifest scope): `state-renorm-milestone`, `co
 4. **Sprint 4:** finalize deferred contract fields (`schema_id`, `source`) + deterministic/back-compat coverage.
 5. **Sprint 5:** promote based on evidence, then refresh manifest/contract-map/roadmap in lockstep.
 
+### Promotion criteria tracking block (Sprints 1–3)
+
+- [ ] **Sprint 1 criterion:** schema + validator + deterministic naming shipped.
+  - Rollback trigger: parity validator/freshness failure or deterministic naming mismatch.
+  - Owner role: capability owner.
+- [ ] **Sprint 2 criterion:** single orchestrator + fail-fast enforcement shipped.
+  - Rollback trigger: fail-open behavior, missing fail-fast assertion coverage, or orchestrator split detected in CI evidence.
+  - Owner role: contract owner.
+- [ ] **Sprint 3 criterion:** status/handoff operational artifacts shipped and consumed.
+  - Rollback trigger: roadmap/sprint-plan/handoff artifact parity drift or unconsumed handoff evidence in governance review.
+  - Owner role: release/governance owner.
+
 ## Now (already implemented + verified tests)
 
 ### 1) Prediction-first contracts and deterministic persistence baseline

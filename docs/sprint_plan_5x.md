@@ -19,6 +19,18 @@ Governed sprint IDs (canonical manifest scope): `sprint-5`, `sprint-next`.
 - [ ] Sprint-close checklist includes coverage artifact evidence for the closing sprint (link to CI artifact or attached report summary), including enough detail to validate governance decisions.
 - [ ] Governance artifacts (`ROADMAP.md`, `docs/dod_manifest.json`, `docs/system_contract_map.md`, and sprint handoff records) are updated only after passing evidence exists and is linked from sprint-close notes.
 
+## Promotion criteria tracking block (mapped to sprint gates)
+
+- [ ] **Sprint 1:** schema + validator + deterministic naming shipped.
+  - Rollback trigger: schema/validator parity drift or deterministic naming mismatch in validator output.
+  - Owner role: capability owner.
+- [ ] **Sprint 2:** single orchestrator + fail-fast enforcement shipped.
+  - Rollback trigger: fail-open execution path, missing fail-fast checks, or split orchestrator behavior in evidence packs.
+  - Owner role: contract owner.
+- [ ] **Sprint 3:** status/handoff operational artifacts shipped and consumed.
+  - Rollback trigger: missing/stale handoff operational artifacts or parity failure across roadmap/sprint/handoff docs.
+  - Owner role: release/governance owner.
+
 ## Source-of-truth matrix
 
 | Decision type | Canonical source-of-truth | One-way derivation rule |

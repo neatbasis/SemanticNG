@@ -143,6 +143,16 @@ Explicit handoff ownership:
 3. **Program/roadmap owner** mirrors transition status in roadmap/progress docs.
 4. **Release/governance owner** executes `make promotion-check` and records a pass before merge.
 
+### Explicit promotion criteria by sprint (required before promotion synchronization)
+
+| Sprint | Promotion criterion (must be shipped) | Rollback trigger | Owner role |
+| --- | --- | --- | --- |
+| Sprint 1 | Schema + validator + deterministic naming are shipped and evidenced in sprint-close artifacts before promotion docs are advanced. | Any schema/validator parity drift or deterministic naming mismatch is detected by parity validators, freshness checks, or command-pack evidence review. | **Capability owner** initiates rollback to pre-promotion status and updates manifest evidence links. |
+| Sprint 2 | Single orchestrator + fail-fast enforcement are shipped and evidenced, with fail-closed behavior validated before promotion docs are advanced. | Orchestrator fragmentation (multiple competing paths), missing fail-fast assertions, or fail-open behavior appears in CI/validator evidence. | **Contract owner** rolls back maturity claims/changelog entries to the last proven contract state. |
+| Sprint 3 | Status/handoff operational artifacts are shipped and consumed (roadmap + sprint plan + sprint handoff show mirrored, evidence-backed transitions). | Required operational artifacts are missing, stale, or not consumed by downstream governance review (promotion parity check fails). | **Release/governance owner** blocks merge and reverts governance promotion synchronization until artifact consumption is restored. |
+
+These criteria reuse the existing handoff ownership structure above and are mandatory promotion gates for sprint-level status advancement.
+
 ## Usage notes
 
 - `docs/dod_manifest.json` remains the machine-readable source of capability status and test commands.

@@ -53,24 +53,48 @@ def _parse_inline_list(value: str) -> list[str]:
     return [part.strip().strip("\"'") for part in body.split(",") if part.strip()]
 
 
+def _expected_commands(stage_spec: dict[str, object]) -> list[tuple[str, int, tuple[str, ...]]]:
+    if "ordered_stages" in stage_spec:
+        command_specs = [
+            command
+            for ordered in stage_spec["ordered_stages"]
+            for command in ordered["commands"]
+        ]
+    else:
+        command_specs = stage_spec["commands"]
+
+    return [
+        (
+            command_spec["command"],
+            int(command_spec["timeout_seconds"]),
+            tuple(command_spec.get("run_if_paths", [])),
+        )
+        for command_spec in command_specs
+    ]
+
+
 def test_stage_definitions_are_loaded_from_manifest() -> None:
     manifest = json.loads(Path("docs/process/quality_stage_commands.json").read_text(encoding="utf-8"))
     stages = MODULE._load_stages()
 
     assert set(stages) == set(manifest["stages"])
     for stage_name, stage_spec in manifest["stages"].items():
-        expected = [
-            (
-                command_spec["command"],
-                int(command_spec["timeout_seconds"]),
-                tuple(command_spec.get("run_if_paths", [])),
-            )
-            for command_spec in stage_spec["commands"]
-        ]
+        expected = _expected_commands(stage_spec)
         actual = [
-            (spec.command, spec.timeout_seconds, tuple(spec.run_if_paths)) for spec in stages[stage_name].commands
+            (spec.command, spec.timeout_seconds, tuple(spec.run_if_paths))
+            for spec in stages[stage_name].commands
         ]
         assert actual == expected
+
+
+def test_ordered_stages_follow_manifest_order() -> None:
+    manifest = json.loads(Path("docs/process/quality_stage_commands.json").read_text(encoding="utf-8"))
+    stages = MODULE._load_stages()
+
+    expected_order = [spec["id"] for spec in manifest["stages"]["qa-ci"]["ordered_stages"]]
+    actual_order = [spec.id for spec in stages["qa-ci"].ordered_stages]
+
+    assert actual_order == expected_order
 
 
 def test_failure_file_extraction_is_deterministic() -> None:
@@ -153,3 +177,47 @@ def test_select_commands_empty_staged_set_uses_full_stage() -> None:
         changed_files=(),
     )
     assert [spec.command for spec in selected] == [spec.command for spec in stages["qa-commit"].commands]
+
+
+def test_main_stops_on_first_blocking_failure_and_emits_reason(monkeypatch, capsys) -> None:
+    fake_stages = {
+        "qa-ci": MODULE.StageSpec(
+            ordered_stages=(
+                MODULE.OrderedStageSpec(
+                    id="schema-validation",
+                    stop_on_fail=True,
+                    commands=(MODULE.CommandSpec(command="first", timeout_seconds=1),),
+                ),
+                MODULE.OrderedStageSpec(
+                    id="heavy-suites",
+                    stop_on_fail=True,
+                    commands=(MODULE.CommandSpec(command="second", timeout_seconds=1),),
+                ),
+            ),
+            commands=(
+                MODULE.CommandSpec(command="first", timeout_seconds=1),
+                MODULE.CommandSpec(command="second", timeout_seconds=1),
+            ),
+        )
+    }
+    ran_commands: list[str] = []
+
+    def _fake_run(spec):
+        ran_commands.append(spec.command)
+        return MODULE.CommandResult(returncode=2)
+
+    monkeypatch.setattr(MODULE, "_load_stages", lambda: fake_stages)
+    monkeypatch.setattr(MODULE, "_run_command", _fake_run)
+    monkeypatch.setattr(sys, "argv", ["run_stage_checks.py", "qa-ci"])
+
+    result = MODULE.main()
+    output = capsys.readouterr().out
+
+    assert result == 2
+    assert ran_commands == ["first"]
+    reason = next(json.loads(line) for line in output.splitlines() if line.startswith("{"))
+    assert reason == {
+        "stage_id": "schema-validation",
+        "reason_code": "command_failed",
+        "next_action": "Rerun command locally: first",
+    }

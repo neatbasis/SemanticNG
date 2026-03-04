@@ -26,7 +26,21 @@ class CommandSpec:
 
 @dataclass(frozen=True)
 class StageSpec:
+    ordered_stages: tuple["OrderedStageSpec", ...]
     commands: tuple[CommandSpec, ...]
+
+
+@dataclass(frozen=True)
+class OrderedStageSpec:
+    id: str
+    stop_on_fail: bool
+    commands: tuple[CommandSpec, ...]
+
+
+@dataclass(frozen=True)
+class CommandResult:
+    returncode: int
+    timed_out: bool = False
 
 
 MANIFEST_PATH = Path(__file__).resolve().parents[2] / "docs/process/quality_stage_commands.json"
@@ -35,21 +49,41 @@ MANIFEST_PATH = Path(__file__).resolve().parents[2] / "docs/process/quality_stag
 def _load_stages() -> dict[str, StageSpec]:
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     stages = manifest["stages"]
-    return {
-        stage_name: StageSpec(
-            commands=tuple(
-                CommandSpec(command=spec["command"], timeout_seconds=int(spec["timeout_seconds"]))
-                if "run_if_paths" not in spec
-                else CommandSpec(
-                    command=spec["command"],
-                    timeout_seconds=int(spec["timeout_seconds"]),
-                    run_if_paths=tuple(spec["run_if_paths"]),
-                )
-                for spec in stage_spec["commands"]
-            )
+
+    def _to_command(spec: dict[str, object]) -> CommandSpec:
+        if "run_if_paths" not in spec:
+            return CommandSpec(command=str(spec["command"]), timeout_seconds=int(spec["timeout_seconds"]))
+        return CommandSpec(
+            command=str(spec["command"]),
+            timeout_seconds=int(spec["timeout_seconds"]),
+            run_if_paths=tuple(spec["run_if_paths"]),
         )
-        for stage_name, stage_spec in stages.items()
-    }
+
+    loaded: dict[str, StageSpec] = {}
+    for stage_name, stage_spec in stages.items():
+        ordered_stage_specs: list[OrderedStageSpec] = []
+        if "ordered_stages" in stage_spec:
+            for ordered in stage_spec["ordered_stages"]:
+                commands = tuple(_to_command(spec) for spec in ordered["commands"])
+                ordered_stage_specs.append(
+                    OrderedStageSpec(
+                        id=str(ordered["id"]),
+                        stop_on_fail=bool(ordered.get("stop_on_fail", True)),
+                        commands=commands,
+                    )
+                )
+        else:
+            commands = tuple(_to_command(spec) for spec in stage_spec["commands"])
+            ordered_stage_specs.append(
+                OrderedStageSpec(id=f"{stage_name}-default", stop_on_fail=True, commands=commands)
+            )
+
+        loaded[stage_name] = StageSpec(
+            ordered_stages=tuple(ordered_stage_specs),
+            commands=tuple(command for ordered in ordered_stage_specs for command in ordered.commands),
+        )
+
+    return loaded
 
 
 def _staged_files() -> tuple[str, ...]:
@@ -76,6 +110,32 @@ def _select_commands(stage: str, stage_spec: StageSpec, *, full_stage: bool, cha
     return tuple(spec for spec in stage_spec.commands if _command_relevant_for_paths(spec, changed_files))
 
 
+def _select_ordered_stages(
+    stage: str,
+    stage_spec: StageSpec,
+    *,
+    full_stage: bool,
+    changed_files: tuple[str, ...],
+) -> tuple[OrderedStageSpec, ...]:
+    selected: list[OrderedStageSpec] = []
+    for ordered_stage in stage_spec.ordered_stages:
+        commands = _select_commands(
+            stage,
+            StageSpec(ordered_stages=(ordered_stage,), commands=ordered_stage.commands),
+            full_stage=full_stage,
+            changed_files=changed_files,
+        )
+        if commands:
+            selected.append(
+                OrderedStageSpec(
+                    id=ordered_stage.id,
+                    stop_on_fail=ordered_stage.stop_on_fail,
+                    commands=commands,
+                )
+            )
+    return tuple(selected)
+
+
 def _first_failing_files(output: str) -> list[str]:
     files: list[str] = []
     for match in FILE_RE.finditer(output):
@@ -87,7 +147,7 @@ def _first_failing_files(output: str) -> list[str]:
     return files
 
 
-def _run_command(spec: CommandSpec) -> int:
+def _run_command(spec: CommandSpec) -> CommandResult:
     print(f"\n▶ Running: {spec.command}")
     print(f"   Timeout budget: {spec.timeout_seconds}s")
     started = time.monotonic()
@@ -106,7 +166,7 @@ def _run_command(spec: CommandSpec) -> int:
         print(err.stderr or "", end="", file=sys.stderr)
         print(f"\n✖ Timeout after {elapsed:.1f}s (budget {spec.timeout_seconds}s)")
         print(f"Rerun command: {spec.command}")
-        return 124
+        return CommandResult(returncode=124, timed_out=True)
 
     elapsed = time.monotonic() - started
     if proc.stdout:
@@ -125,7 +185,11 @@ def _run_command(spec: CommandSpec) -> int:
     else:
         print(f"✔ Passed in {elapsed:.1f}s")
 
-    return proc.returncode
+    return CommandResult(returncode=proc.returncode)
+
+
+def _emit_failure_reason(*, stage_id: str, reason_code: str, next_action: str) -> None:
+    print(json.dumps({"stage_id": stage_id, "reason_code": reason_code, "next_action": next_action}))
 
 
 def main() -> int:
@@ -144,7 +208,7 @@ def main() -> int:
     if args.stage == "qa-commit" and not full_stage:
         changed_files = _staged_files()
 
-    selected_commands = _select_commands(
+    selected_ordered_stages = _select_ordered_stages(
         args.stage,
         stages[args.stage],
         full_stage=full_stage,
@@ -161,14 +225,24 @@ def main() -> int:
     elif args.stage == "qa-commit":
         print("Stage mode: staged-path filtered")
 
-    if not selected_commands:
+    if not selected_ordered_stages:
         print("No commands matched changed paths; stage passed without running commands.")
         return 0
 
-    for spec in selected_commands:
-        code = _run_command(spec)
-        if code != 0:
-            return code
+    for ordered_stage in selected_ordered_stages:
+        print(f"\n=== Ordered stage: {ordered_stage.id} (stop_on_fail={str(ordered_stage.stop_on_fail).lower()}) ===")
+        for spec in ordered_stage.commands:
+            result = _run_command(spec)
+            if result.returncode == 0:
+                continue
+            _emit_failure_reason(
+                stage_id=ordered_stage.id,
+                reason_code="timeout" if result.timed_out else "command_failed",
+                next_action=f"Rerun command locally: {spec.command}",
+            )
+            if ordered_stage.stop_on_fail:
+                print(f"Stopping execution after blocking failure in ordered stage '{ordered_stage.id}'.")
+                return result.returncode
 
     print(f"\nStage {args.stage} passed.")
     return 0

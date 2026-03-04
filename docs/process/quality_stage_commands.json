@@ -1,6 +1,59 @@
 {
   "stages": {
     "qa-commit": {
+      "ordered_stages": [
+        {
+          "id": "qa-commit-local-gates",
+          "stop_on_fail": true,
+          "commands": [
+            {
+              "command": "ruff check --fix src/core src/state_renormalization",
+              "timeout_seconds": 20,
+              "run_if_paths": [
+                "src/core/*.py",
+                "src/core/**/*.py",
+                "src/core/*.pyi",
+                "src/core/**/*.pyi",
+                "src/state_renormalization/*.py",
+                "src/state_renormalization/**/*.py",
+                "src/state_renormalization/*.pyi",
+                "src/state_renormalization/**/*.pyi"
+              ]
+            },
+            {
+              "command": "mypy --config-file=pyproject.toml src/state_renormalization src/core",
+              "timeout_seconds": 40,
+              "run_if_paths": [
+                "src/core/*.py",
+                "src/core/**/*.py",
+                "src/core/*.pyi",
+                "src/core/**/*.pyi",
+                "src/state_renormalization/*.py",
+                "src/state_renormalization/**/*.py",
+                "src/state_renormalization/*.pyi",
+                "src/state_renormalization/**/*.pyi"
+              ]
+            },
+            {
+              "command": "pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py",
+              "timeout_seconds": 80,
+              "run_if_paths": [
+                "src/core/*.py",
+                "src/core/**/*.py",
+                "src/core/*.pyi",
+                "src/core/**/*.pyi",
+                "src/state_renormalization/*.py",
+                "src/state_renormalization/**/*.py",
+                "src/state_renormalization/*.pyi",
+                "src/state_renormalization/**/*.pyi",
+                "tests/test_engine_pending_obligation.py",
+                "tests/test_invariants.py",
+                "tests/test_contracts_decision_effect_shape.py"
+              ]
+            }
+          ]
+        }
+      ],
       "commands": [
         {
           "command": "ruff check --fix src/core src/state_renormalization",
@@ -57,6 +110,34 @@
       }
     },
     "qa-push": {
+      "ordered_stages": [
+        {
+          "id": "qa-push-local-gates",
+          "stop_on_fail": true,
+          "commands": [
+            {
+              "command": "ruff check --fix src tests",
+              "timeout_seconds": 45
+            },
+            {
+              "command": "ruff format --check src tests",
+              "timeout_seconds": 35
+            },
+            {
+              "command": "mypy --config-file=pyproject.toml src/state_renormalization src/core",
+              "timeout_seconds": 60
+            },
+            {
+              "command": "make program-sync",
+              "timeout_seconds": 20
+            },
+            {
+              "command": "pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py",
+              "timeout_seconds": 80
+            }
+          ]
+        }
+      ],
       "commands": [
         {
           "command": "ruff check --fix src tests",
@@ -88,6 +169,64 @@
       }
     },
     "qa-ci": {
+      "ordered_stages": [
+        {
+          "id": "schema-validation",
+          "stop_on_fail": true,
+          "commands": [
+            {
+              "command": "python .github/scripts/check_no_regression_budget.py",
+              "timeout_seconds": 20
+            },
+            {
+              "command": "python scripts/ci/validate_5s_mission_traceability.py",
+              "timeout_seconds": 20
+            },
+            {
+              "command": "python scripts/ci/validate_5s_metrics.py",
+              "timeout_seconds": 20
+            }
+          ]
+        },
+        {
+          "id": "doc-parity",
+          "stop_on_fail": true,
+          "commands": [
+            {
+              "command": "python scripts/ci/scan_unused_code.py",
+              "timeout_seconds": 60
+            }
+          ]
+        },
+        {
+          "id": "unit-contract-subset",
+          "stop_on_fail": true,
+          "commands": [
+            {
+              "command": "pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py",
+              "timeout_seconds": 80
+            }
+          ]
+        },
+        {
+          "id": "heavy-suites",
+          "stop_on_fail": true,
+          "commands": [
+            {
+              "command": "pre-commit run --all-files",
+              "timeout_seconds": 180
+            },
+            {
+              "command": "pytest --cov --cov-report=term-missing --cov-report=xml",
+              "timeout_seconds": 240
+            },
+            {
+              "command": "mypy --config-file=pyproject.toml src tests",
+              "timeout_seconds": 240
+            }
+          ]
+        }
+      ],
       "commands": [
         {
           "command": "python .github/scripts/check_no_regression_budget.py",
@@ -104,6 +243,10 @@
         {
           "command": "python scripts/ci/scan_unused_code.py",
           "timeout_seconds": 60
+        },
+        {
+          "command": "pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py",
+          "timeout_seconds": 80
         },
         {
           "command": "pre-commit run --all-files",

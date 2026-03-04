@@ -82,3 +82,29 @@ This means pytest execution is required before both commit and push for baseline
 - `flaky_test_count`: target `0`; warning at `>= 1`.
 
 Any warning-state metric requires a follow-up issue or explicit rationale in the next main-health review notes.
+
+## Deterministic CI Identity
+
+CI run names must be derived from canonical repository inputs so retrying the same logical stage over the same policy surface yields the same identity string.
+
+- **Format:** `ci::<branch>::canon::<12-char-hash>::stage::<stage-name>`
+- **Canonical inputs (and only these inputs):**
+  - `docs/dod_manifest.json`
+  - `docs/system_contract_map.md`
+  - `docs/process/quality_stage_commands.json`
+  - `docs/status/*.json`
+
+### Canonicalization algorithm
+
+1. Read the fixed canonical files above in the listed order.
+2. Read `docs/status/*.json` sorted by file name.
+3. Canonicalize each JSON file by parsing + re-serializing with sorted keys and compact separators.
+4. Canonicalize `docs/system_contract_map.md` by normalizing line endings to LF and trimming trailing whitespace per line.
+5. Hash a versioned stream using SHA-256 (`ci-run-name-v1`) that includes each relative path and its canonicalized content.
+6. Use the first 12 hex characters of the digest in the run name.
+
+### Collision policy
+
+- The 12-hex digest is a human-facing truncation for readability and grouping.
+- On any practical collision suspicion (same digest but differing canonical payload), CI must treat it as a hard mismatch and compare full SHA-256 values.
+- The derivation algorithm version string (`ci-run-name-v1`) is part of the hashed payload; changing canonicalization rules requires a version bump and policy/document update in the same PR.

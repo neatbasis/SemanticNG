@@ -1,0 +1,14 @@
+{
+  "id": "DR-2026-001",
+  "title": "Missing canonical references",
+  "status": "accepted",
+  "date": "2026-01-10",
+  "owners": ["platform"],
+  "context": "Test fixture for missing canonical ref.",
+  "decision": "Intentionally omit required refs.",
+  "consequences": "Validator should fail.",
+  "canonical_refs": ["docs/dod_manifest.json"],
+  "evidence_commands": ["python scripts/ci/validate_decision_records.py"],
+  "ci_policy": "blocking",
+  "supersedes": null
+}

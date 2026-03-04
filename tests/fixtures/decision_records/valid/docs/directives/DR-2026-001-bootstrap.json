@@ -1,0 +1,18 @@
+{
+  "id": "DR-2026-001",
+  "title": "Bootstrap directive records validation",
+  "status": "accepted",
+  "date": "2026-01-10",
+  "owners": ["platform"],
+  "context": "Need canonical governance metadata.",
+  "decision": "Store directive records under docs/directives and validate them in CI.",
+  "consequences": "New records must include references and evidence commands.",
+  "canonical_refs": [
+    "docs/dod_manifest.json",
+    "docs/system_contract_map.md",
+    "docs/process/quality_stage_commands.json"
+  ],
+  "evidence_commands": ["python scripts/ci/validate_decision_records.py"],
+  "ci_policy": "blocking",
+  "supersedes": null
+}

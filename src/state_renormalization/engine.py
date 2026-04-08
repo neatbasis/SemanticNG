@@ -2022,16 +2022,14 @@ def _persist_halt_and_get_evidence_ref(
     )
 
 
-def append_prediction_record(
-    pred: PredictionRecord,
+def _prediction_append_policy_handoff(
     *,
-    prediction_log_path: str | Path = "artifacts/predictions.jsonl",
-    stable_ids: Mapping[str, str] | None = None,
-    episode: Episode | None = None,
-    projection_state: ProjectionState | None = None,
-    explicit_gate_pass_present: bool = True,
-    halt_log_path: str | Path = "halts.jsonl",
-) -> dict[str, str] | HaltRecord:
+    pred: PredictionRecord,
+    episode: Episode | None,
+    projection_state: ProjectionState | None,
+    explicit_gate_pass_present: bool,
+    halt_log_path: str | Path,
+) -> tuple[CapabilityInvocationPolicyDecision, CapabilityAdapterGate] | HaltRecord:
     state_for_policy = projection_state or ProjectionState(
         current_predictions={pred.scope_key: pred},
         prediction_history=[],
@@ -2057,9 +2055,35 @@ def append_prediction_record(
             ep=episode, decision=policy_decision, halt_log_path=halt_log_path
         )
 
-    adapter_gate = CapabilityAdapterGate(
-        invocation_id=policy_decision.attempt.invocation_id, allowed=True
+    return (
+        policy_decision,
+        CapabilityAdapterGate(
+            invocation_id=policy_decision.attempt.invocation_id,
+            allowed=True,
+        ),
     )
+
+
+def append_prediction_record(
+    pred: PredictionRecord,
+    *,
+    prediction_log_path: str | Path = "artifacts/predictions.jsonl",
+    stable_ids: Mapping[str, str] | None = None,
+    episode: Episode | None = None,
+    projection_state: ProjectionState | None = None,
+    explicit_gate_pass_present: bool = True,
+    halt_log_path: str | Path = "halts.jsonl",
+) -> dict[str, str] | HaltRecord:
+    handoff = _prediction_append_policy_handoff(
+        pred=pred,
+        episode=episode,
+        projection_state=projection_state,
+        explicit_gate_pass_present=explicit_gate_pass_present,
+        halt_log_path=halt_log_path,
+    )
+    if isinstance(handoff, HaltRecord):
+        return handoff
+    policy_decision, adapter_gate = handoff
 
     try:
         prediction_payload = _prediction_payload_with_stable_ids(pred, stable_ids=stable_ids)

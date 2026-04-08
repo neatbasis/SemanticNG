@@ -87,10 +87,10 @@ Then run the enforced local gates in this order:
 make verify-dev-setup
 make qa-commit
 make qa-push
-make promotion-checks
+make promotion-governance-check
 ```
 
-`make promotion-checks` is required whenever staged files include semantic-boundary paths (`src/core/**`, `src/state_renormalization/**`, `src/semanticng/**`). Stage at least one required governance/contract doc update when those paths are included.
+`make promotion-governance-check` is required whenever staged files include semantic-boundary paths (`src/core/**`, `src/state_renormalization/**`, `src/semanticng/**`). Stage at least one required governance/contract doc update when those paths are included. `make promotion-check` and `make promotion-checks` remain compatibility aliases.
 
 Commit-ready means all applicable commands above pass and only intended changes are staged.
 
@@ -273,7 +273,8 @@ When this gate fails:
 ## Branch protection verification checklist (required)
 
 - [ ] Required checks include `Quality Guardrails`.
-- [ ] Required checks include `State Renormalization Milestone Gate`.
+- [ ] Always-on required checks are the four `Quality Guardrails` blockers.
+- [ ] `State Renormalization Milestone Gate` remains path-conditioned and must run for milestone-governed changes (see `docs/process/quality-gate-policy.md`).
 - [ ] Required checks block merge while failing or pending.
 - [ ] Merge queue is enabled for `main`.
 - [ ] Merge queue runs required checks on `merge_group` commits.

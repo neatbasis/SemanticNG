@@ -133,15 +133,17 @@ Capability status/maturity promotions are only complete when the governance trip
 Required command:
 
 ```bash
-make promotion-check
+make promotion-governance-check
 ```
+
+`make promotion-check` and `make promotion-checks` are compatibility aliases; prefer `make promotion-governance-check` in documentation and contributor guidance.
 
 Explicit handoff ownership:
 
 1. **Capability owner** proposes status transition + command/evidence updates in `docs/dod_manifest.json`.
 2. **Contract owner** applies matching maturity/changelog updates in `docs/system_contract_map.md`.
 3. **Program/roadmap owner** mirrors transition status in roadmap/progress docs.
-4. **Release/governance owner** executes `make promotion-check` and records a pass before merge.
+4. **Release/governance owner** executes `make promotion-governance-check` and records a pass before merge.
 
 ### Explicit promotion criteria by sprint (required before promotion synchronization)
 
@@ -157,8 +159,9 @@ These criteria reuse the existing handoff ownership structure above and are mand
 
 - `docs/dod_manifest.json` remains the machine-readable source of capability status and test commands.
 - This document defines when those capabilities are considered complete at capability, integration, and system layers.
+- Capability `done`/sustainment status is a capability-delivery + non-regression evidence lifecycle and does not by itself close ontology/project bridge clarifications tracked in the authoritative gap ledger.
 - `docs/system_contract_map.md` remains the source of truth for contract maturity and changelog evidence.
-- Contributor command workflow remains canonical in `README.md` and `docs/DEVELOPMENT.md`; use `make verify-dev-setup`, `make qa-commit`, `make qa-push`, and `make promotion-checks` before merge.
+- Contributor command workflow remains canonical in `README.md` and `docs/DEVELOPMENT.md`; use `make verify-dev-setup`, `make qa-commit`, `make qa-push`, and `make promotion-governance-check` before merge (`make promotion-check` / `make promotion-checks` remain aliases).
 
 ## Research note: weaker definition of done
 
@@ -170,4 +173,4 @@ The team acknowledges a weaker interim definition of done for research tracking:
 
 Any sprint or milestone closing on this weaker condition must explicitly label it as research-only and include a follow-up plan to satisfy the full Definition of Complete gates.
 
-_Last regenerated from manifest: 2026-03-03T00:00:00Z (UTC)._
+_Last regenerated from manifest: 2026-04-08T16:01:51Z (UTC)._

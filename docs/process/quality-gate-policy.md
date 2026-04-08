@@ -15,7 +15,7 @@
   - `promotion-governance-pokayoke` pre-commit hook (`.github/scripts/run_promotion_checks.sh`), which only runs when staged files touch milestone/policy surfaces.
 - **Measurement-only telemetry (non-blocking):**
   - `Quality Guardrails / policy-measurement`
-  - `State Renormalization Milestone Gate` promotion checklist measurement note emitted from `make promotion-check` step.
+  - `State Renormalization Milestone Gate` promotion checklist measurement note emitted from `make promotion-governance-check` step.
 
 This repository does **not** use global blocking enforcement for promotion-governance checks outside milestone/policy surfaces.
 

@@ -2,6 +2,10 @@ ledger:
   schema_reference: docs/ontology/06-gap-ledger-schema.md
   taxonomy_reference: docs/ontology/02-gap-taxonomy-reference.md
   authoritative: true
+  lifecycle_scope_note: >-
+    This ledger tracks ontology/project bridge clarification lifecycle in
+    parallel to capability delivery status in docs/dod_manifest.json; manifest
+    done/sustainment state does not by itself close in-remediation gap entries.
   updated_on: 2026-04-08
   entries:
     - gap_id: GAP-202604-001

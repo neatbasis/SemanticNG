@@ -220,10 +220,11 @@ When promoting a capability status (for example `planned` -> `in_progress` or `i
 Run all promotion governance checks before pushing:
 
 ```bash
-make promotion-checks
+make promotion-governance-check
 ```
 
 This command validates milestone-doc transition sync and enforces PR-template generated-content cleanliness.
+`make promotion-check` and `make promotion-checks` are compatibility aliases.
 
 ### Pre-submit milestone docs check (local)
 
@@ -280,10 +281,10 @@ git status --short --branch
 make verify-dev-setup
 make qa-commit
 make qa-push
-make promotion-checks
+make promotion-governance-check
 ```
 
-`make promotion-checks` is required when staged files include semantic-boundary paths (`src/core/**`, `src/state_renormalization/**`, `src/semanticng/**`).
+`make promotion-governance-check` is required when staged files include semantic-boundary paths (`src/core/**`, `src/state_renormalization/**`, `src/semanticng/**`).
 
 **Clean enough to commit** means:
 

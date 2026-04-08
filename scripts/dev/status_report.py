@@ -5,7 +5,7 @@ import json
 import os
 import re
 import subprocess
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -483,7 +483,9 @@ def build_status_payload(status_show: str) -> tuple[dict[str, Any], list[Issue]]
         issues.append(Issue(str(DOD_MANIFEST_PATH), "manifest root must be an object"))
         return payload, issues
 
-    generated_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    generated_at = (
+        datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
     as_of = generated_at[:10]
     payload["meta"]["generated_from"] = {
         "manifest": DOD_MANIFEST_PATH.as_posix(),

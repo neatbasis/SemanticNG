@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -126,7 +126,9 @@ def main() -> int:
     parser.parse_args()
 
     manifest = _read_json(MANIFEST_PATH)
-    generated_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    generated_at = (
+        datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
     as_of = generated_at[:10]
 
     objectives = _build_objectives(manifest, as_of=as_of)

@@ -73,6 +73,27 @@ Governed source scope (canonical): src/core/**, src/state_renormalization/**, sr
 
 ## Local quality scopes
 
+### Dirty-repo aware commit workflow (required)
+
+When the repository is already dirty, do not assume all changes belong in one commit. Start each commit cycle with:
+
+```bash
+git status --short --branch
+```
+
+Then run the enforced local gates in this order:
+
+```bash
+make verify-dev-setup
+make qa-commit
+make qa-push
+make promotion-checks
+```
+
+`make promotion-checks` is required whenever staged files include semantic-boundary paths (`src/core/**`, `src/state_renormalization/**`, `src/semanticng/**`). Stage at least one required governance/contract doc update when those paths are included.
+
+Commit-ready means all applicable commands above pass and only intended changes are staged.
+
 ### Required pre-commit scope (Tier 1 strict)
 
 Run this before every commit/push:
@@ -97,6 +118,14 @@ git add -A
 pre-commit run --all-files
 ```
 
+If `pre-commit run --all-files` is blocked by environment restrictions (for example read-only cache/index lock errors), validate via hook-entry commands:
+
+```bash
+python scripts/ci/run_stage_checks.py qa-commit
+python scripts/ci/run_stage_checks.py qa-push
+.github/scripts/run_promotion_checks.sh
+```
+
 ### Required pre-push gate (strict, no bypass)
 
 **Policy: no push unless the pre-push gate passes.**
@@ -112,7 +141,16 @@ The pre-push gate must include all of the following checks:
 - `ruff check --fix src tests`
 - `ruff format --check src tests`
 - `mypy --config-file=pyproject.toml src/state_renormalization src/core`
+- `make program-sync`
 - Fast deterministic pytest smoke subset (`pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py`)
+
+Scratch/untracked hygiene is expected before push review:
+
+```bash
+python .github/scripts/check_root_scratch_files.py
+```
+
+Warnings from this check are non-blocking by default, but root-level scratch files should be moved to `artifacts/` or removed before merge.
 
 ### Stage timeout/performance budgets
 

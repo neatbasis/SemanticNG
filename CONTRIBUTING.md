@@ -35,20 +35,28 @@ make qa-commit
 
 ## Pre-push quality requirement
 
-Before every push, run the full pre-commit suite from the repository root:
+Before every push, run the enforced push gate:
 
 ```bash
-pre-commit run --all-files
+make qa-push
 ```
 
-If any hook rewrites files, you must stage and commit those changes before pushing.
-
-Recommended local sequence:
+Run promotion governance checks whenever semantic-boundary files are staged:
 
 ```bash
-pre-commit run --all-files
-git add -A
-git commit -m "Apply pre-commit fixes"
+make promotion-checks
+```
+
+If any hook/check rewrites files, stage and rerun until clean.
+
+Recommended local sequence before committing:
+
+```bash
+git status --short --branch
+make verify-dev-setup
+make qa-commit
+make qa-push
+make promotion-checks
 ```
 
 If CI uploads a `precommit-autofix-patch` artifact, you can apply it locally with:

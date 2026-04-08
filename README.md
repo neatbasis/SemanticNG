@@ -273,19 +273,37 @@ make qa-local
 
 ### Local preflight checklist (CI parity)
 
-Use this sequence before committing so CI behavior matches local validation:
+Use this sequence before commit/push:
 
 ```bash
-pre-commit run --all-files
-pytest
-mypy --config-file=pyproject.toml src tests
+git status --short --branch
+make verify-dev-setup
+make qa-commit
+make qa-push
+make promotion-checks
 ```
 
-If hooks rewrite files, stage and rerun until clean:
+`make promotion-checks` is required when staged files include semantic-boundary paths (`src/core/**`, `src/state_renormalization/**`, `src/semanticng/**`).
+
+**Clean enough to commit** means:
+
+- `make qa-commit` passes.
+- `make qa-push` passes.
+- Promotion checks pass when semantic-boundary files are staged.
+- No unintended untracked scratch artifacts are left at repo root.
+
+For scratch hygiene:
 
 ```bash
-git add -A
-pre-commit run --all-files
+python .github/scripts/check_root_scratch_files.py
+```
+
+If your execution environment blocks direct `pre-commit run --all-files` (for example read-only cache/index lock errors), validate with hook-entry commands instead:
+
+```bash
+python scripts/ci/run_stage_checks.py qa-commit
+python scripts/ci/run_stage_checks.py qa-push
+.github/scripts/run_promotion_checks.sh
 ```
 
 For fresh-clone setup and troubleshooting guidance, see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
@@ -320,6 +338,13 @@ If `make qa-hook-parity` or `pre-commit` fails, use this quick map:
   python .github/scripts/check_python_support_policy.py
   python .github/scripts/check_precommit_parity.py
   python .github/scripts/print_env_provenance.py
+  ```
+
+- **Environment-level pre-commit lock/read-only failures**
+  ```bash
+  python scripts/ci/run_stage_checks.py qa-commit
+  python scripts/ci/run_stage_checks.py qa-push
+  .github/scripts/run_promotion_checks.sh
   ```
 
 ## Running tests

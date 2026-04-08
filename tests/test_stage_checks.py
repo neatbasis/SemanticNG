@@ -56,9 +56,7 @@ def _parse_inline_list(value: str) -> list[str]:
 def _expected_commands(stage_spec: dict[str, object]) -> list[tuple[str, int, tuple[str, ...]]]:
     if "ordered_stages" in stage_spec:
         command_specs = [
-            command
-            for ordered in stage_spec["ordered_stages"]
-            for command in ordered["commands"]
+            command for ordered in stage_spec["ordered_stages"] for command in ordered["commands"]
         ]
     else:
         command_specs = stage_spec["commands"]
@@ -74,7 +72,9 @@ def _expected_commands(stage_spec: dict[str, object]) -> list[tuple[str, int, tu
 
 
 def test_stage_definitions_are_loaded_from_manifest() -> None:
-    manifest = json.loads(Path("docs/process/quality_stage_commands.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        Path("docs/process/quality_stage_commands.json").read_text(encoding="utf-8")
+    )
     stages = MODULE._load_stages()
 
     assert set(stages) == set(manifest["stages"])
@@ -88,7 +88,9 @@ def test_stage_definitions_are_loaded_from_manifest() -> None:
 
 
 def test_ordered_stages_follow_manifest_order() -> None:
-    manifest = json.loads(Path("docs/process/quality_stage_commands.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        Path("docs/process/quality_stage_commands.json").read_text(encoding="utf-8")
+    )
     stages = MODULE._load_stages()
 
     expected_order = [spec["id"] for spec in manifest["stages"]["qa-ci"]["ordered_stages"]]
@@ -104,7 +106,9 @@ def test_failure_file_extraction_is_deterministic() -> None:
 
 
 def test_stage_hooks_match_canonical_manifest() -> None:
-    manifest = json.loads(Path("docs/process/quality_stage_commands.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        Path("docs/process/quality_stage_commands.json").read_text(encoding="utf-8")
+    )
     config_lines = Path(".pre-commit-config.yaml").read_text(encoding="utf-8").splitlines()
 
     for stage_spec in manifest["stages"].values():
@@ -118,7 +122,9 @@ def test_stage_hooks_match_canonical_manifest() -> None:
 
 
 def test_precommit_has_no_unmanaged_qa_stage_hooks() -> None:
-    manifest = json.loads(Path("docs/process/quality_stage_commands.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        Path("docs/process/quality_stage_commands.json").read_text(encoding="utf-8")
+    )
     config_lines = Path(".pre-commit-config.yaml").read_text(encoding="utf-8").splitlines()
 
     expected_hook_ids = {
@@ -154,7 +160,9 @@ def test_select_commands_core_only_diff() -> None:
         full_stage=False,
         changed_files=("src/core/engine.py",),
     )
-    assert [spec.command for spec in selected] == [spec.command for spec in stages["qa-commit"].commands]
+    assert [spec.command for spec in selected] == [
+        spec.command for spec in stages["qa-commit"].commands
+    ]
 
 
 def test_select_commands_mixed_diff() -> None:
@@ -165,7 +173,9 @@ def test_select_commands_mixed_diff() -> None:
         full_stage=False,
         changed_files=("docs/DEVELOPMENT.md", "src/state_renormalization/model.py"),
     )
-    assert [spec.command for spec in selected] == [spec.command for spec in stages["qa-commit"].commands]
+    assert [spec.command for spec in selected] == [
+        spec.command for spec in stages["qa-commit"].commands
+    ]
 
 
 def test_select_commands_empty_staged_set_uses_full_stage() -> None:
@@ -176,7 +186,44 @@ def test_select_commands_empty_staged_set_uses_full_stage() -> None:
         full_stage=False,
         changed_files=(),
     )
-    assert [spec.command for spec in selected] == [spec.command for spec in stages["qa-commit"].commands]
+    assert [spec.command for spec in selected] == [
+        spec.command for spec in stages["qa-commit"].commands
+    ]
+
+
+def test_select_commands_qa_push_docs_only_diff() -> None:
+    stages = MODULE._load_stages()
+    selected = MODULE._select_commands(
+        "qa-push",
+        stages["qa-push"],
+        full_stage=False,
+        changed_files=("docs/DEVELOPMENT.md",),
+    )
+    assert selected == ()
+
+
+def test_select_commands_qa_push_narrows_ruff_to_changed_python_files() -> None:
+    stages = MODULE._load_stages()
+    selected = MODULE._select_commands(
+        "qa-push",
+        stages["qa-push"],
+        full_stage=False,
+        changed_files=(
+            "docs/DEVELOPMENT.md",
+            "src/core/engine.py",
+            "tests/test_invariants.py",
+            "tests/test_invariants.py",
+        ),
+    )
+
+    commands = [spec.command for spec in selected]
+    assert commands[0] == "ruff check src/core/engine.py tests/test_invariants.py"
+    assert commands[1] == "ruff format --check src/core/engine.py tests/test_invariants.py"
+    assert commands[2:] == [
+        "mypy --config-file=pyproject.toml src/state_renormalization src/core",
+        "make program-sync",
+        "pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py",
+    ]
 
 
 def test_main_stops_on_first_blocking_failure_and_emits_reason(monkeypatch, capsys) -> None:

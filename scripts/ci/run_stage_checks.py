@@ -8,6 +8,7 @@ import fnmatch
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -140,10 +141,47 @@ def _command_relevant_for_paths(command: CommandSpec, changed_files: tuple[str, 
     return any(fnmatch.fnmatch(path, pattern) for path in changed_files for pattern in command.run_if_paths)
 
 
+def _narrow_qa_push_command(command: str, changed_files: tuple[str, ...]) -> str:
+    if command not in {"ruff check src tests", "ruff format --check src tests"}:
+        return command
+
+    targets: list[str] = []
+    for path in changed_files:
+        if not path.startswith(("src/", "tests/")):
+            continue
+        if not path.endswith((".py", ".pyi")):
+            continue
+        if path not in targets:
+            targets.append(path)
+
+    if not targets:
+        return command
+
+    cmd_prefix = "ruff check" if command.startswith("ruff check ") else "ruff format --check"
+    quoted_targets = " ".join(shlex.quote(path) for path in targets)
+    return f"{cmd_prefix} {quoted_targets}"
+
+
+def _finalize_command_for_stage(stage: str, spec: CommandSpec, changed_files: tuple[str, ...]) -> CommandSpec:
+    if stage != "qa-push" or not changed_files:
+        return spec
+
+    narrowed_command = _narrow_qa_push_command(spec.command, changed_files)
+    if narrowed_command == spec.command:
+        return spec
+
+    return CommandSpec(
+        command=narrowed_command,
+        timeout_seconds=spec.timeout_seconds,
+        run_if_paths=spec.run_if_paths,
+    )
+
+
 def _select_commands(stage: str, stage_spec: StageSpec, *, full_stage: bool, changed_files: tuple[str, ...]) -> tuple[CommandSpec, ...]:
     if full_stage or stage not in {"qa-commit", "qa-push"} or not changed_files:
         return stage_spec.commands
-    return tuple(spec for spec in stage_spec.commands if _command_relevant_for_paths(spec, changed_files))
+    selected = tuple(spec for spec in stage_spec.commands if _command_relevant_for_paths(spec, changed_files))
+    return tuple(_finalize_command_for_stage(stage, spec, changed_files) for spec in selected)
 
 
 def _select_ordered_stages(

@@ -48,8 +48,8 @@ Reference checklist template: `docs/process/main-health-review-checklist.md`.
 
 Run this audit once per quarter and attach evidence in the release/governance review artifact.
 
-- [ ] **Protected-branch required checks include both gates:** For each protected branch, required status checks include `Quality Guardrails` and `State Renormalization Milestone Gate`.
-- [ ] **Merge queue parity on merge groups verified:** Merge queue configuration requires the same required checks, and both gates run on `merge_group` commits.
+- [ ] **Protected-branch required checks follow canonical scope:** Always-on required status checks are the four `Quality Guardrails` blockers; `State Renormalization Milestone Gate` remains path-conditioned and must execute for milestone-governed changes (see `docs/process/quality-gate-policy.md`).
+- [ ] **Merge queue parity on merge groups verified:** Merge queue configuration preserves parity with canonical scope: always-on required checks are `Quality Guardrails`, and path-conditioned milestone-gate checks execute on `merge_group` commits when governed paths are touched.
 - [ ] **No-merge-on-red policy verified operationally:** Test with a failing PR confirms merges are blocked while required checks are failing/pending.
 - [ ] **Quarterly exception tracking complete:** Any temporary exception/waiver is tracked via `.github/ISSUE_TEMPLATE/01-enforce-no-merge-on-red.md` and includes owner + closure date.
 - [ ] **Automated drift audit reviewed:** Latest `Branch Protection Audit` workflow run is green (or an approved incident documents remediation), and owner/escalation details in `docs/branch_protection_audit.md` are up to date.
@@ -298,4 +298,4 @@ Use this template:
 
 If conflict reconciliation drops or defers any behavior, do not merge immediately: open follow-up patch PR(s) in the same integration cycle and link them under the affected checklist entry.
 
-_Last regenerated from manifest: 2026-03-03T00:00:00Z (UTC)._
+_Last regenerated from manifest: 2026-04-08T16:01:51Z (UTC)._

@@ -58,6 +58,7 @@ Status categories: `stabilize now`, `local only`, `mapped, not equivalent`, `def
 - `ambiguity_state`, `active_schemas`, `schema_confidence`, `ambiguities_active`: `mapped, not equivalent` (ontology-influenced but runtime interpretation-specific).
 - `belief_version`, `pending_about`, `pending_question`, `pending_attempts`, `last_utterance_type`, `last_status`, `consecutive_no_response`: `local only` (execution control/retry/session artifacts).
 - `bindings`: `defer` (typing not yet stable; runtime read/write boundary anchors are `_write_belief_bindings` + `_update_mission_draft_binding_from_selection` for writes and `_binding_reminder_slot_values`/`_binding_mission_draft` + `_resolve_mission_create_handoff` for reads/mission-create handoff in `src/state_renormalization/engine.py`).
+- `mission.draft` inside `bindings`: structured special-case payload carried through a deferred container; recent seams improved handoff legibility but did not finalize concept meaning.
 
 #### `ProjectionState` field notes
 
@@ -92,6 +93,14 @@ Linkage constraints:
 - Runtime contract artifacts (`InvariantOutcome`, `HaltRecord`, `DecisionEffect`) are linked but non-equivalent types with separate authority roles.
 - Step-layer execution success is evidence of behavior coverage, not runtime authority ownership.
 
+### Runtime interaction model (current execution semantics)
+
+1. `apply_schema_bubbling` updates belief ambiguity/schema state and may refresh `belief.bindings["mission.draft"]` when mission-create schema selection is active.
+2. `run_mission_loop` emits and appends prediction records, then gates decision stages through invariant evaluation.
+3. `_reconcile_predictions` performs comparison pass, then repair-or-persistence handoff, then comparison artifact emission.
+4. `_maybe_create_mission_from_intent` reads mission-create handoff data from belief bindings and appends mission-created lineage events idempotently.
+5. Projection/replay surfaces consume persisted append-only prediction/repair/halt/mission artifacts via projection and read-model paths.
+
 ## Capability-Plane Mapping (Initial Instantiated Subset)
 
 This table instantiates a minimal active subset of cross-plane mappings. It is a mapping artifact, not an ontology-equivalence claim.
@@ -104,6 +113,11 @@ This table instantiates a minimal active subset of cross-plane mappings. It is a
 | Prediction persistence and evidence-link substrate | `prediction_persistence_baseline` | `prediction_availability.v1`; `evidence_link_completeness.v1` | one governance capability maps to a paired runtime invariant anchor set | Runtime invariant IDs are execution policy anchors and do not by themselves define ontology capability identity. |
 | Replay/projection lineage analytics | `replay_projection_analytics` | `prediction_availability.v1`; `evidence_link_completeness.v1`; `explainable_halt_payload.v1` | one governance capability maps to a multi-anchor runtime replay invariant set | Replay invariant anchors constrain runtime projection correctness, not ontology-equivalent capability identity. |
 | Invariant matrix branch coverage governance | `invariant_matrix_coverage` | `prediction_availability.v1`; `evidence_link_completeness.v1`; `explainable_halt_payload.v1`; `authorization.scope.v1` | governance coverage capability maps to runtime invariant ID coverage set | Coverage-governance capability ID is not interchangeable with any single runtime invariant string. |
+
+Deferred mapping boundary (intentional):
+- Runtime anchors not listed above remain deferred until governance capability ID and runtime anchor pairs are explicit and stable in code/tests/docs.
+- `prediction_outcome_binding.v1` is currently treated as a runtime-local validation artifact and is not yet mapped to a governance capability ID.
+- `BeliefState.bindings`-derived runtime strings are deferred from capability-plane mapping while `bindings` typing remains explicitly deferred.
 
 ## Step-Layer Authority Boundary
 

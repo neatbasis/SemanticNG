@@ -43,7 +43,12 @@ ledger:
         docs/ontology/07-process-execution-guide.md plus mapped runtime anchors
         in docs/system_contract_map.md.
       status: in-remediation
-      notes: Governance capability ID != runtime capability string.
+      notes: >-
+        Core mapping rule and initial instantiated subset are now documented in
+        docs/system_contract_map.md and docs/ontology/01-ontology-portfolio-catalogue.md.
+        Gap remains in-remediation because capability-plane mapping is still intentionally
+        partial; additional rows stay deferred where governance ID/runtime anchor pairs
+        are not yet explicit and stable.
       owner: Sebastian
 
     - gap_id: GAP-202604-002
@@ -79,8 +84,15 @@ ledger:
       linked_test_to_confirm_fix: >-
         Documentation acceptance by process gate: taxonomy section present and
         referenced by architecture-refactor planning gate.
-      status: in-remediation
-      notes: Includes required defer on BeliefState.bindings.
+      status: resolved
+      resolved_date: 2026-04-08
+      resolution_evidence: >-
+        Runtime Concept Taxonomy + field-level stabilization statuses present in
+        docs/system_contract_map.md; promotion governance and scoped doc-freshness
+        checks passed for this governed artifact (make promotion-governance-check, 2026-04-08).
+      notes: >-
+        Includes explicit defer on BeliefState.bindings and explicit non-equivalence
+        constraints; closure is documentation/taxonomy closure, not runtime semantic finalization.
       owner: Sebastian
 
     - gap_id: GAP-202604-003
@@ -114,8 +126,14 @@ ledger:
       linked_test_to_confirm_fix: >-
         Documentation acceptance by process gate and cross-reference from
         ontology process decision gate.
-      status: in-remediation
-      notes: Preserve distinction between runtime linkage and ontology equivalence.
+      status: resolved
+      resolved_date: 2026-04-08
+      resolution_evidence: >-
+        Purpose-Stack Linkage section is present in docs/system_contract_map.md and
+        is referenced by ontology process gating artifacts; promotion governance checks
+        passed for the governed document set (make promotion-governance-check, 2026-04-08).
+      notes: >-
+        Preserves runtime linkage semantics with explicit non-equivalence constraints.
       owner: Sebastian
 
     - gap_id: GAP-202604-004
@@ -148,6 +166,12 @@ ledger:
       linked_test_to_confirm_fix: >-
         Documentation acceptance by process gate requiring explicit
         step-layer authority boundary before architecture refactor planning.
-      status: in-remediation
-      notes: Step-layer executable behavior != canonical runtime authority.
+      status: resolved
+      resolved_date: 2026-04-08
+      resolution_evidence: >-
+        Step-Layer Authority Boundary section is present in docs/system_contract_map.md
+        with explicit non-equivalence statement; ontology process gate requires this output
+        before architecture-refactor planning.
+      notes: >-
+        Step-layer executable behavior != canonical runtime authority remains explicit.
       owner: Sebastian

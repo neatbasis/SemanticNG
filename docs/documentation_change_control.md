@@ -55,6 +55,7 @@ Owner roles are aligned to the handoff ownership structure defined in `docs/defi
 
 - Treat this matrix as the canonical routing policy for governance-relevant change sets.
 - If a single PR spans multiple DMAIC phases, satisfy the union of all required file updates, validators, evidence locations, and merge-blocking checks.
+- For behavior-preserving semantic-boundary prep slices, record the explicit authority/boundary intent in one paired governance doc update so promotion coupling remains auditable.
 - Reference this document in PR descriptions when proposing governance or milestone policy adjustments.
 
 _Last regenerated from manifest: 2026-03-01T18:00:00Z (UTC)._

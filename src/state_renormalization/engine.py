@@ -252,6 +252,19 @@ def _extract_typed_slot_values(
     return {slot_id: ask_slots[slot_id] for slot_id in required_slots if slot_id in ask_slots}
 
 
+def _write_belief_bindings(
+    belief: BeliefState,
+    *,
+    updates: Mapping[str, Any] | None = None,
+    key: str | None = None,
+    value: Any = None,
+) -> None:
+    if updates:
+        belief.bindings.update(dict(updates))
+    if key is not None:
+        belief.bindings[key] = value
+
+
 def _build_canonical_mission_draft(
     *,
     ask_slots: Mapping[str, Any] | None,
@@ -3163,7 +3176,7 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
                 )
                 if typed_values:
                     pending_about["typed_slot_values"] = typed_values
-                    belief.bindings.update(typed_values)
+                    _write_belief_bindings(belief, updates=typed_values)
 
                 belief.pending_about = pending_about
 
@@ -3186,9 +3199,13 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
                 belief.pending_attempts += 1
 
     if any(schema_name == "intent.mission_create" for schema_name in belief.active_schemas):
-        belief.bindings["mission.draft"] = _build_canonical_mission_draft(
-            ask_slots=ep.ask.slots,
-            bindings=belief.bindings,
+        _write_belief_bindings(
+            belief,
+            key="mission.draft",
+            value=_build_canonical_mission_draft(
+                ask_slots=ep.ask.slots,
+                bindings=belief.bindings,
+            ),
         )
 
     belief.belief_version += 1

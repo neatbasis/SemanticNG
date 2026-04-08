@@ -169,10 +169,117 @@ def test_option_a_persists_typed_slots_and_composes_ask_outbox_options(
     )
 
     assert b2.pending_about is not None
-    assert b2.pending_about["typed_slot_values"][ClarificationSlotId.REMINDER_SCHEDULE.value] == "tomorrow"
+    assert (
+        b2.pending_about["typed_slot_values"][ClarificationSlotId.REMINDER_SCHEDULE.value]
+        == "tomorrow"
+    )
     assert b2.bindings[ClarificationSlotId.REMINDER_SCHEDULE.value] == "tomorrow"
 
     artifact = next(a for a in ep2.artifacts if a.get("kind") == "schema_selection")
     request = artifact["ask_outbox_request"]
     assert request is not None
     assert ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value in request["action_options"]
+
+
+def test_option_a_routes_typed_slot_binding_writes_through_helper(
+    monkeypatch: pytest.MonkeyPatch,
+    make_episode: Callable[..., Episode],
+) -> None:
+    import state_renormalization.engine as engine
+
+    sel = SchemaSelection(
+        schemas=[SchemaHit(name="clarify.reminder", score=0.9)],
+        ambiguities=[
+            Ambiguity(
+                status=AmbiguityStatus.UNRESOLVED,
+                about=AmbiguityAbout(kind=AboutKind.INTENT, key="reminder.intent"),
+                type=AmbiguityType.UNDERSPECIFIED,
+                ask=[
+                    ClarifyingQuestion(
+                        q="When should I remind you?",
+                        format=AskFormat.MULTICHOICE,
+                        options=["later today", "tomorrow"],
+                        bind={"key": ClarificationSlotId.REMINDER_SCHEDULE.value},
+                    )
+                ],
+                resolution_policy=ResolutionPolicy.ASK_USER,
+            )
+        ],
+    )
+
+    def fake_selector(user_text: str | None, *, error: CaptureOutcome | None) -> SchemaSelection:
+        return sel
+
+    writes: list[tuple[dict[str, str], dict[str, object]]] = []
+    original = engine._write_belief_bindings
+
+    def spy_write(
+        belief: BeliefState,
+        *,
+        updates: dict[str, object] | None = None,
+        key: str | None = None,
+        value: object = None,
+    ) -> None:
+        writes.append(
+            (
+                {"key": key or ""},
+                {"updates": {} if updates is None else dict(updates), "value": value},
+            )
+        )
+        original(belief, updates=updates, key=key, value=value)
+
+    monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
+    monkeypatch.setattr(engine, "_write_belief_bindings", spy_write)
+
+    _, belief = apply_schema_bubbling(
+        make_episode(
+            ask=AskResult(
+                status=AskStatus.OK,
+                sentence="remind me",
+                slots={ClarificationSlotId.REMINDER_SCHEDULE.value: "tomorrow"},
+            )
+        ),
+        BeliefState(),
+    )
+
+    assert belief.bindings[ClarificationSlotId.REMINDER_SCHEDULE.value] == "tomorrow"
+    assert any(
+        write[1]["updates"] == {ClarificationSlotId.REMINDER_SCHEDULE.value: "tomorrow"}
+        for write in writes
+    )
+
+
+def test_option_a_routes_mission_draft_binding_write_through_helper(
+    monkeypatch: pytest.MonkeyPatch,
+    make_episode: Callable[..., Episode],
+) -> None:
+    import state_renormalization.engine as engine
+
+    sel = SchemaSelection(
+        schemas=[SchemaHit(name="intent.mission_create", score=0.95)],
+        ambiguities=[],
+    )
+
+    def fake_selector(user_text: str | None, *, error: CaptureOutcome | None) -> SchemaSelection:
+        return sel
+
+    writes: list[tuple[str | None, object]] = []
+    original = engine._write_belief_bindings
+
+    def spy_write(
+        belief: BeliefState,
+        *,
+        updates: dict[str, object] | None = None,
+        key: str | None = None,
+        value: object = None,
+    ) -> None:
+        writes.append((key, value if updates is None else dict(updates)))
+        original(belief, updates=updates, key=key, value=value)
+
+    monkeypatch.setattr("state_renormalization.engine.naive_schema_selector", fake_selector)
+    monkeypatch.setattr(engine, "_write_belief_bindings", spy_write)
+
+    _, belief = apply_schema_bubbling(make_episode(), BeliefState())
+
+    assert isinstance(belief.bindings.get("mission.draft"), dict)
+    assert any(key == "mission.draft" for key, _ in writes)

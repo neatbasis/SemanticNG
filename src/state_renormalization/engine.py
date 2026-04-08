@@ -224,6 +224,14 @@ class GateOutcomeSelectionResult:
     result_kind: str
 
 
+@dataclass(frozen=True)
+class MissionCreateHandoff:
+    draft: Mapping[str, Any]
+    entity_value: str
+    schedule: str
+    completion_mode: MissionCompletionMode
+
+
 _REMINDER_TYPED_SLOTS: tuple[str, ...] = (
     ClarificationSlotId.REMINDER_SCHEDULE.value,
     ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value,
@@ -326,6 +334,59 @@ def _build_canonical_mission_draft(
     }
 
 
+def _update_mission_draft_binding_from_selection(
+    *,
+    belief: BeliefState,
+    ask_slots: Mapping[str, Any] | None,
+) -> None:
+    if not any(schema_name == "intent.mission_create" for schema_name in belief.active_schemas):
+        return
+    _write_belief_bindings(
+        belief,
+        key=_MISSION_DRAFT_BINDING_KEY,
+        value=_build_canonical_mission_draft(
+            ask_slots=ask_slots,
+            bindings=belief.bindings,
+        ),
+    )
+
+
+def _resolve_mission_create_handoff(belief: BeliefState) -> MissionCreateHandoff | None:
+    if "intent.mission_create" not in belief.active_schemas:
+        return None
+
+    draft = _binding_mission_draft(belief.bindings)
+    if draft is None:
+        return None
+
+    entity_ref = draft.get("entity_ref")
+    if not isinstance(entity_ref, Mapping):
+        return None
+    entity_value = entity_ref.get("ref")
+    schedule = draft.get("schedule")
+    if (
+        not isinstance(entity_value, str)
+        or not entity_value.strip()
+        or not isinstance(schedule, str)
+    ):
+        return None
+
+    completion_mode = MissionCompletionMode.MANUAL
+    completion_mode_raw = draft.get("completion_mode")
+    if isinstance(completion_mode_raw, str):
+        try:
+            completion_mode = MissionCompletionMode(completion_mode_raw)
+        except ValueError:
+            completion_mode = MissionCompletionMode.MANUAL
+
+    return MissionCreateHandoff(
+        draft=draft,
+        entity_value=entity_value,
+        schedule=schedule,
+        completion_mode=completion_mode,
+    )
+
+
 def _find_latest_ask_outbox_response_ref(ep: Episode) -> str | None:
     for artifact in reversed(ep.artifacts):
         if artifact.get("artifact_kind") != "ask_outbox_response":
@@ -343,31 +404,9 @@ def _maybe_create_mission_from_intent(
     projection_state: ProjectionState,
     prediction_log_path: str | Path,
 ) -> ProjectionState:
-    if "intent.mission_create" not in belief.active_schemas:
+    handoff = _resolve_mission_create_handoff(belief)
+    if handoff is None:
         return projection_state
-
-    draft = _binding_mission_draft(belief.bindings)
-    if draft is None:
-        return projection_state
-
-    entity_ref = draft.get("entity_ref")
-    if not isinstance(entity_ref, Mapping):
-        return projection_state
-    entity_value = entity_ref.get("ref")
-    schedule = draft.get("schedule")
-    if (
-        not isinstance(entity_value, str)
-        or not entity_value.strip()
-        or not isinstance(schedule, str)
-    ):
-        return projection_state
-    completion_mode = MissionCompletionMode.MANUAL
-    completion_mode_raw = draft.get("completion_mode")
-    if isinstance(completion_mode_raw, str):
-        try:
-            completion_mode = MissionCompletionMode(completion_mode_raw)
-        except ValueError:
-            completion_mode = MissionCompletionMode.MANUAL
 
     intent_hash = hashlib.sha256(
         json.dumps({"schemas": sorted(belief.active_schemas)}, sort_keys=True).encode("utf-8")
@@ -399,11 +438,11 @@ def _maybe_create_mission_from_intent(
         event_kind="mission_created",
         mission=MissionContract(
             mission_id=mission_id,
-            mission_identity=f"reminder:{entity_value.strip().lower()}",
+            mission_identity=f"reminder:{handoff.entity_value.strip().lower()}",
             idempotency_key=idempotency_key,
             kind=MissionKind.FOLLOW_UP,
-            entity_ref=MissionEntityRef(kind="reminder_target", ref=entity_value.strip()),
-            completion_mode=completion_mode,
+            entity_ref=MissionEntityRef(kind="reminder_target", ref=handoff.entity_value.strip()),
+            completion_mode=handoff.completion_mode,
             status=MissionStatus.ACTIVE,
             created_at_iso=now,
             updated_at_iso=now,
@@ -3415,15 +3454,10 @@ def apply_schema_bubbling(
             else:
                 belief.pending_attempts += 1
 
-    if any(schema_name == "intent.mission_create" for schema_name in belief.active_schemas):
-        _write_belief_bindings(
-            belief,
-            key=_MISSION_DRAFT_BINDING_KEY,
-            value=_build_canonical_mission_draft(
-                ask_slots=ep.ask.slots,
-                bindings=belief.bindings,
-            ),
-        )
+    _update_mission_draft_binding_from_selection(
+        belief=belief,
+        ask_slots=ep.ask.slots,
+    )
 
     belief.belief_version += 1
     belief.updated_at_iso = _now_iso()

@@ -49,7 +49,7 @@ Owner roles are aligned to the handoff ownership structure defined in `docs/defi
 - Both workflows share `.github/actions/python-test-setup/action.yml` for checkout, Python setup, pip caching, and editable test-extra installation to keep CI environment semantics aligned.
 - Trigger boundary intent: baseline quality runs broadly on pull requests/pushes, while milestone governance remains path-scoped to semantic boundary paths (`src/core/**`, `src/state_renormalization/**`, `src/semanticng/**`) and governance artifacts to avoid unnecessary governance gate runs on unrelated changes.
 - Branch protection requirement: when governance-scoped docs/scripts are touched (for example `docs/doc_freshness_slo.json`, `docs/release_checklist.md`, or `.github/scripts/validate_doc_freshness_slo.py`), require the `State Renormalization Milestone Gate / milestone-governance` status check so documentation freshness validation is merge-blocking.
-- Semantic boundary contract policy: edits under `src/core/**`, `src/state_renormalization/**`, or `src/semanticng/**` must be accompanied by matching contract/governance documentation updates (at minimum `docs/system_contract_map.md` or `docs/dod_manifest.json`) and must pass `make promotion-governance-check`.
+- Semantic boundary contract policy: edits under `src/core/**`, `src/state_renormalization/**`, or `src/semanticng/**` must be accompanied by at least one matching contract/governance documentation update (`docs/system_contract_map.md`, `docs/dod_manifest.json`, `docs/definition_of_complete.md`, or `docs/documentation_change_control.md`) and must pass `make promotion-governance-check`.
 
 ## Contributor usage notes
 

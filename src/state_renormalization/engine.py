@@ -19,6 +19,9 @@ from pydantic import BaseModel, Field, ValidationError
 
 from state_renormalization._compat import UTC
 from state_renormalization.adapters.ask_outbox import AskOutboxAdapter
+from state_renormalization.adapters.halt_boundary import (
+    materialize_halt_record_from_invariant_outcome,
+)
 from state_renormalization.adapters.observation_freshness import ObservationFreshnessPolicyAdapter
 from state_renormalization.adapters.persistence import (
     append_ask_outbox_request_event,
@@ -914,18 +917,11 @@ def _halt_record_from_outcome(*, stage: str, outcome: InvariantOutcome) -> HaltR
     if outcome.details is None or outcome.evidence is None:
         raise HaltPayloadValidationError("halt payload is malformed or incomplete")
 
-    reason = outcome.reason
-    return HaltRecord.from_payload(
-        HaltRecord.build_canonical_payload(
-            halt_id=_stable_halt_id(stage=stage, outcome=outcome),
-            stage=stage,
-            invariant_id=outcome.invariant_id.value,
-            reason=reason,
-            details=dict(outcome.details),
-            evidence=list(outcome.evidence),
-            timestamp=_now_iso(),
-            retryability=bool(outcome.action_hints),
-        )
+    return materialize_halt_record_from_invariant_outcome(
+        stage=stage,
+        outcome=outcome,
+        halt_id=_stable_halt_id(stage=stage, outcome=outcome),
+        timestamp_iso=_now_iso(),
     )
 
 

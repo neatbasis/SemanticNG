@@ -2872,6 +2872,93 @@ def bind_prediction_outcome(
     return updated_pred, outcome
 
 
+def _mission_loop_return_with_summary(
+    ep: Episode,
+    belief: BeliefState,
+    projection_state: ProjectionState,
+) -> tuple[Episode, BeliefState, ProjectionState]:
+    append_turn_summary(ep)
+    return ep, belief, projection_state
+
+
+def _append_turn_prediction_emission(
+    *,
+    ep: Episode,
+    projection_state: ProjectionState,
+    prediction_log_path: str | Path,
+) -> tuple[ProjectionState, WrittenPredictionPayload] | HaltRecord:
+    turn_prediction = _emit_turn_prediction(ep)
+    turn_prediction_ref = append_prediction_record(
+        turn_prediction,
+        prediction_log_path=prediction_log_path,
+        stable_ids=_episode_stable_ids(ep),
+        episode=ep,
+        projection_state=projection_state,
+    )
+    if isinstance(turn_prediction_ref, HaltRecord):
+        return turn_prediction_ref
+
+    updated_projection = project_current(turn_prediction, projection_state)
+    _append_episode_artifact(
+        ep,
+        {
+            "artifact_kind": "prediction_emit",
+            "prediction_id": turn_prediction.prediction_id,
+            "scope_key": turn_prediction.scope_key,
+            "target_variable": turn_prediction.target_variable,
+            "target_horizon_iso": turn_prediction.target_horizon_iso,
+            "evidence_ref": turn_prediction_ref,
+        },
+    )
+    return (
+        updated_projection,
+        WrittenPredictionPayload.from_evidence_ref(
+            key=turn_prediction.scope_key,
+            evidence_ref=turn_prediction_ref,
+        ),
+    )
+
+
+def _append_pending_prediction_update_emission(
+    *,
+    ep: Episode,
+    pred: PredictionRecord,
+    projection_state: ProjectionState,
+    prediction_log_path: str | Path,
+) -> tuple[ProjectionState, WrittenPredictionPayload] | HaltRecord:
+    evidence_ref = append_prediction_record(
+        pred,
+        prediction_log_path=prediction_log_path,
+        stable_ids=_episode_stable_ids(ep),
+        episode=ep,
+        projection_state=projection_state,
+    )
+    if isinstance(evidence_ref, HaltRecord):
+        return evidence_ref
+
+    updated_projection = project_current(pred, projection_state)
+    _append_episode_artifact(
+        ep,
+        {
+            "artifact_kind": "prediction_update",
+            "prediction_id": pred.prediction_id,
+            "scope_key": pred.scope_key,
+            "filtration_id": pred.filtration_id,
+            "target_variable": pred.target_variable,
+            "target_horizon_iso": pred.target_horizon_iso,
+            "evidence_ref": evidence_ref,
+            "projection_updated_at_iso": updated_projection.updated_at_iso,
+        },
+    )
+    return (
+        updated_projection,
+        WrittenPredictionPayload.from_evidence_ref(
+            key=pred.scope_key,
+            evidence_ref=evidence_ref,
+        ),
+    )
+
+
 def run_mission_loop(
     ep: Episode,
     belief: BeliefState,
@@ -2921,68 +3008,30 @@ def run_mission_loop(
             ask_outbox_adapter=ask_outbox_adapter,
         )
 
-    turn_prediction = _emit_turn_prediction(ep)
-    turn_prediction_ref = append_prediction_record(
-        turn_prediction,
-        prediction_log_path=prediction_log_path,
-        stable_ids=_episode_stable_ids(ep),
-        episode=ep,
+    turn_emission = _append_turn_prediction_emission(
+        ep=ep,
         projection_state=updated_projection,
+        prediction_log_path=prediction_log_path,
     )
-    if isinstance(turn_prediction_ref, HaltRecord):
-        append_turn_summary(ep)
-        return ep, belief, updated_projection
-    updated_projection = project_current(turn_prediction, updated_projection)
-    _append_episode_artifact(
-        ep,
-        {
-            "artifact_kind": "prediction_emit",
-            "prediction_id": turn_prediction.prediction_id,
-            "scope_key": turn_prediction.scope_key,
-            "target_variable": turn_prediction.target_variable,
-            "target_horizon_iso": turn_prediction.target_horizon_iso,
-            "evidence_ref": turn_prediction_ref,
-        },
-    )
+    if isinstance(turn_emission, HaltRecord):
+        return _mission_loop_return_with_summary(ep, belief, updated_projection)
+    updated_projection, last_written_prediction = turn_emission
 
-    last_written_prediction = WrittenPredictionPayload.from_evidence_ref(
-        key=turn_prediction.scope_key,
-        evidence_ref=turn_prediction_ref,
-    )
     for pending in pending_predictions:
         pred = (
             pending
             if isinstance(pending, PredictionRecord)
             else PredictionRecord.model_validate(pending)
         )
-        evidence_ref = append_prediction_record(
-            pred,
-            prediction_log_path=prediction_log_path,
-            stable_ids=_episode_stable_ids(ep),
-            episode=ep,
+        pending_emission = _append_pending_prediction_update_emission(
+            ep=ep,
+            pred=pred,
             projection_state=updated_projection,
+            prediction_log_path=prediction_log_path,
         )
-        if isinstance(evidence_ref, HaltRecord):
-            append_turn_summary(ep)
-            return ep, belief, updated_projection
-        updated_projection = project_current(pred, updated_projection)
-        _append_episode_artifact(
-            ep,
-            {
-                "artifact_kind": "prediction_update",
-                "prediction_id": pred.prediction_id,
-                "scope_key": pred.scope_key,
-                "filtration_id": pred.filtration_id,
-                "target_variable": pred.target_variable,
-                "target_horizon_iso": pred.target_horizon_iso,
-                "evidence_ref": evidence_ref,
-                "projection_updated_at_iso": updated_projection.updated_at_iso,
-            },
-        )
-        last_written_prediction = WrittenPredictionPayload.from_evidence_ref(
-            key=pred.scope_key,
-            evidence_ref=evidence_ref,
-        )
+        if isinstance(pending_emission, HaltRecord):
+            return _mission_loop_return_with_summary(ep, belief, updated_projection)
+        updated_projection, last_written_prediction = pending_emission
 
     active_scope = next(iter(updated_projection.current_predictions), "decision_stage")
     pre_decision_gate = evaluate_invariant_gates(
@@ -2994,8 +3043,7 @@ def run_mission_loop(
         gate_point="pre-decision",
     )
     if isinstance(pre_decision_gate, HaltRecord):
-        append_turn_summary(ep)
-        return ep, belief, updated_projection
+        return _mission_loop_return_with_summary(ep, belief, updated_projection)
 
     should_continue, _ = _apply_intervention_hook(
         ep=ep,
@@ -3028,8 +3076,7 @@ def run_mission_loop(
         gate_point="post-observation",
     )
     if isinstance(post_observation_gate, HaltRecord):
-        append_turn_summary(ep)
-        return ep, belief, updated_projection
+        return _mission_loop_return_with_summary(ep, belief, updated_projection)
 
     should_continue, _ = _apply_intervention_hook(
         ep=ep,
@@ -3054,8 +3101,7 @@ def run_mission_loop(
         just_written_prediction=last_written_prediction.model_dump(mode="json"),
     )
     if isinstance(pre_output_gate, HaltRecord):
-        append_turn_summary(ep)
-        return ep, belief, updated_projection
+        return _mission_loop_return_with_summary(ep, belief, updated_projection)
 
     should_continue, _ = _apply_intervention_hook(
         ep=ep,
@@ -3078,8 +3124,7 @@ def run_mission_loop(
         projection_state=updated_projection,
         prediction_log_path=prediction_log_path,
     )
-    append_turn_summary(ep)
-    return ep, belief, updated_projection
+    return _mission_loop_return_with_summary(ep, belief, updated_projection)
 
 
 def build_episode(

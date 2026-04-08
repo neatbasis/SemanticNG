@@ -313,6 +313,7 @@ proceeding. They are not optional checkpoints.
 | **Before PostingEpistemics.ttl v0.1** | Instantiation pass complete; gap ledger contains specific motivated entries for every class and property to be added.                              |
 | **Before any deployment milestone**   | No gap with decision-risk "high" and operational impact ≥ 3 is unresolved; import conservativity passes; mandatory SHACL shapes pass on real data. |
 | **Mid-level alignment fork**          | Before MissionContext.ttl advances beyond skeleton: BFO/CCO vs UFO/gUFO decision recorded in catalogue and in MissionContext.ttl header.           |
+| **Before architecture refactor planning** | Project concept-binding outputs are complete and current: (1) capability identifier relationship clarified in `docs/ontology/01-ontology-portfolio-catalogue.md`; (2) runtime concept taxonomy present in `docs/system_contract_map.md`; (3) purpose-stack linkage present in `docs/system_contract_map.md`; (4) step-layer authority boundary present in `docs/system_contract_map.md`; and linked gap-tracking evidence exists in the authoritative gap ledger (`gaps/ledger.yaml` or `gaps/LEDGER.md`). If any required output is missing or stale, this gate is fail-closed and refactor planning does not proceed. |
 
 **6. Artifact Dependency Map**
 

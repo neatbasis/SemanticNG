@@ -345,6 +345,25 @@ import from higher layers without explicit justification.
 11. Rule 11: No single ontology may become the semantic center of
     everything. Layered authority must be preserved.
 
+### Project Binding: Capability Identifier Relationships (SemanticNG)
+
+SemanticNG operates across three identifier planes that must be bound by mapping, not by unification:
+
+- Ontology capability concept plane: ontology-level capability meanings and relations (for example UAF/mission-alignment concept space).
+- Governance capability ID plane: release/governance tracking identifiers used in DoD and promotion workflows.
+- Runtime capability string plane: executable runtime capability strings used by mission-loop and gate evaluation paths.
+
+Binding rule:
+- Required relationship is explicit mapping + non-equivalence.
+- Governance capability ID != runtime capability string.
+- No plane is implicitly authoritative for another plane without a declared mapping entry.
+
+Mapping authority:
+- `docs/system_contract_map.md` owns the concrete runtime-facing cross-plane mapping anchors for SemanticNG.
+
+Maintenance trigger:
+- Any addition, rename, or semantic change in any plane requires synchronized review of this subsection and the mapped runtime authority anchors before merge.
+
 **5. Maintenance Rules**
 
 - Every new class or property must cite a gap ledger entry that

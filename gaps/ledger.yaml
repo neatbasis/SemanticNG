@@ -1,0 +1,149 @@
+ledger:
+  schema_reference: docs/ontology/06-gap-ledger-schema.md
+  taxonomy_reference: docs/ontology/02-gap-taxonomy-reference.md
+  authoritative: true
+  updated_on: 2026-04-08
+  entries:
+    - gap_id: GAP-202604-001
+      title: Capability identifier planes missing explicit project binding
+      gap_type_primary: D
+      gap_type_secondary: [C]
+      affected_modules:
+        - UAF/NAF (reference alignment layer)
+        - Local MissionContext
+        - Governance capability manifests
+        - Runtime contract map bindings
+      observed_symptom: >-
+        Capability identifiers appear across ontology concept references,
+        governance capability IDs, and runtime capability strings without a
+        single explicit project binding rule and authority anchor.
+      evidence_source: >-
+        Concept-clarification and alignment audits; documented non-equivalence
+        and mapping requirements in docs/system_contract_map.md.
+      evidence_date: 2026-04-08
+      hypothesis_confirmed: true
+      operational_impact: 3
+      frequency: common
+      scope: cross-module
+      epistemic_risk: medium
+      decision_risk: medium
+      recoverability: partial
+      proposed_remediation_type: Add alignment + boundary rule documentation
+      proposed_remediation_detail: >-
+        Add project-binding subsection that defines ontology capability concept,
+        governance capability ID, and runtime capability string planes with
+        explicit mapping (not unification) and mapping authority.
+      target_module_for_remediation: docs/ontology/01-ontology-portfolio-catalogue.md
+      linked_test_to_confirm_fix: >-
+        Process gate evidence: decision-gate row in
+        docs/ontology/07-process-execution-guide.md plus mapped runtime anchors
+        in docs/system_contract_map.md.
+      status: in-remediation
+      notes: Governance capability ID != runtime capability string.
+      owner: Sebastian
+
+    - gap_id: GAP-202604-002
+      title: Runtime state/decision taxonomy not explicitly codified
+      gap_type_primary: A
+      gap_type_secondary: [F]
+      affected_modules:
+        - Runtime state renormalization contracts
+        - Runtime invariant evaluation flow
+        - Runtime contract documentation surface
+      observed_symptom: >-
+        Runtime concepts and decision/state roles were present in code and
+        tests but lacked a single explicit taxonomy with role and stabilization
+        status.
+      evidence_source: >-
+        Field-level concept audit covering BeliefState, ProjectionState,
+        MissionContract, and Observation; role/authority checks in runtime
+        modules and behavioral contract tests.
+      evidence_date: 2026-04-08
+      hypothesis_confirmed: true
+      operational_impact: 3
+      frequency: common
+      scope: cross-module
+      epistemic_risk: medium
+      decision_risk: medium
+      recoverability: partial
+      proposed_remediation_type: Add vocabulary and role taxonomy documentation
+      proposed_remediation_detail: >-
+        Add Runtime Concept Taxonomy section including concept role
+        classification, field-level stabilization statuses, and explicit
+        non-equivalence constraints.
+      target_module_for_remediation: docs/system_contract_map.md
+      linked_test_to_confirm_fix: >-
+        Documentation acceptance by process gate: taxonomy section present and
+        referenced by architecture-refactor planning gate.
+      status: in-remediation
+      notes: Includes required defer on BeliefState.bindings.
+      owner: Sebastian
+
+    - gap_id: GAP-202604-003
+      title: Purpose stack linkage not documented as one explicit chain
+      gap_type_primary: M
+      gap_type_secondary: [C]
+      affected_modules:
+        - Mission/capability governance artifacts
+        - Runtime contracts and invariant outcomes
+        - Persistence/audit artifact obligations
+        - Promotion/governance checks
+      observed_symptom: >-
+        Purpose relationships existed across artifacts but were string-coupled
+        and not documented as one explicit mission->capability->invariant->artifact->governance chain.
+      evidence_source: >-
+        Purpose-stack audit and authority mapping across runtime modules,
+        governance commands, and contract map documentation.
+      evidence_date: 2026-04-08
+      hypothesis_confirmed: true
+      operational_impact: 2
+      frequency: common
+      scope: cross-module
+      epistemic_risk: medium
+      decision_risk: low
+      recoverability: easy
+      proposed_remediation_type: Add reusable linkage pattern documentation
+      proposed_remediation_detail: >-
+        Add Purpose-Stack Linkage section that explicitly names the runtime
+        execution chain and preserves non-equivalence of linked artifacts.
+      target_module_for_remediation: docs/system_contract_map.md
+      linked_test_to_confirm_fix: >-
+        Documentation acceptance by process gate and cross-reference from
+        ontology process decision gate.
+      status: in-remediation
+      notes: Preserve distinction between runtime linkage and ontology equivalence.
+      owner: Sebastian
+
+    - gap_id: GAP-202604-004
+      title: Step-layer authority boundary not explicitly defined
+      gap_type_primary: C
+      gap_type_secondary: [F]
+      affected_modules:
+        - Feature step harness layer
+        - Runtime state renormalization authority
+        - Runtime authority documentation surface
+      observed_symptom: >-
+        Step-layer executable behavior and runtime authority were easy to
+        conflate because no explicit authority boundary statement was present.
+      evidence_source: >-
+        Step-layer role audit on src/features/steps/* and src/semanticng/step_state.py
+        versus runtime authority in src/state_renormalization/*.
+      evidence_date: 2026-04-08
+      hypothesis_confirmed: true
+      operational_impact: 2
+      frequency: occasional
+      scope: cross-module
+      epistemic_risk: low
+      decision_risk: low
+      recoverability: easy
+      proposed_remediation_type: Add boundary rule documentation
+      proposed_remediation_detail: >-
+        Add Step-Layer Authority Boundary section clarifying step harness
+        adapter role and canonical runtime authority ownership.
+      target_module_for_remediation: docs/system_contract_map.md
+      linked_test_to_confirm_fix: >-
+        Documentation acceptance by process gate requiring explicit
+        step-layer authority boundary before architecture refactor planning.
+      status: in-remediation
+      notes: Step-layer executable behavior != canonical runtime authority.
+      owner: Sebastian

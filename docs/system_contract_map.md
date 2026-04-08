@@ -30,6 +30,78 @@ Maturity levels:
 
 Capability statuses are synchronized to manifest `done` states with CI evidence links attached; contract maturity remains unchanged in this update.
 
+## Runtime Concept Taxonomy (State and Decision Contracts)
+
+This section is the runtime-facing authority for concept roles used by `src/state_renormalization/*` and related behavioral contract tests. Ontology alignment is recorded as runtime mapping status, not equivalence.
+
+### Concept role classification
+
+| Concept | Runtime role | Runtime authority anchors | Alignment status | Non-equivalence note |
+|---|---|---|---|---|
+| `MissionContract` | Mission execution contract and scheduling envelope for mission-loop decisions | `src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py` (`run_mission_loop`) | mapped, not equivalent | Governance capability IDs do not define mission runtime semantics. |
+| `BeliefState` | Turn-local interpretation and ambiguity state for pending obligations | `src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py` (`apply_schema_bubbling`) | mapped, not equivalent | `BeliefState` is not `ProjectionState`. |
+| `ProjectionState` | Projection/replay-facing prediction and mission status view | `src/state_renormalization/contracts.py`, `src/state_renormalization/read_model.py`, replay tests | mapped, not equivalent | `ProjectionState` is not `BeliefState`. |
+| `Observation` | Normalized observed input envelope used by mission-loop processing | `src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py` (`ingest_observation`) | mapped, not equivalent | Observation normalization is runtime-scoped, not ontology identity authority. |
+| `DecisionEffect` | Emitted decision outcome/effect record for downstream evaluation and persistence | `src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py` (`attach_decision_effect`) | mapped, not equivalent | Effect envelope is execution-local; not a canonical ontology decision class. |
+| `InvariantOutcome` | Invariant evaluation result used to continue/defer/halt loop progression | `src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py` (`evaluate_invariant_gates`) | local validation artifact | `InvariantOutcome` does not equal persisted halt artifact. |
+| `HaltRecord` | Persisted explainable stop artifact for replay/audit lineage | `src/state_renormalization/contracts.py`, `src/state_renormalization/adapters/persistence.py` | ontology-mappable only with qualifiers | `HaltRecord` does not equal `InvariantOutcome`. |
+| `EvidenceRef` | Evidence lineage reference attached to runtime/persisted artifacts | `src/state_renormalization/contracts.py`, persistence and replay tests | ontology-mappable only with qualifiers | Evidence linkage is contract-governed execution metadata. |
+| `SchemaSelection` / `Ambiguity` | Runtime schema disambiguation output for state shaping | `src/state_renormalization/contracts.py`, `src/state_renormalization/adapters/schema_selector.py` | mapped, not equivalent | Ambiguity handling is runtime selection behavior, not ontology identity resolution authority. |
+
+### Field-level stabilization status
+
+Status categories: `stabilize now`, `local only`, `mapped, not equivalent`, `defer`.
+
+#### `BeliefState` field notes
+
+- `updated_at_iso`: `stabilize now` (canonical runtime timestamp qualifier).
+- `ambiguity_state`, `active_schemas`, `schema_confidence`, `ambiguities_active`: `mapped, not equivalent` (ontology-influenced but runtime interpretation-specific).
+- `belief_version`, `pending_about`, `pending_question`, `pending_attempts`, `last_utterance_type`, `last_status`, `consecutive_no_response`: `local only` (execution control/retry/session artifacts).
+- `bindings`: `defer` (typing and authority boundary not yet stable).
+
+#### `ProjectionState` field notes
+
+- `updated_at_iso`: `stabilize now` (canonical runtime timestamp qualifier).
+- `current_predictions`, `prediction_history`, `active_missions`, `deferred_missions`, `completed_missions`, `last_comparison_at_iso`: `mapped, not equivalent` (projection/replay application view, not ontology identity model).
+- `correction_metrics`: `local only` (runtime correction instrumentation artifact).
+
+#### `MissionContract` field notes
+
+- `kind`, `lineage_refs`, `created_at_iso`, `updated_at_iso`: `stabilize now` (core mission contract and lineage/time qualifiers).
+- `mission_identity`, `entity_ref`, `schedule_policy`, `completion_mode`, `status`, `next_prompt_at`: `mapped, not equivalent` (runtime mission semantics with ontology/project qualifiers).
+- `mission_id`, `idempotency_key`: `local only` (non-ontology execution identifiers for control/idempotency).
+
+#### `Observation` field notes
+
+- `t_observed_iso`: `stabilize now` (canonical observation-time qualifier).
+- `type`, `text`, `source`: `mapped, not equivalent` (runtime observation envelope semantics).
+- `observation_id`: `local only` (execution-local identifier).
+
+## Purpose-Stack Linkage
+
+Runtime linkage is defined as an execution chain, not ontology equivalence:
+
+1. Mission principle intent is declared in capability/governance artifacts (`docs/dod_manifest.json`, `docs/definition_of_complete.md`).
+2. Runtime capability execution is implemented via mission-loop/state-renormalization contracts and engine paths (`src/state_renormalization/contracts.py`, `src/state_renormalization/engine.py`).
+3. Invariant sets are evaluated in runtime policy code (`src/state_renormalization/invariants.py`) and surfaced as `InvariantOutcome`.
+4. Artifact obligations are enforced through runtime contract shapes and persistence envelopes (for example `HaltRecord` explainability fields in `src/state_renormalization/contracts.py` and persistence adapter behavior).
+5. Governance checks validate required coupling and promotion conditions (`scripts/ci/*`, `docs/process/quality_stage_commands.json`, promotion tests).
+
+Linkage constraints:
+- Governance capability IDs are governance/control identifiers and are not interchangeable with runtime capability strings.
+- Runtime contract artifacts (`InvariantOutcome`, `HaltRecord`, `DecisionEffect`) are linked but non-equivalent types with separate authority roles.
+- Step-layer execution success is evidence of behavior coverage, not runtime authority ownership.
+
+## Step-Layer Authority Boundary
+
+`src/features/steps/*` and `src/semanticng/step_state.py` are executable test/harness adapters. They may orchestrate scenarios and fixtures, but canonical runtime authority remains in `src/state_renormalization/*`.
+
+Boundary rules:
+- Step-layer logic may express scenario intent and setup policy for behavioral verification.
+- Step-layer code must not be treated as the canonical owner of runtime decision/state contracts.
+- Canonical contract and invariant authority resides in runtime modules and their contract tests (`tests/test_*contracts*`, `tests/test_*invariants*`, mission-loop contract suites).
+- Non-equivalence: step-layer executable behavior does not imply canonical runtime authority.
+
 ## Maturity update protocol (apply each milestone review)
 
 Reference convention:

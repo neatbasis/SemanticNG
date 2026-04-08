@@ -205,6 +205,25 @@ class GateInvariantEvaluation:
     outcome: InvariantOutcome
 
 
+@dataclass(frozen=True)
+class GateEvaluationPhaseResult:
+    observer: ObserverFrame | None
+    auth_context: dict[str, Any]
+    current_predictions: dict[str, str]
+    authorization_evaluation: GateInvariantEvaluation | None
+    evaluations: list[GateInvariantEvaluation]
+    result: GateDecision
+
+
+@dataclass(frozen=True)
+class GateOutcomeSelectionResult:
+    outcome_bundle: GatePredictionOutcome
+    gate_checks: list[GateInvariantCheck]
+    invariant_audit: list[InvariantAuditResult]
+    halt_outcome: InvariantOutcome | None
+    result_kind: str
+
+
 _REMINDER_TYPED_SLOTS: tuple[str, ...] = (
     ClarificationSlotId.REMINDER_SCHEDULE.value,
     ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value,
@@ -1676,14 +1695,53 @@ def evaluate_invariant_gates(
     just_written_prediction: CanonicalPredictionPayload | None = None,
     halt_log_path: str | Path = "halts.jsonl",
 ) -> GateDecision:
+    phase = _evaluate_gate_invariant_phase(
+        ep=ep,
+        scope=scope,
+        prediction_key=prediction_key,
+        projection_state=projection_state,
+        prediction_log_available=prediction_log_available,
+        gate_point=gate_point,
+        just_written_prediction=just_written_prediction,
+    )
+    selection = _select_gate_outcome_phase(
+        gate_point=gate_point,
+        scope=scope,
+        prediction_key=prediction_key,
+        prediction_log_available=prediction_log_available,
+        just_written_prediction=just_written_prediction,
+        phase=phase,
+    )
+    _emit_gate_artifacts_phase(
+        ep=ep,
+        scope=scope,
+        prediction_key=prediction_key,
+        projection_state=projection_state,
+        prediction_log_available=prediction_log_available,
+        just_written_prediction=just_written_prediction,
+        halt_log_path=halt_log_path,
+        phase=phase,
+        selection=selection,
+    )
+    return phase.result
+
+
+def _evaluate_gate_invariant_phase(
+    *,
+    ep: Episode | None,
+    scope: str,
+    prediction_key: str | None,
+    projection_state: ProjectionState,
+    prediction_log_available: bool,
+    gate_point: str,
+    just_written_prediction: CanonicalPredictionPayload | None,
+) -> GateEvaluationPhaseResult:
     observer = getattr(ep, "observer", None) if ep is not None else None
-    halt_evidence_ref: dict[str, str] | None = None
     is_authorized, auth_context = _observer_authorized_for_action(
         observer=observer,
         action="evaluate_invariant_gates",
         required_capability="baseline.invariant_evaluation",
     )
-
     current_predictions = {
         key: pred.prediction_id for key, pred in projection_state.current_predictions.items()
     }
@@ -1729,10 +1787,29 @@ def evaluate_invariant_gates(
             just_written_prediction=just_written_prediction,
             gate_point=gate_point,
         )
+    return GateEvaluationPhaseResult(
+        observer=observer,
+        auth_context=auth_context,
+        current_predictions=current_predictions,
+        authorization_evaluation=authorization_evaluation,
+        evaluations=evaluations,
+        result=result,
+    )
 
+
+def _select_gate_outcome_phase(
+    *,
+    gate_point: str,
+    scope: str,
+    prediction_key: str | None,
+    prediction_log_available: bool,
+    just_written_prediction: CanonicalPredictionPayload | None,
+    phase: GateEvaluationPhaseResult,
+) -> GateOutcomeSelectionResult:
     gate_checks: list[GateInvariantCheck] = []
     invariant_audit: list[InvariantAuditResult] = []
-
+    result = phase.result
+    evaluations = phase.evaluations
     outcome_bundle = (
         result.artifact
         if isinstance(result, Success)
@@ -1741,7 +1818,6 @@ def evaluate_invariant_gates(
             post_write=tuple(ev.outcome for ev in evaluations if ev.phase == "post_write"),
         )
     )
-
     for evaluation in evaluations:
         normalized = normalize_outcome(evaluation.outcome, gate=gate_point)
         gate_checks.append(
@@ -1758,14 +1834,13 @@ def evaluate_invariant_gates(
         )
 
     halt_outcome, _ = _first_halt_from_evaluations(evaluations=evaluations, gate_point=gate_point)
-
     if isinstance(result, HaltRecord) and halt_outcome is not None:
         halt_validation = normalize_outcome(
             REGISTRY[InvariantId.EXPLAINABLE_HALT_PAYLOAD](
                 default_check_context(
                     scope=scope,
                     prediction_key=prediction_key,
-                    current_predictions=current_predictions,
+                    current_predictions=phase.current_predictions,
                     prediction_log_available=prediction_log_available,
                     just_written_prediction=just_written_prediction,
                     halt_candidate=halt_outcome,
@@ -1783,8 +1858,29 @@ def evaluate_invariant_gates(
             _invariant_audit_result_from_checker("halt_validation", halt_validation)
         )
 
-    result_kind = "prediction" if isinstance(result, Success) else "halt"
+    return GateOutcomeSelectionResult(
+        outcome_bundle=outcome_bundle,
+        gate_checks=gate_checks,
+        invariant_audit=invariant_audit,
+        halt_outcome=halt_outcome,
+        result_kind="prediction" if isinstance(result, Success) else "halt",
+    )
 
+
+def _emit_gate_artifacts_phase(
+    *,
+    ep: Episode | None,
+    scope: str,
+    prediction_key: str | None,
+    projection_state: ProjectionState,
+    prediction_log_available: bool,
+    just_written_prediction: CanonicalPredictionPayload | None,
+    halt_log_path: str | Path,
+    phase: GateEvaluationPhaseResult,
+    selection: GateOutcomeSelectionResult,
+) -> None:
+    result = phase.result
+    halt_evidence_ref: dict[str, str] | None = None
     stable_ids = _episode_stable_ids(ep) if ep is not None else {}
     if isinstance(result, HaltRecord):
         halt_evidence_ref = _persist_halt_and_get_evidence_ref(
@@ -1792,83 +1888,84 @@ def evaluate_invariant_gates(
             halt_log_path=halt_log_path,
             stable_ids=stable_ids,
         )
-        if authorization_evaluation is not None:
-            halt_outcome = authorization_evaluation.outcome
+        if phase.authorization_evaluation is not None:
+            halt_outcome = phase.authorization_evaluation.outcome
             if ep is not None and halt_outcome.invariant_id == InvariantId.AUTHORIZATION_SCOPE:
-                _append_authorization_issue(ep, halt=result, context=auth_context)
+                _append_authorization_issue(ep, halt=result, context=phase.auth_context)
 
-    if ep is not None:
+    if ep is None:
+        return
+
+    _append_episode_artifact(
+        ep,
+        {
+            "artifact_kind": "invariant_outcomes",
+            "observer": _to_dict(getattr(ep, "observer", None)),
+            "observer_enforcement": {
+                "requested_evaluation_invariants": list(
+                    getattr(phase.observer, "evaluation_invariants", []) or []
+                ),
+                "enforced": bool(getattr(phase.observer, "evaluation_invariants", []) or []),
+                "observer_role": getattr(phase.observer, "role", None),
+                "authorization_level": getattr(phase.observer, "authorization_level", None),
+            },
+            "scope": scope,
+            "prediction_key": prediction_key,
+            "invariant_context": {
+                "has_current_predictions": projection_state.has_current_predictions,
+                "current_predictions": dict(phase.current_predictions),
+                "prediction_log_available": prediction_log_available,
+                "just_written_prediction": _to_dict(just_written_prediction),
+            },
+            "pre_consume": [_to_dict(outcome) for outcome in selection.outcome_bundle.pre_consume],
+            "post_write": [_to_dict(outcome) for outcome in selection.outcome_bundle.post_write],
+            "invariant_results": [
+                _to_dict(outcome) for outcome in selection.outcome_bundle.combined
+            ],
+            "invariant_checks": [
+                {
+                    "gate_point": check.gate_point,
+                    "invariant_id": check.output.invariant_id,
+                    "passed": check.output.passed,
+                    "evidence": _to_dict(check.output.evidence),
+                    "reason": check.output.reason,
+                    "flow": check.output.flow,
+                    "validity": check.output.validity,
+                    "code": check.output.code,
+                    "details": _to_dict(check.output.details),
+                    "action_hints": _to_dict(check.output.action_hints),
+                }
+                for check in selection.gate_checks
+            ],
+            "invariant_audit": [item.model_dump(mode="json") for item in selection.invariant_audit],
+            "kind": selection.result_kind,
+            "prediction": _to_dict(result.artifact) if isinstance(result, Success) else None,
+            "halt": _halt_payload(result) if isinstance(result, HaltRecord) else None,
+            "halt_evidence_ref": halt_evidence_ref,
+        },
+    )
+
+    if isinstance(result, HaltRecord):
+        halt_observation = Observation(
+            observation_id=_new_id("obs:"),
+            t_observed_iso=_now_iso(),
+            type=ObservationType.HALT,
+            text=result.reason,
+            source=f"invariant:{result.invariant_id}",
+        )
+        if not hasattr(ep, "observations") or ep.observations is None:
+            ep.observations = []
+        ep.observations.append(halt_observation)
         _append_episode_artifact(
             ep,
             {
-                "artifact_kind": "invariant_outcomes",
-                "observer": _to_dict(getattr(ep, "observer", None)),
-                "observer_enforcement": {
-                    "requested_evaluation_invariants": list(
-                        getattr(observer, "evaluation_invariants", []) or []
-                    ),
-                    "enforced": bool(getattr(observer, "evaluation_invariants", []) or []),
-                    "observer_role": getattr(observer, "role", None),
-                    "authorization_level": getattr(observer, "authorization_level", None),
-                },
-                "scope": scope,
-                "prediction_key": prediction_key,
-                "invariant_context": {
-                    "has_current_predictions": projection_state.has_current_predictions,
-                    "current_predictions": dict(current_predictions),
-                    "prediction_log_available": prediction_log_available,
-                    "just_written_prediction": _to_dict(just_written_prediction),
-                },
-                "pre_consume": [_to_dict(outcome) for outcome in outcome_bundle.pre_consume],
-                "post_write": [_to_dict(outcome) for outcome in outcome_bundle.post_write],
-                "invariant_results": [_to_dict(outcome) for outcome in outcome_bundle.combined],
-                "invariant_checks": [
-                    {
-                        "gate_point": check.gate_point,
-                        "invariant_id": check.output.invariant_id,
-                        "passed": check.output.passed,
-                        "evidence": _to_dict(check.output.evidence),
-                        "reason": check.output.reason,
-                        "flow": check.output.flow,
-                        "validity": check.output.validity,
-                        "code": check.output.code,
-                        "details": _to_dict(check.output.details),
-                        "action_hints": _to_dict(check.output.action_hints),
-                    }
-                    for check in gate_checks
-                ],
-                "invariant_audit": [item.model_dump(mode="json") for item in invariant_audit],
-                "kind": result_kind,
-                "prediction": _to_dict(result.artifact) if isinstance(result, Success) else None,
-                "halt": _halt_payload(result) if isinstance(result, HaltRecord) else None,
+                "artifact_kind": "halt_observation",
+                "observation_type": "halt",
+                "observation_id": halt_observation.observation_id,
+                **_halt_payload(result),
                 "halt_evidence_ref": halt_evidence_ref,
             },
         )
-
-        if isinstance(result, HaltRecord):
-            halt = result
-            halt_observation = Observation(
-                observation_id=_new_id("obs:"),
-                t_observed_iso=_now_iso(),
-                type=ObservationType.HALT,
-                text=halt.reason,
-                source=f"invariant:{halt.invariant_id}",
-            )
-            if not hasattr(ep, "observations") or ep.observations is None:
-                ep.observations = []
-            ep.observations.append(halt_observation)
-            _append_episode_artifact(
-                ep,
-                {
-                    "artifact_kind": "halt_observation",
-                    "observation_type": "halt",
-                    "observation_id": halt_observation.observation_id,
-                    **_halt_payload(halt),
-                    "halt_evidence_ref": halt_evidence_ref,
-                },
-            )
-
-    return result
 
 
 def _prediction_payload_with_stable_ids(

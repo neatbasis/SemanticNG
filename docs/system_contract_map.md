@@ -92,6 +92,16 @@ Linkage constraints:
 - Runtime contract artifacts (`InvariantOutcome`, `HaltRecord`, `DecisionEffect`) are linked but non-equivalent types with separate authority roles.
 - Step-layer execution success is evidence of behavior coverage, not runtime authority ownership.
 
+## Capability-Plane Mapping (Initial Instantiated Subset)
+
+This table instantiates a minimal active subset of cross-plane mappings. It is a mapping artifact, not an ontology-equivalence claim.
+
+| Ontology capability concept (project label) | Governance capability ID (`docs/dod_manifest.json`) | Runtime capability string anchor(s) | Relation type | Non-equivalence note |
+|---|---|---|---|---|
+| Intent disambiguation and schema-grounded mission extraction | `schema_selection_ambiguity_baseline` | `clarify.reminder`; `intent.mission_create` | many runtime schema strings map into one governance capability | Runtime schema strings are execution-local selectors and do not define ontology capability identity. |
+| Observer-scoped authorization gating | `observer_authorization_contract` | `authorization.scope.v1` | runtime invariant/policy string anchors governance capability checks | Invariant ID strings are runtime policy anchors, not ontology capability identifiers. |
+| Explainable halt envelope governance | `gate_halt_unification` | `explainable_halt_payload.v1` | runtime invariant string maps to halt-governance capability intent | Runtime halt invariant string does not unify with governance capability ID semantics. |
+
 ## Step-Layer Authority Boundary
 
 `src/features/steps/*` and `src/semanticng/step_state.py` are executable test/harness adapters. They may orchestrate scenarios and fixtures, but canonical runtime authority remains in `src/state_renormalization/*`.
@@ -129,4 +139,4 @@ Reference convention:
 - 2026-02-28 (Now): capability_id=prediction_persistence_baseline; Prediction append contract operational -> proven; deterministic persistence and gate-consumption behavior is repeatedly validated in baseline and invariant/gate regressions. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
 - 2026-02-28 (Now): capability_id=invariant_matrix_coverage; Projection view contract prototype -> operational; deterministic invariant-matrix coverage now validates all registered InvariantId branches with explicit non-applicable markers, matching manifest `done`/ROADMAP `Now` canonical status. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
 
-_Last regenerated from manifest: 2026-03-01T00:00:00Z (UTC)._
+_Last regenerated from manifest: 2026-04-08T16:01:51Z (UTC)._

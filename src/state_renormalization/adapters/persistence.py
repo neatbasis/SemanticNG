@@ -1,10 +1,10 @@
 # state_renormalization/adapters/persistence.py
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Iterator
 from dataclasses import asdict, is_dataclass
-import hashlib
 from pathlib import Path
 from typing import Any, Literal
 
@@ -13,6 +13,7 @@ from pydantic import BaseModel, ValidationError
 from state_renormalization.contracts import (
     CapabilityAdapterGate,
     ContextSnapshotArtifact,
+    EvidenceRef,
     HaltPayloadValidationError,
     HaltRecord,
     MissionLifecycleEvent,
@@ -242,10 +243,6 @@ def append_ask_outbox_response_event(
     return append_prediction(path=path, record=payload, adapter_gate=adapter_gate)
 
 
-
-
-
-
 def _parse_jsonl_ref(ref: str) -> tuple[str, int] | None:
     if "@" not in ref:
         return None
@@ -295,7 +292,9 @@ def _validate_completion_evidence_ref(*, event: MissionLifecycleEvent, path: Pat
         "repair_decision",
     }
     if evidence_kind not in allowed_kinds:
-        raise ValueError("completion_evidence_ref must point to prediction/repair persisted evidence")
+        raise ValueError(
+            "completion_evidence_ref must point to prediction/repair persisted evidence"
+        )
 
 
 def append_mission_created_event(
@@ -350,7 +349,9 @@ def append_context_snapshot_event(
         raise ValueError("append_context_snapshot_event expects a dict-like payload")
 
     snapshot = ContextSnapshotArtifact.model_validate(payload)
-    return append_prediction(path=path, record=snapshot.model_dump(mode="json"), adapter_gate=adapter_gate)
+    return append_prediction(
+        path=path, record=snapshot.model_dump(mode="json"), adapter_gate=adapter_gate
+    )
 
 
 def append_mission_lifecycle_event(
@@ -367,7 +368,9 @@ def append_mission_lifecycle_event(
 
     event = MissionLifecycleEvent.model_validate(payload)
     _validate_completion_evidence_ref(event=event, path=path)
-    return append_prediction(path=path, record=event.model_dump(mode="json"), adapter_gate=adapter_gate)
+    return append_prediction(
+        path=path, record=event.model_dump(mode="json"), adapter_gate=adapter_gate
+    )
 
 
 def _lineage_record_time_iso(record: JsonObj) -> str | None:
@@ -388,9 +391,7 @@ def _time_travel_violation_halt(
     observed_time_iso: str | None,
 ) -> JsonObj:
     fingerprint = hashlib.sha256(
-        f"{as_of_iso}|{line_no}|{violation_code}|{artifact_kind}|{observed_time_iso or ''}".encode(
-            "utf-8"
-        )
+        f"{as_of_iso}|{line_no}|{violation_code}|{artifact_kind}|{observed_time_iso or ''}".encode()
     ).hexdigest()
     return HaltRecord.build_canonical_payload(
         halt_id=f"halt:{fingerprint}",
@@ -405,7 +406,7 @@ def _time_travel_violation_halt(
             "observed_time_iso": observed_time_iso,
             "line_no": line_no,
         },
-        evidence=[{"kind": "jsonl", "ref": f"{source_name}@{line_no}"}],
+        evidence=[EvidenceRef(kind="jsonl", ref=f"{source_name}@{line_no}")],
         retryability=False,
         timestamp=as_of_iso,
     )
@@ -471,7 +472,9 @@ def iter_projection_lineage_records(
 
             if query_mode == "as_of" and isinstance(as_of_iso, str):
                 event_time = _lineage_record_time_iso(candidate)
-                artifact_kind = str(candidate.get("event_kind") or candidate.get("stage") or "unknown")
+                artifact_kind = str(
+                    candidate.get("event_kind") or candidate.get("stage") or "unknown"
+                )
                 if event_time is None:
                     yield _time_travel_violation_halt(
                         as_of_iso=as_of_iso,

@@ -63,15 +63,19 @@ from state_renormalization.contracts import (
     InterventionDecision,
     InterventionRequest,
     InvariantAuditResult,
+    MissionCompletionMode,
+    MissionContract,
+    MissionEntityRef,
+    MissionKind,
+    MissionLifecycleEvent,
+    MissionLineageRef,
+    MissionStatus,
     Observation,
     ObservationFreshnessDecision,
     ObservationFreshnessDecisionOutcome,
     ObservationFreshnessPolicyContract,
     ObservationType,
     ObserverFrame,
-    MissionContract,
-    MissionLifecycleEvent,
-    MissionStatus,
     PredictionOutcome,
     PredictionRecord,
     ProjectionAnalyticsSnapshot,
@@ -163,7 +167,7 @@ class WrittenPredictionPayload(BaseModel):
         *,
         key: str | None,
         evidence_ref: Mapping[str, object],
-    ) -> "WrittenPredictionPayload":
+    ) -> WrittenPredictionPayload:
         return cls(
             key=key,
             evidence_refs=[EvidenceRef.from_raw(evidence_ref)],
@@ -198,8 +202,6 @@ class GateInvariantEvaluation:
     outcome: InvariantOutcome
 
 
-
-
 _REMINDER_TYPED_SLOTS: tuple[str, ...] = (
     ClarificationSlotId.REMINDER_SCHEDULE.value,
     ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value,
@@ -207,7 +209,9 @@ _REMINDER_TYPED_SLOTS: tuple[str, ...] = (
 )
 
 
-def _compose_pending_obligation_request(pending_about: Mapping[str, Any] | None) -> dict[str, Any] | None:
+def _compose_pending_obligation_request(
+    pending_about: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
     if not isinstance(pending_about, Mapping):
         return None
     required_slots = pending_about.get("required_slots")
@@ -297,11 +301,24 @@ def _maybe_create_mission_from_intent(
     if not isinstance(draft, Mapping):
         return projection_state
 
-    entity_ref = draft.get("entity_ref") if isinstance(draft.get("entity_ref"), Mapping) else {}
+    entity_ref = draft.get("entity_ref")
+    if not isinstance(entity_ref, Mapping):
+        return projection_state
     entity_value = entity_ref.get("ref")
     schedule = draft.get("schedule")
-    if not isinstance(entity_value, str) or not entity_value.strip() or not isinstance(schedule, str):
+    if (
+        not isinstance(entity_value, str)
+        or not entity_value.strip()
+        or not isinstance(schedule, str)
+    ):
         return projection_state
+    completion_mode = MissionCompletionMode.MANUAL
+    completion_mode_raw = draft.get("completion_mode")
+    if isinstance(completion_mode_raw, str):
+        try:
+            completion_mode = MissionCompletionMode(completion_mode_raw)
+        except ValueError:
+            completion_mode = MissionCompletionMode.MANUAL
 
     intent_hash = hashlib.sha256(
         json.dumps({"schemas": sorted(belief.active_schemas)}, sort_keys=True).encode("utf-8")
@@ -335,18 +352,18 @@ def _maybe_create_mission_from_intent(
             mission_id=mission_id,
             mission_identity=f"reminder:{entity_value.strip().lower()}",
             idempotency_key=idempotency_key,
-            kind="follow_up",
-            entity_ref={"kind": "reminder_target", "ref": entity_value.strip()},
-            completion_mode=draft.get("completion_mode", "manual"),
-            status="active",
+            kind=MissionKind.FOLLOW_UP,
+            entity_ref=MissionEntityRef(kind="reminder_target", ref=entity_value.strip()),
+            completion_mode=completion_mode,
+            status=MissionStatus.ACTIVE,
             created_at_iso=now,
             updated_at_iso=now,
             lineage_refs=[
-                {
-                    "relation": "resolved_by",
-                    "mission_id": mission_id,
-                    "event_ref": response_ref,
-                }
+                MissionLineageRef(
+                    relation="resolved_by",
+                    mission_id=mission_id,
+                    event_ref=response_ref,
+                )
             ],
         ),
     )
@@ -377,6 +394,7 @@ def _maybe_create_mission_from_intent(
         },
     )
     return _project_mission_lifecycle(projection_state, mission_event)
+
 
 class InterventionLifecycleHook(Protocol):
     def __call__(
@@ -430,7 +448,9 @@ def _mission_open_ask_requests(prediction_log_path: str | Path) -> dict[str, lis
                 mission_id = request_to_mission.get(request_id)
                 if mission_id is None:
                     continue
-                open_requests = [req for req in open_by_mission.get(mission_id, []) if req != request_id]
+                open_requests = [
+                    req for req in open_by_mission.get(mission_id, []) if req != request_id
+                ]
                 if open_requests:
                     open_by_mission[mission_id] = open_requests
                 else:
@@ -2116,7 +2136,9 @@ def _read_jsonl_event_at(path: Path, line_no: int) -> Mapping[str, object] | Non
     return None
 
 
-def _validate_replay_completion_evidence_ref(*, event: MissionLifecycleEvent, log_path: Path) -> None:
+def _validate_replay_completion_evidence_ref(
+    *, event: MissionLifecycleEvent, log_path: Path
+) -> None:
     if event.event_kind != "mission_completed":
         return
 
@@ -2144,7 +2166,9 @@ def _validate_replay_completion_evidence_ref(*, event: MissionLifecycleEvent, lo
         "repair_decision",
     }
     if row.get("event_kind") not in allowed_kinds:
-        raise ValueError("completion_evidence_ref must point to prediction/repair persisted evidence")
+        raise ValueError(
+            "completion_evidence_ref must point to prediction/repair persisted evidence"
+        )
 
 
 def replay_projection_analytics(
@@ -2297,8 +2321,10 @@ def build_context_snapshot_artifact(
     selectable_kinds: Sequence[str] | None = None,
     artifact_ref_prefix: str = "predictions.jsonl",
 ) -> ContextSnapshotArtifact:
-    kinds = list(selectable_kinds) if selectable_kinds is not None else sorted(
-        DEFAULT_CONTEXT_SNAPSHOT_SELECTABLE_KINDS
+    kinds = (
+        list(selectable_kinds)
+        if selectable_kinds is not None
+        else sorted(DEFAULT_CONTEXT_SNAPSHOT_SELECTABLE_KINDS)
     )
     allowed = set(kinds)
     selected: list[ContextSnapshotRef] = []

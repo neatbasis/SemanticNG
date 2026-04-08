@@ -1056,16 +1056,14 @@ class MissionLifecycleEvent(BaseModel):
                 )
 
             if mode == MissionCompletionMode.MANUAL:
-                if not isinstance(payload.get("confirmed_by"), str) or not payload.get(
-                    "confirmed_by"
-                ).strip():
+                confirmed_by = payload.get("confirmed_by")
+                if not isinstance(confirmed_by, str) or not confirmed_by.strip():
                     raise ValueError(
                         "manual mission completion requires completion_payload.confirmed_by"
                     )
             elif mode == MissionCompletionMode.UNTIL_FRESH:
-                if not isinstance(payload.get("observation_ref"), str) or not payload.get(
-                    "observation_ref"
-                ).strip():
+                observation_ref = payload.get("observation_ref")
+                if not isinstance(observation_ref, str) or not observation_ref.strip():
                     raise ValueError(
                         "until_fresh mission completion requires completion_payload.observation_ref"
                     )
@@ -1122,9 +1120,7 @@ class RepairProposalEvent(BaseModel):
 
     event_kind: Literal["repair_proposal"] = "repair_proposal"
     repair_id: str
-    proposed_at_iso: str = Field(
-        validation_alias=AliasChoices("proposed_at_iso", "proposed_at")
-    )
+    proposed_at_iso: str = Field(validation_alias=AliasChoices("proposed_at_iso", "proposed_at"))
     reason: str
     invariant_id: str
     lineage_ref: RepairLineageRef
@@ -1147,12 +1143,8 @@ class RepairResolutionEvent(BaseModel):
         default="repair_proposal",
         validation_alias=AliasChoices("proposal_event_kind", "proposal_kind"),
     )
-    decision: RepairResolution = Field(
-        validation_alias=AliasChoices("decision", "resolution")
-    )
-    resolved_at_iso: str = Field(
-        validation_alias=AliasChoices("resolved_at_iso", "resolved_at")
-    )
+    decision: RepairResolution = Field(validation_alias=AliasChoices("decision", "resolution"))
+    resolved_at_iso: str = Field(validation_alias=AliasChoices("resolved_at_iso", "resolved_at"))
     lineage_ref: RepairLineageRef
     accepted_prediction: PredictionRecord | None = Field(
         default=None,
@@ -1276,10 +1268,11 @@ class TimeTravelAnswer(BaseModel):
     @model_validator(mode="after")
     def _validate_mode_requirements(self) -> Self:
         if self.mode == TimeTravelAnswerMode.STRICT_REPLAY:
-            if not isinstance(self.historical_output_artifact_ref, str) or not self.historical_output_artifact_ref:
-                raise ValueError(
-                    "strict_replay mode requires historical_output_artifact_ref"
-                )
+            if (
+                not isinstance(self.historical_output_artifact_ref, str)
+                or not self.historical_output_artifact_ref
+            ):
+                raise ValueError("strict_replay mode requires historical_output_artifact_ref")
             return self
 
         reconstructed_required = (
@@ -1288,7 +1281,11 @@ class TimeTravelAnswer(BaseModel):
             ("reconstruction_template_id", self.reconstruction_template_id),
             ("reconstruction_model_id", self.reconstruction_model_id),
         )
-        missing = [name for name, value in reconstructed_required if not isinstance(value, str) or not value]
+        missing = [
+            name
+            for name, value in reconstructed_required
+            if not isinstance(value, str) or not value
+        ]
         if missing:
             raise ValueError(
                 "reconstructed mode requires context snapshot + reconstruction identifiers: "

@@ -15,11 +15,12 @@ from state_renormalization.contracts import (
     AmbiguityStatus,
     AmbiguityType,
     AskFormat,
+    BindSpec,
     Candidate,
     CaptureOutcome,
     CaptureStatus,
-    ClarifyingQuestion,
     ClarificationSlotId,
+    ClarifyingQuestion,
     IntentOutput,
     ResolutionPolicy,
     SchemaHit,
@@ -495,24 +496,27 @@ def _reminder_missing_schedule_emit(ctx: SelectorCheckContext) -> SchemaSelectio
                 q="When should I remind you?",
                 format=AskFormat.MULTICHOICE,
                 options=["in 10 minutes", "later today", "tomorrow", "custom"],
-                bind={"key": ClarificationSlotId.REMINDER_SCHEDULE.value, "expected_type": "string"},
+                bind=BindSpec(
+                    key=ClarificationSlotId.REMINDER_SCHEDULE.value,
+                    expected_type="string",
+                ),
             ),
             ClarifyingQuestion(
                 q="Should this reminder auto-complete once I notify you?",
                 format=AskFormat.MULTICHOICE,
                 options=["manual", "auto", "until_fresh"],
-                bind={
-                    "key": ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value,
-                    "expected_type": "enum",
-                },
+                bind=BindSpec(
+                    key=ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value,
+                    expected_type="enum",
+                ),
             ),
             ClarifyingQuestion(
                 q="What is this reminder about?",
                 format=AskFormat.FREEFORM,
-                bind={
-                    "key": ClarificationSlotId.REMINDER_TARGET_ENTITY.value,
-                    "expected_type": "string",
-                },
+                bind=BindSpec(
+                    key=ClarificationSlotId.REMINDER_TARGET_ENTITY.value,
+                    expected_type="string",
+                ),
             ),
         ],
         evidence={"signals": ["reminder_intent", "missing_schedule"]},
@@ -605,7 +609,9 @@ def build_selector_context(text: str | None, *, error: CaptureOutcome | None) ->
                 }
             )
             or bool(re.search(r"\b\d{1,2}:\d{2}\b", normalized))
-            or bool(re.search(r"\bin\s+\d+\s+(second|seconds|minute|minutes|hour|hours)\b", normalized)),
+            or bool(
+                re.search(r"\bin\s+\d+\s+(second|seconds|minute|minutes|hour|hours)\b", normalized)
+            ),
         },
     )
 

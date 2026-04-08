@@ -158,6 +158,7 @@ These criteria reuse the existing handoff ownership structure above and are mand
 - `docs/dod_manifest.json` remains the machine-readable source of capability status and test commands.
 - This document defines when those capabilities are considered complete at capability, integration, and system layers.
 - `docs/system_contract_map.md` remains the source of truth for contract maturity and changelog evidence.
+- Contributor command workflow remains canonical in `README.md` and `docs/DEVELOPMENT.md`; use `make verify-dev-setup`, `make qa-commit`, `make qa-push`, and `make promotion-checks` before merge.
 
 ## Research note: weaker definition of done
 

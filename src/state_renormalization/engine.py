@@ -2740,112 +2740,35 @@ def _reconcile_predictions(
         if pred.target_variable != "user_response_present" or pred.expectation is None:
             continue
 
-        updated_pred, outcome = bind_prediction_outcome(pred, observed_outcome=observed_value)
+        updated_pred, outcome, compared_at = _evaluate_prediction_comparison(
+            pred=pred,
+            observed_value=observed_value,
+        )
         compared += 1
         error_total += outcome.absolute_error
-        compared_at = outcome.recorded_at_iso
-
-        if repair_mode_enabled(invariant_handling_mode):
-            repair_id = _stable_repair_id(
-                scope_key=scope_key,
-                prediction_id=pred.prediction_id,
-                compared_at_iso=compared_at,
-            )
-            lineage_ref = _repair_lineage_ref(ep=ep, pred=pred)
-            proposal = RepairProposalEvent(
-                repair_id=repair_id,
-                proposed_at_iso=compared_at,
-                reason="prediction outcome reconciliation proposed",
-                invariant_id=InvariantId.PREDICTION_OUTCOME_BINDING.value,
-                lineage_ref=lineage_ref,
-                proposed_prediction=updated_pred,
-                prediction_outcome=outcome,
-            )
-            proposal_ref = _append_repair_event(
-                proposal,
-                prediction_log_path=prediction_log_path,
-                stable_ids=stable_ids,
-            )
-            decision = (
-                repair_acceptance_policy(proposal)
-                if repair_acceptance_policy is not None
-                else RepairResolution.ACCEPTED
-            )
-            resolution = RepairResolutionEvent(
-                repair_id=repair_id,
-                decision=decision,
-                resolved_at_iso=compared_at,
-                lineage_ref=lineage_ref,
-                accepted_prediction=updated_pred if decision == RepairResolution.ACCEPTED else None,
-                rejection_reason=(
-                    None
-                    if decision == RepairResolution.ACCEPTED
-                    else "repair acceptance policy rejected proposal"
-                ),
-            )
-            resolution_ref = _append_repair_event(
-                resolution,
-                prediction_log_path=prediction_log_path,
-                stable_ids=stable_ids,
-            )
-            if resolution.decision == RepairResolution.ACCEPTED:
-                updated_projection = _apply_accepted_repair_event(
-                    updated_projection, resolution_event=resolution
-                )
-            _append_episode_artifact(
-                ep,
-                {
-                    "artifact_kind": "repair_event",
-                    "repair_id": repair_id,
-                    "mode": invariant_handling_mode.value,
-                    "proposal": proposal.model_dump(mode="json"),
-                    "resolution": resolution.model_dump(mode="json"),
-                    "proposal_evidence_ref": proposal_ref,
-                    "resolution_evidence_ref": resolution_ref,
-                },
-            )
-        else:
-            persist_result = append_prediction_record(
-                updated_pred,
-                prediction_log_path=prediction_log_path,
-                stable_ids=stable_ids,
-                episode=ep,
-                projection_state=updated_projection,
-            )
-            if not isinstance(persist_result, HaltRecord):
-                updated_projection = _project_current_at(
-                    updated_pred, updated_projection, updated_at_iso=compared_at
-                )
-
-        binding_ctx = default_check_context(
-            scope=scope_key,
-            prediction_key=scope_key,
-            current_predictions={
-                k: v.prediction_id for k, v in updated_projection.current_predictions.items()
-            },
-            prediction_log_available=True,
-            prediction_outcome=outcome.model_dump(mode="json"),
+        updated_projection = _apply_repair_or_persistence_handoff(
+            ep=ep,
+            scope_key=scope_key,
+            pred=pred,
+            updated_pred=updated_pred,
+            outcome=outcome,
+            compared_at=compared_at,
+            projection_state=updated_projection,
+            prediction_log_path=prediction_log_path,
+            stable_ids=stable_ids,
+            invariant_handling_mode=invariant_handling_mode,
+            repair_acceptance_policy=repair_acceptance_policy,
         )
-        binding_outcome = REGISTRY[InvariantId.PREDICTION_OUTCOME_BINDING](binding_ctx)
-
-        _append_episode_artifact(
-            ep,
-            {
-                "artifact_kind": "prediction_comparison",
-                "prediction_id": updated_pred.prediction_id,
-                "scope_key": scope_key,
-                "expected": pred.expectation,
-                "observed": observed_value,
-                "error": outcome.error_metric,
-                "absolute_error": outcome.absolute_error,
-                "compared_at_iso": compared_at,
-                "prediction_outcome": outcome.model_dump(mode="json"),
-                "prediction_outcome_binding": normalize_outcome(
-                    binding_outcome,
-                    gate="post-observation",
-                ).__dict__,
-                "repair_mode": invariant_handling_mode.value,
-            },
+        _emit_prediction_comparison_artifact(
+            ep=ep,
+            scope_key=scope_key,
+            pred=pred,
+            updated_pred=updated_pred,
+            outcome=outcome,
+            compared_at=compared_at,
+            observed_value=observed_value,
+            projection_state=updated_projection,
+            invariant_handling_mode=invariant_handling_mode,
         )
 
     if compared > 0:
@@ -2864,6 +2787,149 @@ def _reconcile_predictions(
         correction_metrics=metrics,
         last_comparison_at_iso=_now_iso() if compared else projection_state.last_comparison_at_iso,
         updated_at_iso=_now_iso(),
+    )
+
+
+def _evaluate_prediction_comparison(
+    *,
+    pred: PredictionRecord,
+    observed_value: float,
+) -> tuple[PredictionRecord, PredictionOutcome, str]:
+    updated_pred, outcome = bind_prediction_outcome(pred, observed_outcome=observed_value)
+    return updated_pred, outcome, outcome.recorded_at_iso
+
+
+def _apply_repair_or_persistence_handoff(
+    *,
+    ep: Episode,
+    scope_key: str,
+    pred: PredictionRecord,
+    updated_pred: PredictionRecord,
+    outcome: PredictionOutcome,
+    compared_at: str,
+    projection_state: ProjectionState,
+    prediction_log_path: str | Path,
+    stable_ids: Mapping[str, str],
+    invariant_handling_mode: InvariantHandlingMode,
+    repair_acceptance_policy: RepairAcceptancePolicy | None,
+) -> ProjectionState:
+    updated_projection = projection_state
+    if repair_mode_enabled(invariant_handling_mode):
+        repair_id = _stable_repair_id(
+            scope_key=scope_key,
+            prediction_id=pred.prediction_id,
+            compared_at_iso=compared_at,
+        )
+        lineage_ref = _repair_lineage_ref(ep=ep, pred=pred)
+        proposal = RepairProposalEvent(
+            repair_id=repair_id,
+            proposed_at_iso=compared_at,
+            reason="prediction outcome reconciliation proposed",
+            invariant_id=InvariantId.PREDICTION_OUTCOME_BINDING.value,
+            lineage_ref=lineage_ref,
+            proposed_prediction=updated_pred,
+            prediction_outcome=outcome,
+        )
+        proposal_ref = _append_repair_event(
+            proposal,
+            prediction_log_path=prediction_log_path,
+            stable_ids=stable_ids,
+        )
+        decision = (
+            repair_acceptance_policy(proposal)
+            if repair_acceptance_policy is not None
+            else RepairResolution.ACCEPTED
+        )
+        resolution = RepairResolutionEvent(
+            repair_id=repair_id,
+            decision=decision,
+            resolved_at_iso=compared_at,
+            lineage_ref=lineage_ref,
+            accepted_prediction=updated_pred if decision == RepairResolution.ACCEPTED else None,
+            rejection_reason=(
+                None
+                if decision == RepairResolution.ACCEPTED
+                else "repair acceptance policy rejected proposal"
+            ),
+        )
+        resolution_ref = _append_repair_event(
+            resolution,
+            prediction_log_path=prediction_log_path,
+            stable_ids=stable_ids,
+        )
+        if resolution.decision == RepairResolution.ACCEPTED:
+            updated_projection = _apply_accepted_repair_event(
+                updated_projection, resolution_event=resolution
+            )
+        _append_episode_artifact(
+            ep,
+            {
+                "artifact_kind": "repair_event",
+                "repair_id": repair_id,
+                "mode": invariant_handling_mode.value,
+                "proposal": proposal.model_dump(mode="json"),
+                "resolution": resolution.model_dump(mode="json"),
+                "proposal_evidence_ref": proposal_ref,
+                "resolution_evidence_ref": resolution_ref,
+            },
+        )
+        return updated_projection
+
+    persist_result = append_prediction_record(
+        updated_pred,
+        prediction_log_path=prediction_log_path,
+        stable_ids=stable_ids,
+        episode=ep,
+        projection_state=updated_projection,
+    )
+    if not isinstance(persist_result, HaltRecord):
+        updated_projection = _project_current_at(
+            updated_pred, updated_projection, updated_at_iso=compared_at
+        )
+    return updated_projection
+
+
+def _emit_prediction_comparison_artifact(
+    *,
+    ep: Episode,
+    scope_key: str,
+    pred: PredictionRecord,
+    updated_pred: PredictionRecord,
+    outcome: PredictionOutcome,
+    compared_at: str,
+    observed_value: float,
+    projection_state: ProjectionState,
+    invariant_handling_mode: InvariantHandlingMode,
+) -> None:
+    binding_ctx = default_check_context(
+        scope=scope_key,
+        prediction_key=scope_key,
+        current_predictions={
+            key: value.prediction_id for key, value in projection_state.current_predictions.items()
+        },
+        prediction_log_available=True,
+        prediction_outcome=outcome.model_dump(mode="json"),
+    )
+    binding_outcome = REGISTRY[InvariantId.PREDICTION_OUTCOME_BINDING](binding_ctx)
+
+    _append_episode_artifact(
+        ep,
+        {
+            "artifact_kind": "prediction_comparison",
+            "prediction_id": updated_pred.prediction_id,
+            "scope_key": scope_key,
+            "expected": pred.expectation,
+            "observed": observed_value,
+            "error": outcome.error_metric,
+            "absolute_error": outcome.absolute_error,
+            "compared_at_iso": compared_at,
+            "prediction_outcome": outcome.model_dump(mode="json"),
+            "prediction_outcome_binding": normalize_outcome(
+                binding_outcome,
+                gate="post-observation",
+            ).__dict__,
+            "repair_mode": invariant_handling_mode.value,
+        },
     )
 
 

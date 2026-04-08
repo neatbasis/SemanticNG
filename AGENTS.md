@@ -5,17 +5,6 @@ This project is indexed by GitNexus as **SemanticNG** (2955 symbols, 6687 relati
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
-## Repo Workflow
-
-- Canonical workflow source of truth: [`README.md`](README.md) and [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
-- Canonical governance/release workflow policy: [`docs/release_checklist.md`](docs/release_checklist.md).
-- Before proposing a commit, run:
-  - `make verify-dev-setup`
-  - `make qa-commit`
-  - `make qa-push`
-  - `make promotion-checks` (required when staged files touch `src/core/**`, `src/state_renormalization/**`, or `src/semanticng/**`)
-- If semantic-boundary code changes are staged, include at least one required governance/contract doc update (`docs/system_contract_map.md`, `docs/dod_manifest.json`, `docs/definition_of_complete.md`, or `docs/documentation_change_control.md`) so promotion checks can pass.
-
 ## Always Do
 
 - **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.

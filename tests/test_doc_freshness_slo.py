@@ -302,3 +302,34 @@ def test_doc_freshness_slo_main_prints_release_checklist_remediation_on_failure(
     assert exit_code == 1
     assert "missing freshness metadata" in captured.err
     assert "docs/release_checklist.md#freshness-validator-remediation-playbook" in captured.err
+
+
+def test_doc_freshness_slo_scope_validates_only_requested_paths(tmp_path: Path) -> None:
+    governed = tmp_path / "docs" / "governed.md"
+    governed.parent.mkdir(parents=True, exist_ok=True)
+    governed.write_text(
+        "# Governed Doc\n\n_Last regenerated from manifest: 2026-02-28T15:48:35Z (UTC)._\n",
+        encoding="utf-8",
+    )
+    stale = tmp_path / "docs" / "stale.md"
+    stale.write_text(
+        "# Stale Doc\n\n_Last regenerated from manifest: 2025-12-01T00:00:00Z (UTC)._\n",
+        encoding="utf-8",
+    )
+
+    config = _base_config()
+    config["governed_files"] = [
+        {"path": "docs/governed.md", "class": "governance_doc"},
+        {"path": "docs/stale.md", "class": "governance_doc"},
+    ]
+    config["source_commit_policy"]["governed_source_map"]["docs/stale.md"] = ["manifest"]
+
+    issues = validate_doc_freshness_slo._validate_doc_freshness(
+        config,
+        tmp_path,
+        datetime(2026, 3, 1, tzinfo=UTC),
+        git_runner=_git_runner,
+        scoped_paths=["docs/governed.md"],
+    )
+
+    assert issues == []

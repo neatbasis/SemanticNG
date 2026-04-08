@@ -59,7 +59,9 @@ print(\"ok\")
         )
 
     subprocess.run(["git", "add", "."], cwd=repo, check=True)
-    subprocess.run(["git", "commit", "-m", "initial"], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(
+        ["git", "commit", "-m", "initial"], cwd=repo, check=True, capture_output=True, text=True
+    )
 
     return repo
 
@@ -138,3 +140,17 @@ def test_semantic_boundary_change_with_contract_docs_passes(tmp_path: Path) -> N
 
     assert result.returncode == 0
     assert "Promotion checks passed." in result.stdout
+
+
+def test_doc_freshness_scope_passes_staged_paths_to_validator(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    _write_file(repo / "docs" / "system_contract_map.md", "# contract update\n")
+    subprocess.run(["git", "add", "docs/system_contract_map.md"], cwd=repo, check=True)
+
+    result = _run_hook(repo, fail_target="validate_doc_freshness_slo.py")
+
+    assert result.returncode != 0
+    assert (
+        "validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json --paths docs/system_contract_map.md"
+        in result.stdout
+    )

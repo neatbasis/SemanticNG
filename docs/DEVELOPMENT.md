@@ -107,6 +107,7 @@ Tier 1 mypy scope is intentionally narrow and enforced by the hook (derived from
 Commit-time checks now include a deterministic pytest smoke subset (`pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py`) so basic runtime regressions are caught before commit, not only before push.
 
 Tier 1 commit-time checks also include the `promotion-governance-pokayoke` hook (`.github/scripts/run_promotion_checks.sh`) so policy-surface violations fail fast with explicit remediation commands before commit.
+For freshness policy specifically, local hook execution is staged-path scoped (`--paths`), while CI/release execution without `--paths` remains full governed-set freshness validation.
 
 **Explicit enforcement split:** poka-yoke blockers are always-on `Quality Guardrails` blocking jobs plus milestone-path `State Renormalization Milestone Gate` and scoped `promotion-governance-pokayoke`; measurement-only telemetry is `Quality Guardrails / policy-measurement` and milestone promotion-check measurement output.
 

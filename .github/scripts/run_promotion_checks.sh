@@ -116,7 +116,7 @@ fi
 if [[ ${#freshness_reasons[@]} -gt 0 ]]; then
   freshness_reason="matched staged path(s): $(printf '%s, ' "${freshness_reasons[@]}")"
   freshness_reason="${freshness_reason%, }"
-  run_check "doc-freshness-slo" "$freshness_reason" python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json
+  run_check "doc-freshness-slo" "$freshness_reason" python .github/scripts/validate_doc_freshness_slo.py --config docs/doc_freshness_slo.json --paths "${freshness_reasons[@]}"
 fi
 
 if [[ ${#pr_template_reasons[@]} -gt 0 ]]; then

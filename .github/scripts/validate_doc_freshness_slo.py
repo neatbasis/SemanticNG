@@ -61,6 +61,12 @@ def _resolve_governed_paths(base_dir: Path, configured_path: str) -> list[str]:
     return [candidate]
 
 
+def _normalize_scope_paths(paths: list[str] | None) -> set[str]:
+    if not paths:
+        return set()
+    return {str(Path(path).as_posix()) for path in paths if path.strip()}
+
+
 def _run_git_command(base_dir: Path, args: list[str]) -> str | None:
     try:
         result = subprocess.run(
@@ -151,9 +157,11 @@ def _validate_doc_freshness(
     now_utc: datetime,
     *,
     git_runner: GitCommandRunner | None = None,
+    scoped_paths: list[str] | None = None,
 ) -> list[dict[str, str]]:
     issues: list[dict[str, str]] = []
     git_runner = git_runner or _run_git_command
+    scope_set = _normalize_scope_paths(scoped_paths)
 
     timestamp_policy = config.get("timestamp_policy", {})
     timestamp_pattern = str(timestamp_policy.get("pattern", ""))
@@ -205,6 +213,10 @@ def _validate_doc_freshness(
             continue
 
         resolved_paths = _resolve_governed_paths(base_dir, configured_path)
+        if scope_set:
+            resolved_paths = [path for path in resolved_paths if path in scope_set]
+            if not resolved_paths:
+                continue
         if not resolved_paths:
             if _contains_glob(configured_path):
                 issues.append(
@@ -376,12 +388,21 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Override current UTC timestamp for deterministic checks (ISO-8601, e.g., 2026-03-01T00:00:00Z).",
     )
+    parser.add_argument(
+        "--paths",
+        nargs="*",
+        default=None,
+        help=(
+            "Optional repo-relative governed file paths to validate. "
+            "When omitted, validate the full governed file set."
+        ),
+    )
     args = parser.parse_args(argv)
 
     config_path = Path(args.config)
     config = _load_config(config_path)
     now_utc = _parse_now(args.now_utc)
-    issues = _validate_doc_freshness(config, Path.cwd(), now_utc)
+    issues = _validate_doc_freshness(config, Path.cwd(), now_utc, scoped_paths=args.paths)
 
     if issues:
         print("Documentation freshness SLO validation failed:", file=sys.stderr)

@@ -456,6 +456,34 @@ class InterventionLifecycleHook(Protocol):
     ) -> InterventionDecision | CanonicalPredictionPayload | None: ...
 
 
+class SchemaSelectorPort(Protocol):
+    def __call__(
+        self,
+        text: str | None,
+        *,
+        error: CaptureOutcome | None,
+    ) -> SchemaSelection | Mapping[str, Any]: ...
+
+
+def _default_schema_selector(
+    text: str | None,
+    *,
+    error: CaptureOutcome | None,
+) -> SchemaSelection | Mapping[str, Any]:
+    return naive_schema_selector(text, error=error)
+
+
+def _resolve_schema_selection(
+    *,
+    user_text: str | None,
+    error: CaptureOutcome | None,
+    schema_selector: SchemaSelectorPort | None,
+) -> SchemaSelection:
+    selector = schema_selector or _default_schema_selector
+    raw_selection = selector(user_text, error=error)
+    return _validated_selection(raw_selection)
+
+
 def _parse_iso8601(value: str) -> datetime | None:
     txt = (value or "").strip()
     if not txt:
@@ -2854,6 +2882,7 @@ def run_mission_loop(
     intervention_hook: InterventionLifecycleHook | None = None,
     ask_outbox_adapter: AskOutboxAdapter | None = None,
     observation_freshness_policy_adapter: ObservationFreshnessPolicyAdapter | None = None,
+    schema_selector: SchemaSelectorPort | None = None,
     invariant_handling_mode: InvariantHandlingMode = InvariantHandlingMode.STRICT_HALT,
     repair_acceptance_policy: RepairAcceptancePolicy | None = None,
     halt_log_path: str | Path = "halts.jsonl",
@@ -3042,7 +3071,7 @@ def run_mission_loop(
         return ep, belief, updated_projection
 
     ep, belief = apply_utterance_interpretation(ep, belief)
-    ep, belief = apply_schema_bubbling(ep, belief)
+    ep, belief = apply_schema_bubbling(ep, belief, schema_selector=schema_selector)
     updated_projection = _maybe_create_mission_from_intent(
         ep=ep,
         belief=belief,
@@ -3235,7 +3264,12 @@ def _validated_selection(raw_selection: object) -> SchemaSelection:
     )
 
 
-def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, BeliefState]:
+def apply_schema_bubbling(
+    ep: Episode,
+    belief: BeliefState,
+    *,
+    schema_selector: SchemaSelectorPort | None = None,
+) -> tuple[Episode, BeliefState]:
     """
     Single-writer: updates belief state based on the latest observation.
 
@@ -3259,8 +3293,11 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
         return ep, belief
 
     user_text = extract_user_utterance(ep)
-    raw_selection: SchemaSelection = naive_schema_selector(user_text, error=ep.ask.error)
-    sel = _validated_selection(raw_selection)
+    sel = _resolve_schema_selection(
+        user_text=user_text,
+        error=ep.ask.error,
+        schema_selector=schema_selector,
+    )
 
     # --- Schemas
     belief.active_schemas = [h.name for h in sel.schemas]

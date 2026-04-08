@@ -46,7 +46,7 @@ This section is the runtime-facing authority for concept roles used by `src/stat
 | `InvariantOutcome` | Invariant evaluation result used to continue/defer/halt loop progression | `src/state_renormalization/invariants.py`, `src/state_renormalization/engine.py` (`evaluate_invariant_gates`; `_evaluate_gate_invariant_phase`, `_select_gate_outcome_phase`) | local validation artifact | `InvariantOutcome` does not equal persisted halt artifact. |
 | `HaltRecord` | Persisted explainable stop artifact for replay/audit lineage | `src/state_renormalization/contracts.py`, `src/state_renormalization/adapters/persistence.py` | ontology-mappable only with qualifiers | `HaltRecord` does not equal `InvariantOutcome`. |
 | `EvidenceRef` | Evidence lineage reference attached to runtime/persisted artifacts | `src/state_renormalization/contracts.py`, persistence and replay tests | ontology-mappable only with qualifiers | Evidence linkage is contract-governed execution metadata. |
-| `SchemaSelection` / `Ambiguity` | Runtime schema disambiguation output for state shaping | `src/state_renormalization/contracts.py`, `src/state_renormalization/adapters/schema_selector.py` | mapped, not equivalent | Ambiguity handling is runtime selection behavior, not ontology identity resolution authority. |
+| `SchemaSelection` / `Ambiguity` | Runtime schema disambiguation output for state shaping | `src/state_renormalization/contracts.py`, `src/state_renormalization/adapters/schema_selector.py`, `src/state_renormalization/engine.py` (`_resolve_schema_selection`, `SchemaSelectorPort`) | mapped, not equivalent | Ambiguity handling is runtime selection behavior, not ontology identity resolution authority. |
 
 ### Field-level stabilization status
 

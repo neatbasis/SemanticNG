@@ -29,3 +29,24 @@ def test_apply_schema_bubbling_calls_selector_with_error_kwarg(
         make_episode(turn_index=1, assistant_prompt_asked="prompt", ask=make_ask_result()),
         BeliefState(),
     )
+
+
+def test_apply_schema_bubbling_supports_injected_selector_port(
+    make_episode: Callable[..., Episode],
+    make_ask_result: Callable[..., AskResult],
+) -> None:
+    calls: list[tuple[str | None, CaptureOutcome | None]] = []
+
+    def injected_selector(
+        user_text: str | None, *, error: CaptureOutcome | None
+    ) -> SchemaSelection:
+        calls.append((user_text, error))
+        return SchemaSelection()
+
+    apply_schema_bubbling(
+        make_episode(turn_index=1, assistant_prompt_asked="prompt", ask=make_ask_result()),
+        BeliefState(),
+        schema_selector=injected_selector,
+    )
+
+    assert len(calls) == 1

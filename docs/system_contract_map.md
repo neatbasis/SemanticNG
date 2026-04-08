@@ -57,7 +57,7 @@ Status categories: `stabilize now`, `local only`, `mapped, not equivalent`, `def
 - `updated_at_iso`: `stabilize now` (canonical runtime timestamp qualifier).
 - `ambiguity_state`, `active_schemas`, `schema_confidence`, `ambiguities_active`: `mapped, not equivalent` (ontology-influenced but runtime interpretation-specific).
 - `belief_version`, `pending_about`, `pending_question`, `pending_attempts`, `last_utterance_type`, `last_status`, `consecutive_no_response`: `local only` (execution control/retry/session artifacts).
-- `bindings`: `defer` (typing and authority boundary not yet stable).
+- `bindings`: `defer` (typing not yet stable; runtime read/write boundary anchors are `_write_belief_bindings` for writes and `_binding_reminder_slot_values`/`_binding_mission_draft` for reads in `src/state_renormalization/engine.py`).
 
 #### `ProjectionState` field notes
 

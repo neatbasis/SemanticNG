@@ -24,7 +24,11 @@ from state_renormalization.contracts import (
     SchemaHit,
     SchemaSelection,
 )
-from state_renormalization.engine import apply_schema_bubbling
+from state_renormalization.engine import (
+    _binding_mission_draft,
+    _binding_reminder_slot_values,
+    apply_schema_bubbling,
+)
 
 
 def test_option_a_sets_pending_about_and_question_when_unresolved(
@@ -283,3 +287,24 @@ def test_option_a_routes_mission_draft_binding_write_through_helper(
 
     assert isinstance(belief.bindings.get("mission.draft"), dict)
     assert any(key == "mission.draft" for key, _ in writes)
+
+
+def test_binding_reminder_slot_values_reads_known_slots_only() -> None:
+    bindings = {
+        ClarificationSlotId.REMINDER_SCHEDULE.value: "  tomorrow at 9  ",
+        ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value: "manual",
+        ClarificationSlotId.REMINDER_TARGET_ENTITY.value: "",
+        "unrelated.key": "ignore",
+    }
+    values = _binding_reminder_slot_values(bindings)
+    assert values == {
+        ClarificationSlotId.REMINDER_SCHEDULE.value: "tomorrow at 9",
+        ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value: "manual",
+    }
+
+
+def test_binding_mission_draft_reads_structured_binding_only() -> None:
+    assert _binding_mission_draft({"mission.draft": {"intent": "reminder.create"}}) == {
+        "intent": "reminder.create"
+    }
+    assert _binding_mission_draft({"mission.draft": "not-structured"}) is None

@@ -210,6 +210,7 @@ _REMINDER_TYPED_SLOTS: tuple[str, ...] = (
     ClarificationSlotId.REMINDER_COMPLETION_CONDITION.value,
     ClarificationSlotId.REMINDER_TARGET_ENTITY.value,
 )
+_MISSION_DRAFT_BINDING_KEY = "mission.draft"
 
 
 def _compose_pending_obligation_request(
@@ -265,15 +266,28 @@ def _write_belief_bindings(
         belief.bindings[key] = value
 
 
+def _binding_reminder_slot_values(bindings: Mapping[str, Any]) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for slot in _REMINDER_TYPED_SLOTS:
+        raw = bindings.get(slot)
+        if isinstance(raw, str) and raw.strip():
+            values[slot] = raw.strip()
+    return values
+
+
+def _binding_mission_draft(bindings: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    value = bindings.get(_MISSION_DRAFT_BINDING_KEY)
+    if isinstance(value, Mapping):
+        return value
+    return None
+
+
 def _build_canonical_mission_draft(
     *,
     ask_slots: Mapping[str, Any] | None,
     bindings: Mapping[str, Any],
 ) -> dict[str, Any]:
-    merged: dict[str, Any] = {}
-    for slot in _REMINDER_TYPED_SLOTS:
-        if isinstance(bindings.get(slot), str) and str(bindings[slot]).strip():
-            merged[slot] = str(bindings[slot]).strip()
+    merged: dict[str, Any] = dict(_binding_reminder_slot_values(bindings))
     if isinstance(ask_slots, Mapping):
         for slot in _REMINDER_TYPED_SLOTS:
             value = ask_slots.get(slot)
@@ -313,8 +327,8 @@ def _maybe_create_mission_from_intent(
     if "intent.mission_create" not in belief.active_schemas:
         return projection_state
 
-    draft = belief.bindings.get("mission.draft")
-    if not isinstance(draft, Mapping):
+    draft = _binding_mission_draft(belief.bindings)
+    if draft is None:
         return projection_state
 
     entity_ref = draft.get("entity_ref")
@@ -3201,7 +3215,7 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
     if any(schema_name == "intent.mission_create" for schema_name in belief.active_schemas):
         _write_belief_bindings(
             belief,
-            key="mission.draft",
+            key=_MISSION_DRAFT_BINDING_KEY,
             value=_build_canonical_mission_draft(
                 ask_slots=ep.ask.slots,
                 bindings=belief.bindings,
@@ -3239,7 +3253,7 @@ def apply_schema_bubbling(ep: Episode, belief: BeliefState) -> tuple[Episode, Be
                 if isinstance(belief.pending_about, Mapping)
                 else None
             ),
-            "mission_draft": _to_dict(belief.bindings.get("mission.draft")),
+            "mission_draft": _to_dict(_binding_mission_draft(belief.bindings)),
         },
     )
 

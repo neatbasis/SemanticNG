@@ -138,7 +138,7 @@ make qa-push
 
 The pre-push gate must include all of the following checks:
 
-- `ruff check --fix src tests`
+- `ruff check src tests`
 - `ruff format --check src tests`
 - `mypy --config-file=pyproject.toml src/state_renormalization src/core`
 - `make program-sync`
@@ -174,9 +174,9 @@ Interpret stop reasons from the emitted JSON line when a blocking stage fails:
 - `reason_code="timeout"`: the command exceeded its timeout budget; rerun locally (same command) and reduce runtime or split work before retrying.
 - If `stop_on_fail=true`, execution halts immediately after that failure (`Stopping execution after blocking failure ...`).
 
-`qa-commit` also supports staged-path filtering to avoid expensive checks when staged changes are outside Tier-1 runtime paths:
+`qa-commit` and `qa-push` support staged-path filtering to avoid expensive checks when changed paths are outside relevant runtime/test surfaces:
 
-- The hook reads `git diff --cached --name-only --diff-filter=ACMR` and applies `run_if_paths` filters from `docs/process/quality_stage_commands.json`.
+- Stage checks apply `run_if_paths` filters from `docs/process/quality_stage_commands.json` using changed paths from the current staged set (`qa-commit`) or commit range ahead of upstream (`qa-push` when index is clean).
 - Docs-only staged changes skip Tier-1 lint/type/test commands.
 - Changes in `src/core`, `src/state_renormalization`, or `src/semanticng` (plus the deterministic smoke test files) run the same command set as before.
 - If no files are staged, or when `CI=1`/`true` (or `python scripts/ci/run_stage_checks.py <stage> --full-stage`), the full stage command list runs deterministically.

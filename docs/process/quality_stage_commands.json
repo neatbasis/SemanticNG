@@ -116,48 +116,174 @@
           "stop_on_fail": true,
           "commands": [
             {
-              "command": "ruff check --fix src tests",
-              "timeout_seconds": 45
+              "command": "ruff check src tests",
+              "timeout_seconds": 45,
+              "run_if_paths": [
+                "src/*.py",
+                "src/**/*.py",
+                "src/*.pyi",
+                "src/**/*.pyi",
+                "tests/*.py",
+                "tests/**/*.py",
+                "tests/*.pyi",
+                "tests/**/*.pyi"
+              ]
             },
             {
               "command": "ruff format --check src tests",
-              "timeout_seconds": 35
+              "timeout_seconds": 35,
+              "run_if_paths": [
+                "src/*.py",
+                "src/**/*.py",
+                "src/*.pyi",
+                "src/**/*.pyi",
+                "tests/*.py",
+                "tests/**/*.py",
+                "tests/*.pyi",
+                "tests/**/*.pyi"
+              ]
             },
             {
               "command": "mypy --config-file=pyproject.toml src/state_renormalization src/core",
-              "timeout_seconds": 60
+              "timeout_seconds": 60,
+              "run_if_paths": [
+                "src/core/*.py",
+                "src/core/**/*.py",
+                "src/core/*.pyi",
+                "src/core/**/*.pyi",
+                "src/state_renormalization/*.py",
+                "src/state_renormalization/**/*.py",
+                "src/state_renormalization/*.pyi",
+                "src/state_renormalization/**/*.pyi"
+              ]
             },
             {
               "command": "make program-sync",
-              "timeout_seconds": 20
+              "timeout_seconds": 20,
+              "run_if_paths": [
+                "ROADMAP.md",
+                "docs/dod_manifest.json",
+                "docs/status/*.json",
+                "docs/status/**/*.json",
+                "docs/sprint_plan_5x.md",
+                "docs/system_contract_map.md",
+                "src/core/*.py",
+                "src/core/**/*.py",
+                "src/core/*.pyi",
+                "src/core/**/*.pyi",
+                "src/state_renormalization/*.py",
+                "src/state_renormalization/**/*.py",
+                "src/state_renormalization/*.pyi",
+                "src/state_renormalization/**/*.pyi",
+                "src/semanticng/*.py",
+                "src/semanticng/**/*.py",
+                "src/semanticng/*.pyi",
+                "src/semanticng/**/*.pyi"
+              ]
             },
             {
               "command": "pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py",
-              "timeout_seconds": 80
+              "timeout_seconds": 80,
+              "run_if_paths": [
+                "src/core/*.py",
+                "src/core/**/*.py",
+                "src/core/*.pyi",
+                "src/core/**/*.pyi",
+                "src/state_renormalization/*.py",
+                "src/state_renormalization/**/*.py",
+                "src/state_renormalization/*.pyi",
+                "src/state_renormalization/**/*.pyi",
+                "tests/test_engine_pending_obligation.py",
+                "tests/test_invariants.py",
+                "tests/test_contracts_decision_effect_shape.py"
+              ]
             }
           ]
         }
       ],
       "commands": [
         {
-          "command": "ruff check --fix src tests",
-          "timeout_seconds": 45
+          "command": "ruff check src tests",
+          "timeout_seconds": 45,
+          "run_if_paths": [
+            "src/*.py",
+            "src/**/*.py",
+            "src/*.pyi",
+            "src/**/*.pyi",
+            "tests/*.py",
+            "tests/**/*.py",
+            "tests/*.pyi",
+            "tests/**/*.pyi"
+          ]
         },
         {
           "command": "ruff format --check src tests",
-          "timeout_seconds": 35
+          "timeout_seconds": 35,
+          "run_if_paths": [
+            "src/*.py",
+            "src/**/*.py",
+            "src/*.pyi",
+            "src/**/*.pyi",
+            "tests/*.py",
+            "tests/**/*.py",
+            "tests/*.pyi",
+            "tests/**/*.pyi"
+          ]
         },
         {
           "command": "mypy --config-file=pyproject.toml src/state_renormalization src/core",
-          "timeout_seconds": 60
+          "timeout_seconds": 60,
+          "run_if_paths": [
+            "src/core/*.py",
+            "src/core/**/*.py",
+            "src/core/*.pyi",
+            "src/core/**/*.pyi",
+            "src/state_renormalization/*.py",
+            "src/state_renormalization/**/*.py",
+            "src/state_renormalization/*.pyi",
+            "src/state_renormalization/**/*.pyi"
+          ]
         },
         {
           "command": "make program-sync",
-          "timeout_seconds": 20
+          "timeout_seconds": 20,
+          "run_if_paths": [
+            "ROADMAP.md",
+            "docs/dod_manifest.json",
+            "docs/status/*.json",
+            "docs/status/**/*.json",
+            "docs/sprint_plan_5x.md",
+            "docs/system_contract_map.md",
+            "src/core/*.py",
+            "src/core/**/*.py",
+            "src/core/*.pyi",
+            "src/core/**/*.pyi",
+            "src/state_renormalization/*.py",
+            "src/state_renormalization/**/*.py",
+            "src/state_renormalization/*.pyi",
+            "src/state_renormalization/**/*.pyi",
+            "src/semanticng/*.py",
+            "src/semanticng/**/*.py",
+            "src/semanticng/*.pyi",
+            "src/semanticng/**/*.pyi"
+          ]
         },
         {
           "command": "pytest -q tests/test_engine_pending_obligation.py tests/test_invariants.py tests/test_contracts_decision_effect_shape.py",
-          "timeout_seconds": 80
+          "timeout_seconds": 80,
+          "run_if_paths": [
+            "src/core/*.py",
+            "src/core/**/*.py",
+            "src/core/*.pyi",
+            "src/core/**/*.pyi",
+            "src/state_renormalization/*.py",
+            "src/state_renormalization/**/*.py",
+            "src/state_renormalization/*.pyi",
+            "src/state_renormalization/**/*.pyi",
+            "tests/test_engine_pending_obligation.py",
+            "tests/test_invariants.py",
+            "tests/test_contracts_decision_effect_shape.py"
+          ]
         }
       ],
       "precommit_hook": {

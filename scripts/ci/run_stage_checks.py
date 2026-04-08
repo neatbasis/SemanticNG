@@ -98,6 +98,42 @@ def _staged_files() -> tuple[str, ...]:
     return tuple(path.strip() for path in proc.stdout.splitlines() if path.strip())
 
 
+def _diff_files(revision_range: str) -> tuple[str, ...]:
+    proc = subprocess.run(
+        ["git", "diff", "--name-only", "--diff-filter=ACMR", revision_range],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        return ()
+    return tuple(path.strip() for path in proc.stdout.splitlines() if path.strip())
+
+
+def _qa_push_changed_files() -> tuple[str, ...]:
+    # 1) Prefer staged files when running qa-push manually before commit.
+    staged_files = _staged_files()
+    if staged_files:
+        return staged_files
+
+    # 2) During pre-push (clean index), scope by commits ahead of upstream.
+    upstream_proc = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if upstream_proc.returncode == 0:
+        upstream_ref = upstream_proc.stdout.strip()
+        if upstream_ref:
+            ahead_files = _diff_files(f"{upstream_ref}...HEAD")
+            if ahead_files:
+                return ahead_files
+
+    # 3) Fallback for no-upstream/local-only branches: last commit delta.
+    return _diff_files("HEAD~1..HEAD")
+
+
 def _command_relevant_for_paths(command: CommandSpec, changed_files: tuple[str, ...]) -> bool:
     if not command.run_if_paths:
         return True
@@ -105,7 +141,7 @@ def _command_relevant_for_paths(command: CommandSpec, changed_files: tuple[str, 
 
 
 def _select_commands(stage: str, stage_spec: StageSpec, *, full_stage: bool, changed_files: tuple[str, ...]) -> tuple[CommandSpec, ...]:
-    if full_stage or stage != "qa-commit" or not changed_files:
+    if full_stage or stage not in {"qa-commit", "qa-push"} or not changed_files:
         return stage_spec.commands
     return tuple(spec for spec in stage_spec.commands if _command_relevant_for_paths(spec, changed_files))
 
@@ -214,6 +250,8 @@ def main() -> int:
     changed_files: tuple[str, ...] = ()
     if args.stage == "qa-commit" and not full_stage:
         changed_files = _staged_files()
+    elif args.stage == "qa-push" and not full_stage:
+        changed_files = _qa_push_changed_files()
 
     selected_ordered_stages = _select_ordered_stages(
         args.stage,
@@ -225,11 +263,11 @@ def main() -> int:
     print(f"QA stage: {args.stage}")
     if changed_files:
         print(f"Staged files considered for command selection: {', '.join(changed_files)}")
-    elif args.stage == "qa-commit" and not full_stage:
-        print("No staged files detected; falling back to full stage command set.")
+    elif args.stage in {"qa-commit", "qa-push"} and not full_stage:
+        print("No changed files detected for stage filtering; falling back to full stage command set.")
     if full_stage:
         print("Stage mode: full")
-    elif args.stage == "qa-commit":
+    elif args.stage in {"qa-commit", "qa-push"}:
         print("Stage mode: staged-path filtered")
 
     if not selected_ordered_stages:

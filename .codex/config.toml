@@ -1,0 +1,53 @@
+model = "gpt-5.3-codex"
+model_reasoning_effort = "medium"
+approval_policy = "never"
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+network_access = true
+
+[shell_environment_policy]
+inherit = "core"
+exclude = [
+  "*TOKEN*",
+  "*SECRET*",
+  "*KEY*",
+  "AWS_*",
+  "AZURE_*",
+  "GOOGLE_*"
+]
+include_only = [
+  "PATH",
+  "HOME",
+  "USER",
+  "SHELL",
+  "TERM",
+  "LANG",
+  "LC_ALL",
+  "PYTHONPATH",
+  "VIRTUAL_ENV"
+]
+
+[mcp_servers.gitnexus]
+command = "npx"
+args = [ "-y", "gitnexus@latest", "mcp" ]
+
+[mcp_servers.gitnexus.tools.query]
+approval_mode = "approve"
+
+[mcp_servers.gitnexus.tools.impact]
+approval_mode = "approve"
+
+[mcp_servers.gitnexus.tools.detect_changes]
+approval_mode = "approve"
+
+[mcp_servers.gitnexus.tools.context]
+approval_mode = "approve"
+
+[mcp_servers.gitnexus.tools.cypher]
+approval_mode = "approve"
+
+
+[mcp_servers.context7]
+type = "http"
+url = "https://mcp.context7.com/mcp"

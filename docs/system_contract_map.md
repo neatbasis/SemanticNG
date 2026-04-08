@@ -101,6 +101,9 @@ This table instantiates a minimal active subset of cross-plane mappings. It is a
 | Intent disambiguation and schema-grounded mission extraction | `schema_selection_ambiguity_baseline` | `clarify.reminder`; `intent.mission_create` | many runtime schema strings map into one governance capability | Runtime schema strings are execution-local selectors and do not define ontology capability identity. |
 | Observer-scoped authorization gating | `observer_authorization_contract` | `authorization.scope.v1` | runtime invariant/policy string anchors governance capability checks | Invariant ID strings are runtime policy anchors, not ontology capability identifiers. |
 | Explainable halt envelope governance | `gate_halt_unification` | `explainable_halt_payload.v1` | runtime invariant string maps to halt-governance capability intent | Runtime halt invariant string does not unify with governance capability ID semantics. |
+| Prediction persistence and evidence-link substrate | `prediction_persistence_baseline` | `prediction_availability.v1`; `evidence_link_completeness.v1` | one governance capability maps to a paired runtime invariant anchor set | Runtime invariant IDs are execution policy anchors and do not by themselves define ontology capability identity. |
+| Replay/projection lineage analytics | `replay_projection_analytics` | `prediction_availability.v1`; `evidence_link_completeness.v1`; `explainable_halt_payload.v1` | one governance capability maps to a multi-anchor runtime replay invariant set | Replay invariant anchors constrain runtime projection correctness, not ontology-equivalent capability identity. |
+| Invariant matrix branch coverage governance | `invariant_matrix_coverage` | `prediction_availability.v1`; `evidence_link_completeness.v1`; `explainable_halt_payload.v1`; `authorization.scope.v1` | governance coverage capability maps to runtime invariant ID coverage set | Coverage-governance capability ID is not interchangeable with any single runtime invariant string. |
 
 ## Step-Layer Authority Boundary
 
@@ -139,4 +142,4 @@ Reference convention:
 - 2026-02-28 (Now): capability_id=prediction_persistence_baseline; Prediction append contract operational -> proven; deterministic persistence and gate-consumption behavior is repeatedly validated in baseline and invariant/gate regressions. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
 - 2026-02-28 (Now): capability_id=invariant_matrix_coverage; Projection view contract prototype -> operational; deterministic invariant-matrix coverage now validates all registered InvariantId branches with explicit non-applicable markers, matching manifest `done`/ROADMAP `Now` canonical status. https://github.com/neatbasis/SemanticNG/actions/runs/18994531201
 
-_Last regenerated from manifest: 2026-04-08T16:01:51Z (UTC)._
+_Last regenerated from manifest: 2026-04-08T16:13:25Z (UTC)._
